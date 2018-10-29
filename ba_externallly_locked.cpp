@@ -69,12 +69,12 @@ void AccountManager::Checking2Savings(int amount)
 void AccountManager::AMoreComplicatedChecking2Savings(int amount)
 {
     unique_lock<AccountManager> guard1(*this);
-    boost::mutex mtx_; // explicit mutex declaration
+    // XXX boost::mutex mtx_; // explicit mutex declaration
 
     if (some_condition()) {
         guard1.lock();
-        // TODO boost::lock_guard<boost::mutex> sopedGuard(mtx_);
-        // FIXME if(checkingAcct_.get(guard).GetBalcance() >= amount)
+        // TODO: XXX boost::lock_guard<boost::mutex> sopedGuard(mtx_);
+        // FIXME: if(checkingAcct_.get(guard).GetBalcance() >= amount)
         {
             nested_strict_lock<unique_lock<AccountManager> > guard(guard1);
             checkingAcct_.get(guard).Withdraw(amount);

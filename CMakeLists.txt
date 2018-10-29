@@ -9,43 +9,24 @@ if(CCACHE_EXECUTABLE AND NOT CMAKE_TOOLCHAIN_FILE)
     set(CMAKE_CXX_COMPILER_ARG1 ${GXX_EXECUTABLE} CACHE PATH "the real clang++" FORCE)
 endif()
 
-# The name of our project is "AgentPro". CMakeLists files in this project can
-# refer to the root source directory of the project as ${AgentPro_SOURCE_DIR}
-# and to the root binary directory of the project as ${AgentPro_BINARY_DIR}.
+# The name of our project is "ThreadPoolTests". CMakeLists files in this project can
+# refer to the root source directory of the project as ${PROJECT_SOURCE_DIR}
+# and to the root binary directory of the project as ${PROJECT_BINARY_DIR}.
 #====================
-project(AgentppTest CXX)
+project(ThreadPoolTests CXX)
 #====================
-
-# The version number.
-set(AgentPro_VERSION_MAJOR 4)
-set(AgentPro_VERSION_MINOR 1)
 
 # ----------------------------------------------------------------------
 # default cmake setup the build configuration for this project
 # ----------------------------------------------------------------------
-if ( NOT CMAKE_BUILD_TYPE )
+if( NOT CMAKE_BUILD_TYPE )
   set(CMAKE_BUILD_TYPE Debug CACHE STRING
       "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
       FORCE )
   add_definitions(-D_DEBUG)
-endif ( NOT CMAKE_BUILD_TYPE )
+endif()
 
-mark_as_advanced(CLEAR CMAKE_MACOSX_RPATH)
-mark_as_advanced(CLEAR CMAKE_SKIP_RPATH)
-mark_as_advanced(CLEAR CMAKE_SKIP_INSTALL_RPATH)
-
-option(CMAKE_MACOSX_RPATH "Whether to use rpaths on Mac OS X." ON)
-option(CMAKE_SKIP_RPATH "If true, do not add run time path information." OFF)
-option(CMAKE_SKIP_INSTALL_RPATH "If true, do not include RPATHs in the install tree." OFF)
-
-option(WARN_PEDANTIC "Compile with security and Weffc++ warnings" ON)
-
-# ----------------------------------------------------------------------
-# fix options, should not changed! ck see XXX
-# ----------------------------------------------------------------------
-set(WITH_THREADS ON CACHE BOOL "Use threads" FORCE)
-# ----------------------------------------------------------------------
-
+option(WARN_PEDANTIC "Compile with security and all extra warnings" ON)
 option(DISABLE_LOGGING "if you do not want any logging output " OFF)
 
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
@@ -59,7 +40,7 @@ option(USE_CTEST "build with unittests added by CK" ON)
 # from http://www.cmake.org/Wiki/CMake_Useful_Variables#System_.26_Compiler_Information
 # UNIX : is TRUE on all UNIX-like OS's, including Apple OS X and CygWin
 # WIN32: is TRUE on Windows, including CygWin
-if ( NOT UNIX )
+if( NOT UNIX )
   # This variable is a special case of the more-general
   # CMAKE_<CONFIG>_POSTFIX variable for the DEBUG configuration.
   # See variable CMAKE_<CONFIG>_POSTFIX.
@@ -70,7 +51,7 @@ if ( NOT UNIX )
   set(CMAKE_INSTALL_PREFIX "C:/usr" CACHE STRING "Install path prefix" FORCE)
   message( "NOTE: CMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}")
 
-  if ( NOT BUILD_SHARED_LIBS AND LINK_STATIC_RUNTIME)
+  if( NOT BUILD_SHARED_LIBS AND LINK_STATIC_RUNTIME)
     message( "MSV: Force cmake to link MSVCR.dll statically!" )
     foreach(flag_var
       CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
@@ -82,9 +63,9 @@ if ( NOT UNIX )
         string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
         message( "${flag_var}:'${${flag_var}}'" )
         set(${flag_var} "${${flag_var}}" CACHE STRING "compiler flags used" FORCE)
-      endif(${flag_var} MATCHES "/MD")
+      endif()
     endforeach(flag_var)
-  endif ( NOT BUILD_SHARED_LIBS AND LINK_STATIC_RUNTIME)
+  endif()
 
   # Disable incremental linking for debug only!
   #
@@ -101,10 +82,7 @@ if ( NOT UNIX )
     message( "${flag_var}:'${${flag_var}}'" )
   endforeach ()
 
-  set(WITH_PTHREAD OFF CACHE BOOL "Do not use pthread libs" FORCE)
-else ( NOT UNIX )
-  set(WITH_PTHREAD ON CACHE BOOL "Use pthread libs" FORCE)
-endif ( NOT UNIX )
+endif()
 # ----------------------------------------------------------------------
 
 
@@ -116,30 +94,36 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
 # Make sure the linker can find the library once it is built.
 link_directories(${LIBRARY_OUTPUT_PATH})
 
-find_library(PTHREAD_LIBRARY pthread)
-if (PTHREAD_LIBRARY)
-  set(EXTRA_LIBS ${EXTRA_LIBS} ${PTHREAD_LIBRARY})
-  add_definitions(-DHAVE_PTHREAD)
-  # add_definitions(-DAGENTPP_OPAQUE_PTHREAD_T=long)
-endif (PTHREAD_LIBRARY)
 
-if (MSVC)
+# ----------------------------------------------------------------------
+set(ASIO_ROOT /usr/local CACHE PATH "path to install dir" FORCE)
+find_package(asio 1.11 CONFIG HINTS ${ASIO_ROOT})
+if(asio_FOUND)
+  # TODO: how to use the imported asio_INCLUDE_DIR? CK
+  # NO! include_directories(BEFORE SYSTEM ${ASIO_ROOT}/include)
+  set(asio_INCLUDE_DIR ${ASIO_ROOT}/include)
+endif()
+# ----------------------------------------------------------------------
+
+
+set(EXTRA_LIBS)
+if(MSVC)
   ###NO! add_definitions(-DWIN32)
-  if (NOT WARN_PEDANTIC)
+  if(NOT WARN_PEDANTIC)
     message("MSVC: no secure warnings!")
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-  endif (NOT WARN_PEDANTIC)
-  if (MSVC_VERSION GREATER 1399)
+  endif()
+  if(MSVC_VERSION GREATER 1399)
     # If using Visual C++ 2005 (MSVC80) and greater (MSVC_VERSION=1400)
     # Disable Visual C++ Security Enhancements in the CRT
     # See http://msdn.microsoft.com/en-us/library/8ef0s5kh%28VS.100%29.aspx
     # This is non standard and Microsoft specific
     add_definitions(-D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -D_CRT_OBSOLETE_NO_WARNINGS)
     message("MSVC: no obsolete warnings!")
-  endif (MSVC_VERSION GREATER 1399)
+  endif()
   set(EXTRA_LIBS ${EXTRA_LIBS} ws2_32 CACHE PATH "extra libraries used")
   mark_as_advanced(FORCE EXTRA_LIBS)
-else (MSVC)
+else()
   ### if(CMAKE_COMPILER_IS_GNUCXX)
     # each error message will appear on a single line.
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmessage-length=0")
@@ -147,65 +131,58 @@ else (MSVC)
     ###FIXME Run the Clang Static Analyzer only.
     ###FIXME add_definitions(--analyze)
 
-    add_definitions(-Wall -std=c++14)
+    add_definitions(-Wall)
     add_definitions(-Wextra)
-    if (WARN_PEDANTIC)
-      ## add_definitions(-Weffc++ -Wno-unused-parameter -Wno-tautological-compare )
+    if(WARN_PEDANTIC)
+      add_definitions(-Wpedantic -Wno-unused-parameter -Wno-tautological-compare )
       add_definitions(-Wunused-private-field -Wunknown-pragmas -Woverloaded-virtual -Wtautological-compare -Wmismatched-tags )
-    else (WARN_PEDANTIC)
+    else()
       add_definitions(-Wno-unused-parameter -Wno-unused-private-field -Wno-unknown-pragmas -Wno-tautological-compare)
-    endif (WARN_PEDANTIC)
-  ### endif(CMAKE_COMPILER_IS_GNUCXX)
-endif (MSVC)
+    endif()
+  ### endif()
+endif()
 
-if (MSYS OR MINGW)
+if(MSYS OR MINGW)
   set(EXTRA_LIBS ${EXTRA_LIBS} ws2_32 CACHE PATH "extra libraries used")
   mark_as_advanced(FORCE EXTRA_LIBS)
   message("XXX crosscompile for windows")
-  add_definitions(-DWIN32)
-endif (MSYS OR MINGW)
-
-if (CYGWIN)
-  add_definitions(-DNO_NANOSLEEP)
-endif (CYGWIN)
+endif()
 
 
-if (DISABLE_LOGGING)
+if(DISABLE_LOGGING)
   set(WITH_LOGGING OFF CACHE BOOL "NO logging" FORCE)
-  set(WITH_LOG_PROFILES OFF CACHE BOOL "NO profiles" FORCE)
   add_definitions(-D_NO_LOGGING)
-else (DISABLE_LOGGING)
+else()
   set(WITH_LOGGING ON CACHE BOOL "Use logging" FORCE)
-  set(WITH_LOG_PROFILES ON CACHE BOOL "Use log profiles" FORCE)
   add_definitions(-DDEFAULT_LOG_PROFILE)
-endif (DISABLE_LOGGING)
+endif()
 
 
 if(USE_BOOST)
-  option(Boost_DEBUG  "find boost at verbose mod"     ON)
+  option(Boost_DEBUG  "find boost at verbose mod"     OFF)
   set(Boost_USE_MULTITHREADED     ON)
   set(Boost_NO_BOOST_CMAKE        ON)
-  ## set(BOOST_ROOT /Users/clausklein/Workspace/cpp/boost_1_65_1/stage)
   set(BOOST_ROOT /opt/local CACHE PATH "path to boost install dir" FORCE)
 
   find_package(Boost 1.65 COMPONENTS unit_test_framework chrono atomic thread log system)
   if(Boost_FOUND)
     include_directories(BEFORE SYSTEM ${Boost_INCLUDE_DIR})
   else()
-    #NOTE! only header needed
+    #NOTE! only header usable
     include_directories(BEFORE SYSTEM ${BOOST_ROOT}/include)
   endif()
 endif()
 
 
-if (USE_BOOST OR USE_CTEST)
+if(USE_BOOST OR USE_CTEST)
 
   # enable ctest
   enable_testing()
 
   if(Boost_FOUND)
-    # additional examples from boost
+    # additional single file examples from boost/thread and boost/asio
     set(noinst_PROGRAMS
+        bank_account
         ba_externallly_locked
         default_executor
         executor
@@ -222,20 +199,30 @@ if (USE_BOOST OR USE_CTEST)
     foreach(program ${noinst_PROGRAMS})
         add_executable(${program} ${program}.cpp)
         set_target_properties(${program} PROPERTIES CXX_STANDARD 14)
-        target_link_libraries(${program} ${Boost_LIBRARIES})
+        target_compile_definitions(${program} PRIVATE -DBOOST_THREAD_VERSION=4
+            ### -DBOOST_THREAD_PROVIDES_EXECUTORS
+        )
+        target_link_libraries(${program} ${Boost_LIBRARIES} ${EXTRA_LIBS})
+        add_test(NAME ${program} COMMAND ${program})
     endforeach()
 
-    add_test(NAME test_shared_mutex COMMAND shared_mutex)
-    add_test(NAME test_executor COMMAND executor)
+  endif()
+
+  if(asio_FOUND)
+    add_executable(test_priority_scheduler priority_scheduler.cpp)
+    target_include_directories(test_priority_scheduler SYSTEM BEFORE PRIVATE ${asio_INCLUDE_DIR})
+    #XXX target_compile_definitions(test_priority_scheduler PRIVATE -std=c++03)
+    set_target_properties(test_priority_scheduler PROPERTIES CXX_STANDARD 98)
+    target_link_libraries(test_priority_scheduler ${Boost_LIBRARIES} ${EXTRA_LIBS})
+    add_test(NAME test_priority_scheduler COMMAND test_priority_scheduler)
   endif()
 
   add_executable(test_threads threads_test.cpp
     threadpool.cpp threadpool.hpp
   )
   set_target_properties(test_threads PROPERTIES CXX_STANDARD 14)
-  #NO! target_compile_definitions(test_threads PRIVATE -DUSE_AGENTPP)
   target_link_libraries(test_threads ${EXTRA_LIBS})
   add_test(NAME test_threads COMMAND test_threads)
 
-endif ()
+endif()
 

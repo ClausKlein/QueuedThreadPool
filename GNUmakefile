@@ -1,6 +1,6 @@
 BOOST_ROOT:=/opt/local
 
-USE_AGENTPP:=1
+### USE_AGENTPP:=1
 
 ## CPPFLAGS+=-D_NO_LOGGING
 CPPFLAGS+=-D_POSIX_C_SOURCE=200809L -DBOOST_TEST_NO_LIB -DPOSIX_THREADS
@@ -13,9 +13,17 @@ CXXFLAGS+=-g
 CXXFLAGS+=-Wextra -Wno-unused-parameter
 #XXX CXXFLAGS+=--std=c++03
 CXXFLAGS+=--std=c++14
-.PHONY: all test clean cppcheck
-all: threads_test trylock_test thread_tss_test
 
+.PHONY: all ctest test clean distclean cppcheck
+all: build ### threads_test trylock_test thread_tss_test
+	cd build && cmake --build .
+
+build: CMakeLists.txt
+	mkdir -p build
+	cd build && cmake -G Xcode ..
+
+ctest: build
+	cd build && ctest -C debug
 
 threads_test.o: threads_test.cpp
 threads_test.o: threadpool.hpp
@@ -43,19 +51,22 @@ thread_tss_test: thread_tss_test.cpp
 
 
 clean:
-	rm -rf threads_test thread_tss_test trylock_test *.o *.exe *.dSYM *.bak *.orig *~ *.stackdump
+	$(RM) threads_test thread_tss_test trylock_test *.o *.exe
 
-test: all
+distclean: clean
+	$(RM) -r build *.bak *.orig *~ *.stackdump *.dSYM
+
+test: ctest threads_test
 	./threads_test -l message --random
 	./threads_test --run_test=ThreadPool_test -25
 	./threads_test --run_test=QueuedThreadPoolLoad_test -25
 	#TODO ./threads_test --run_test=QueuedThreadPoolLoad_test -1000
-	./trylock_test +1
-	./trylock_test -1
+	# ./trylock_test +1
+	# ./trylock_test -1
 
 #NOTE: bash for loop:
 #	i=0 && while test $$i -lt 1000 && ./threads_test -t QueuedThreadPoolLoad_test ; do \
 #	  echo $$i; i=$$(($$i+1)); done
 
 cppcheck:
-	cppcheck --enable=all --inconclusive --std=posix --force -j 2 thread*.cpp
+	cppcheck --enable=all --inconclusive --std=posix --force $(CPPFLAGS) -std=c++14 -j 2 thread*.cpp

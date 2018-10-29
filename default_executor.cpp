@@ -57,5 +57,5 @@ int main()
 
     std::cout << BOOST_CONTEXTOF << std::endl;
 
-    return 1;
+    return 0;
 }
