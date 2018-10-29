@@ -20,7 +20,7 @@ all: build ### threads_test trylock_test thread_tss_test
 
 build: CMakeLists.txt
 	mkdir -p build
-	cd build && cmake -G Xcode ..
+	cd build && cmake -G Ninja ..
 
 ctest: build
 	cd build && ctest -C debug

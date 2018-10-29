@@ -728,6 +728,6 @@ protected:
     void run();
     volatile bool go;
 };
-};
+} // namespace Agentpp
 
 #endif

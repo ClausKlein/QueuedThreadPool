@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.9.1)
 
 ## use ccache if found
-find_program(CCACHE_EXECUTABLE "ccache" HINTS /opt/local/bin)
+find_program(CCACHE_EXECUTABLE "ccache" HINTS /usr/local/bin /opt/local/bin)
 if(CCACHE_EXECUTABLE AND NOT CMAKE_TOOLCHAIN_FILE)
     message(STATUS "use ccache")
-    find_program(GXX_EXECUTABLE "clang++" HINTS /opt/local/bin)
+    find_program(GXX_EXECUTABLE "g++" HINTS /usr/local/bin /opt/local/bin)
     set(CMAKE_CXX_COMPILER "${CCACHE_EXECUTABLE}" CACHE PATH "ccache" FORCE)
-    set(CMAKE_CXX_COMPILER_ARG1 ${GXX_EXECUTABLE} CACHE PATH "the real clang++" FORCE)
+    set(CMAKE_CXX_COMPILER_ARG1 ${GXX_EXECUTABLE} CACHE PATH "the real g++" FORCE)
 endif()
 
 # The name of our project is "ThreadPoolTests". CMakeLists files in this project can
@@ -24,6 +24,25 @@ if( NOT CMAKE_BUILD_TYPE )
       "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
       FORCE )
   add_definitions(-D_DEBUG)
+endif()
+
+#
+# user options
+#
+option(CMAKE_C_DEPFILE_EXTENSION_REPLACE "name depend files as main.d instead of main.c.d" ON)
+option(CMAKE_C_OUTPUT_EXTENSION_REPLACE "name object files as main.o instead of main.c.o" ON)
+option(CMAKE_CXX_DEPFILE_EXTENSION_REPLACE "name depend files as main.d instead of main.cpp.d" ON)
+option(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE "name object files as main.o instead of main.cpp.o" ON)
+
+option(CMAKE_DEPENDS_IN_PROJECT_ONLY "do not use system header files" ON)
+if(CMAKE_DEPENDS_IN_PROJECT_ONLY)
+  set(CMAKE_DEPFILE_FLAGS_C "-MD" CACHE STRING "dependency flag" FORCE)
+  set(CMAKE_DEPFILE_FLAGS_CXX "-MD" CACHE STRING "dependency flag" FORCE)
+endif()
+
+option(USE_CXX_CPPCHECK "run clang-tidy along with the compiler and report any problems" ON)
+if(USE_CXX_CPPCHECK)
+  find_program(CMAKE_CXX_CPPCHECK cppcheck HINTS /usr/local/bin /opt/local/bin "/c/Program Files/Cppcheck" REQUIRED)
 endif()
 
 option(WARN_PEDANTIC "Compile with security and all extra warnings" ON)
@@ -48,7 +67,7 @@ if( NOT UNIX )
   set( CMAKE_DEBUG_POSTFIX "D" CACHE STRING "Postfix added to the debug version of libraries and executables" )
   # Install path prefix, prepended onto install directories.
   # NOTE: can't be an OPTION; options are true/flase values only! ck
-  set(CMAKE_INSTALL_PREFIX "C:/usr" CACHE STRING "Install path prefix" FORCE)
+  set(CMAKE_INSTALL_PREFIX "C:/usr" CACHE STRING "Install path prefix")
   message( "NOTE: CMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}")
 
   if( NOT BUILD_SHARED_LIBS AND LINK_STATIC_RUNTIME)
@@ -78,7 +97,7 @@ if( NOT UNIX )
     string (REGEX REPLACE "INCREMENTAL:YES" "INCREMENTAL:NO" flag_tmp "${${flag_var}}")
     ### string (REGEX REPLACE "/EDITANDCONTINUE" "" flag_tmp ${flag_tmp})
     set (${flag_var} ${flag_tmp} CACHE STRING "Overriding default debug linker flags." FORCE)
-    mark_as_advanced (${flag_var})
+    mark_as_advanced(FORCE ${flag_var})
     message( "${flag_var}:'${${flag_var}}'" )
   endforeach ()
 
@@ -96,7 +115,7 @@ link_directories(${LIBRARY_OUTPUT_PATH})
 
 
 # ----------------------------------------------------------------------
-set(ASIO_ROOT /usr/local CACHE PATH "path to install dir" FORCE)
+set(ASIO_ROOT /usr/local CACHE PATH "path to install dir")
 find_package(asio 1.11 CONFIG HINTS ${ASIO_ROOT})
 if(asio_FOUND)
   # TODO: how to use the imported asio_INCLUDE_DIR? CK
@@ -135,9 +154,9 @@ else()
     add_definitions(-Wextra)
     if(WARN_PEDANTIC)
       add_definitions(-Wpedantic -Wno-unused-parameter -Wno-tautological-compare )
-      add_definitions(-Wunused-private-field -Wunknown-pragmas -Woverloaded-virtual -Wtautological-compare -Wmismatched-tags )
+      add_definitions(-Wunknown-pragmas -Woverloaded-virtual -Wtautological-compare )
     else()
-      add_definitions(-Wno-unused-parameter -Wno-unused-private-field -Wno-unknown-pragmas -Wno-tautological-compare)
+      add_definitions(-Wno-unused-parameter -Wno-unknown-pragmas -Wno-tautological-compare)
     endif()
   ### endif()
 endif()
@@ -159,18 +178,30 @@ endif()
 
 
 if(USE_BOOST)
-  option(Boost_DEBUG  "find boost at verbose mod"     OFF)
+  option(Boost_DEBUG  "find boost at verbose mod"     ON)
   set(Boost_USE_MULTITHREADED     ON)
   set(Boost_NO_BOOST_CMAKE        ON)
-  set(BOOST_ROOT /opt/local CACHE PATH "path to boost install dir" FORCE)
+  if( NOT $ENV{BOOST_ROOT} STREQUAL "")
+    set(BOOST_ROOT $ENV{BOOST_ROOT} CACHE PATH "path to boost install dir")
+  else()
+    set(BOOST_ROOT /usr/local CACHE PATH "path to boost install dir")
+  endif()
 
-  find_package(Boost 1.65 COMPONENTS unit_test_framework chrono atomic thread log system)
+  find_package(Boost 1.65 COMPONENTS unit_test_framework chrono atomic thread log system)   # Not REQUIRED!
   if(Boost_FOUND)
     include_directories(BEFORE SYSTEM ${Boost_INCLUDE_DIR})
   else()
-    #NOTE! only header usable
+    message("BOOST header only usable!")
+    add_definitions(-DBOOST_ALL_NO_LIB)
     include_directories(BEFORE SYSTEM ${BOOST_ROOT}/include)
   endif()
+endif()
+
+
+find_library(PTHREAD_LIBRARY pthread)
+if(PTHREAD_LIBRARY)
+  message(STATUS "pthread library found")
+  list(APPEND EXTRA_LIBS ${PTHREAD_LIBRARY})
 endif()
 
 
@@ -206,23 +237,25 @@ if(USE_BOOST OR USE_CTEST)
         add_test(NAME ${program} COMMAND ${program})
     endforeach()
 
+    if(asio_FOUND)
+      add_executable(test_priority_scheduler priority_scheduler.cpp)
+      target_include_directories(test_priority_scheduler SYSTEM BEFORE PRIVATE ${asio_INCLUDE_DIR})
+      #XXX target_compile_definitions(test_priority_scheduler PRIVATE -std=c++03)
+      set_target_properties(test_priority_scheduler PROPERTIES CXX_STANDARD 98)
+      target_link_libraries(test_priority_scheduler ${Boost_LIBRARIES} ${EXTRA_LIBS})
+      add_test(NAME test_priority_scheduler COMMAND test_priority_scheduler)
+    endif()
+
   endif()
 
-  if(asio_FOUND)
-    add_executable(test_priority_scheduler priority_scheduler.cpp)
-    target_include_directories(test_priority_scheduler SYSTEM BEFORE PRIVATE ${asio_INCLUDE_DIR})
-    #XXX target_compile_definitions(test_priority_scheduler PRIVATE -std=c++03)
-    set_target_properties(test_priority_scheduler PROPERTIES CXX_STANDARD 98)
-    target_link_libraries(test_priority_scheduler ${Boost_LIBRARIES} ${EXTRA_LIBS})
-    add_test(NAME test_priority_scheduler COMMAND test_priority_scheduler)
+  if(PTHREAD_LIBRARY)
+    add_executable(test_threads threads_test.cpp
+      threadpool.cpp threadpool.hpp
+    )
+    set_target_properties(test_threads PROPERTIES CXX_STANDARD 14)
+    target_link_libraries(test_threads ${EXTRA_LIBS})
+    add_test(NAME test_threads COMMAND test_threads)
   endif()
-
-  add_executable(test_threads threads_test.cpp
-    threadpool.cpp threadpool.hpp
-  )
-  set_target_properties(test_threads PROPERTIES CXX_STANDARD 14)
-  target_link_libraries(test_threads ${EXTRA_LIBS})
-  add_test(NAME test_threads COMMAND test_threads)
 
 endif()
 
