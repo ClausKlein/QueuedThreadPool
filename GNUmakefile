@@ -3,7 +3,8 @@ BOOST_ROOT:=/opt/local
 ### USE_AGENTPP:=1
 
 ## CPPFLAGS+=-D_NO_LOGGING
-CPPFLAGS+=-D_POSIX_C_SOURCE=200809L -DBOOST_TEST_NO_LIB -DPOSIX_THREADS
+# CPPFLAGS+=-D_POSIX_C_SOURCE=200809L
+CPPFLAGS+=-DBOOST_TEST_NO_LIB -DPOSIX_THREADS # -DBOOST_THREAD_VERSION=3
 CPPFLAGS+=-I$(BOOST_ROOT)/include ## -isystem agent++/include
 LDFLAGS+= -L$(BOOST_ROOT)/lib
 
@@ -14,7 +15,7 @@ CXXFLAGS+=-Wextra -Wno-unused-parameter
 #XXX CXXFLAGS+=--std=c++03
 CXXFLAGS+=--std=c++14
 
-.PHONY: all ctest test clean distclean cppcheck
+.PHONY: all ctest test clean distclean cppcheck format
 all: build ### threads_test trylock_test thread_tss_test
 	cd build && cmake --build .
 
@@ -70,3 +71,6 @@ test: ctest threads_test
 
 cppcheck:
 	cppcheck --enable=all --inconclusive --std=posix --force $(CPPFLAGS) -std=c++14 -j 2 thread*.cpp
+
+format:
+	clang-format -i -style=file *.cpp *.hpp *.c

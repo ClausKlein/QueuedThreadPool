@@ -5,8 +5,6 @@
 #include <cassert>
 #include <iostream>
 
-// XXX #define NO_MAIN
-// XXX #include "timeval_demo.cpp"
 #include "simple_stopwatch.hpp"
 
 const size_t iterations = 10000000;
@@ -22,10 +20,10 @@ boost::atomic<bool> done(false);
 
 typedef boost::chrono::system_simple_stopwatch Stopwatch;
 
+using namespace boost::chrono;
 
 void producer(void)
 {
-    // XXX timeval_demo::time_meas_helper measurement(BOOST_CURRENT_FUNCTION);
     Stopwatch timer;
 
     for (size_t i = 0; i != iterations; ++i) {
@@ -35,13 +33,14 @@ void producer(void)
         }
     }
 
-    //FIXME std::cout << BOOST_CURRENT_FUNCTION << duration_cast<microseconds>(timer.elapsed()).count() << " us" << std::endl;
+    std::cout << BOOST_CURRENT_FUNCTION
+              << duration_cast<milliseconds>(timer.elapsed()).count() << " ms"
+              << std::endl;
 }
 
 
 void consumer(void)
 {
-    // XXX timeval_demo::time_meas_helper measurement(BOOST_CURRENT_FUNCTION);
     Stopwatch timer;
 
     data_type value = 0;
@@ -56,13 +55,14 @@ void consumer(void)
         ++consumer_count;
     }
 
-    //FIXME std::cout << BOOST_CURRENT_FUNCTION << duration_cast<microseconds>(timer.elapsed()).count() << " us" << std::endl;
+    std::cout << BOOST_CURRENT_FUNCTION
+              << duration_cast<milliseconds>(timer.elapsed()).count() << " ms"
+              << std::endl;
 }
 
 
 int main(int, char**)
 {
-    using namespace boost::chrono;
 
     std::cout << "boost::lockfree::queue is ";
     if (!spsc_queue.is_lock_free()) {
@@ -70,20 +70,18 @@ int main(int, char**)
     }
     std::cout << "lockfree" << std::endl;
 
+    Stopwatch timer;
     {
-        // XXX timeval_demo::time_meas_helper
-        // measurement(BOOST_CURRENT_FUNCTION);
-        Stopwatch timer;
-
         boost::thread producer_thread(producer);
         boost::thread consumer_thread(consumer);
 
         producer_thread.join();
         done = true;
         consumer_thread.join();
-
-        std::cout << "elapsed time: " << timer.elapsed().count() << " us" << std::endl;
     }
+    std::cout << BOOST_CURRENT_FUNCTION
+              << duration_cast<milliseconds>(timer.elapsed()).count() << " ms"
+              << std::endl;
 
     std::cout << "produced " << producer_count << " objects." << std::endl;
     std::cout << "consumed " << consumer_count << " objects." << std::endl;

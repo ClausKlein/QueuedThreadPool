@@ -5,23 +5,30 @@
 //  http://www.boost.org/LICENSE_1_0.txt)
 
 #include <boost/config.hpp>
+
 #if !defined BOOST_NO_CXX11_DECLTYPE
+#warning BOOST_RESULT_OF_USE_DECLTYPE used
 #define BOOST_RESULT_OF_USE_DECLTYPE
 #endif
 
-#define BOOST_THREAD_VERSION 4
+// TODO: BOOST_THREAD_VERSION should be 4! CK
+#define BOOST_THREAD_VERSION 3
 
 #include <boost/thread/future.hpp>
+
+#include <exception>
 #include <iostream>
 
+
+// FIXME: why? CK
 namespace boost
 {
-
 template <typename T> exception_ptr make_exception_ptr(T v)
 {
     return copy_exception(v);
 }
 }
+
 
 int f1() { return 5; }
 
@@ -34,18 +41,21 @@ int& f1r()
 void p() {}
 
 #if defined BOOST_THREAD_USES_MOVE
+#warning BOOST_THREAD_USES_MOVE
 boost::future<void> void_compute()
 {
     return BOOST_THREAD_MAKE_RV_REF(boost::make_ready_future());
 }
 #endif
 
+#if BOOST_THREAD_VERSION >= 4
 boost::future<int> compute(int x)
 {
     if (x == 0)
         return boost::make_ready_future(0);
 
 #ifdef BOOST_NO_CXX11_RVALUE_REFERENCES
+#warning BOOST_NO_CXX11_RVALUE_REFERENCES
     if (x < 0)
         return boost::make_exceptional_future<int>(std::logic_error("Error"));
 #else
@@ -54,9 +64,10 @@ boost::future<int> compute(int x)
 #endif
 
     // boost::future<int> f1 = boost::async([]() { return x+1; });
-    boost::future<int> f1 = boost::async(f1);
+    boost::future<int> f1 = boost::async(boost::launch::async, f1);
     return boost::move(f1);
 }
+#endif
 
 boost::future<int&> compute_ref(int x)
 {
@@ -74,10 +85,11 @@ boost::future<int&> compute_ref(int x)
         return boost::make_exceptional(std::logic_error("Error"));
 #endif
 
-    boost::future<int&> f1 = boost::async(f1r);
+    boost::future<int&> f1 = boost::async(boost::launch::async, f1r);
     return boost::move(f1);
 }
 
+#if BOOST_THREAD_VERSION >= 4
 boost::shared_future<int> shared_compute(int x)
 {
     if (x == 0)
@@ -93,9 +105,11 @@ boost::shared_future<int> shared_compute(int x)
 #endif
 
     // boost::future<int> f1 = boost::async([]() { return x+1; });
-    boost::shared_future<int> f1 = boost::async(&f1).share();
+    boost::shared_future<int> f1 =
+        boost::async(boost::launch::async, &f1).share();
     return f1;
 }
+#endif
 
 
 int main()
@@ -103,11 +117,11 @@ int main()
     const int number_of_tests = 100;
     for (int i = 0; i < number_of_tests; i++)
         try {
-        //    {
-        //    std::cout << __FILE__ << " "<<__LINE__ << std::endl;
-        //    boost::future<int> f = boost::async(boost::launch::async, f1);
-        //    std::cout << i << " "<<f.get() << std::endl;
-        //    }
+            {
+                std::cout << __FILE__ << " " << __LINE__ << std::endl;
+                boost::future<int> f = boost::async(boost::launch::async, f1);
+                std::cout << i << " " << f.get() << std::endl;
+            }
 
 #if defined BOOST_THREAD_USES_MOVE
             {
@@ -116,6 +130,8 @@ int main()
                 f.get();
             }
 #endif
+
+#if BOOST_THREAD_VERSION >= 4
             {
                 std::cout << __FILE__ << " " << __LINE__ << std::endl;
                 boost::future<int> f = compute(-1);
@@ -126,6 +142,8 @@ int main()
                 boost::future<int> f = compute(0);
                 std::cout << f.get() << std::endl;
             }
+#endif
+
             {
                 std::cout << __FILE__ << " " << __LINE__ << std::endl;
                 boost::future<int&> f = compute_ref(0);
@@ -155,6 +173,8 @@ int main()
                     boost::make_ready_future(boost::cref(i));
                 std::cout << f.get() << std::endl;
             }
+
+#if BOOST_THREAD_VERSION >= 4
             {
                 std::cout << __FILE__ << " " << __LINE__ << std::endl;
                 boost::future<int> f = compute(2);
@@ -165,12 +185,14 @@ int main()
                 boost::shared_future<int> f = shared_compute(0);
                 std::cout << f.get() << std::endl;
             }
+#endif
+
         } catch (std::exception& ex) {
             std::cout << "ERRORRRRR " << ex.what() << "" << std::endl;
             return 1;
         } catch (...) {
             std::cout << "ERRORRRRR "
-                      << "ERRORRRRR exception thrown" << std::endl;
+                      << "non std::exception thrown" << std::endl;
             return 2;
         }
 

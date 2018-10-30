@@ -5,8 +5,12 @@ find_program(CCACHE_EXECUTABLE "ccache" HINTS /usr/local/bin /opt/local/bin)
 if(CCACHE_EXECUTABLE AND NOT CMAKE_TOOLCHAIN_FILE)
     message(STATUS "use ccache")
     find_program(GXX_EXECUTABLE "g++" HINTS /usr/local/bin /opt/local/bin)
-    set(CMAKE_CXX_COMPILER "${CCACHE_EXECUTABLE}" CACHE PATH "ccache" FORCE)
-    set(CMAKE_CXX_COMPILER_ARG1 ${GXX_EXECUTABLE} CACHE PATH "the real g++" FORCE)
+    if(GXX_EXECUTABLE)
+      message(STATUS "GXX_EXECUTABLE FOUND")
+      set(CMAKE_COMPILER_IS_GNUCXX ON)
+      set(CMAKE_CXX_COMPILER "${CCACHE_EXECUTABLE}" CACHE PATH "ccache" FORCE)
+      set(CMAKE_CXX_COMPILER_ARG1 ${GXX_EXECUTABLE} CACHE PATH "the real g++" FORCE)
+    endif()
 endif()
 
 # The name of our project is "ThreadPoolTests". CMakeLists files in this project can
@@ -26,17 +30,20 @@ if( NOT CMAKE_BUILD_TYPE )
   add_definitions(-D_DEBUG)
 endif()
 
+# ----------------------------------------------------------------------
 #
-# user options
+# general user options for ninja and cppcheck
 #
+# ----------------------------------------------------------------------
 option(CMAKE_C_DEPFILE_EXTENSION_REPLACE "name depend files as main.d instead of main.c.d" ON)
 option(CMAKE_C_OUTPUT_EXTENSION_REPLACE "name object files as main.o instead of main.c.o" ON)
 option(CMAKE_CXX_DEPFILE_EXTENSION_REPLACE "name depend files as main.d instead of main.cpp.d" ON)
 option(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE "name object files as main.o instead of main.cpp.o" ON)
 
+
 option(CMAKE_DEPENDS_IN_PROJECT_ONLY "do not use system header files" ON)
 if(CMAKE_DEPENDS_IN_PROJECT_ONLY)
-  if (CMAKE_COMPILER_IS_GNUCXX)
+  if(GXX_EXECUTABLE)
     set(CMAKE_DEPFILE_FLAGS_C "-MMD" CACHE STRING "dependency flag" FORCE)
     set(CMAKE_DEPFILE_FLAGS_CXX "-MMD" CACHE STRING "dependency flag" FORCE)
   elseif(GHSMULTI)
@@ -45,25 +52,19 @@ if(CMAKE_DEPENDS_IN_PROJECT_ONLY)
   endif()
 endif()
 
+
 option(USE_CXX_CPPCHECK "run clang-tidy along with the compiler and report any problems" ON)
 if(USE_CXX_CPPCHECK)
-  find_program(CMAKE_CXX_CPPCHECK cppcheck HINTS /usr/local/bin /opt/local/bin "/c/Program Files/Cppcheck" REQUIRED)
+  find_program(CMAKE_CXX_CPPCHECK cppcheck HINTS /usr/local/bin /opt/local/bin "C:/Program Files/Cppcheck" REQUIRED)
 endif()
 
-option(WARN_PEDANTIC "Compile with security and all extra warnings" ON)
-option(DISABLE_LOGGING "if you do not want any logging output " OFF)
-
-option(BUILD_SHARED_LIBS "Build shared libraries" ON)
-option(LINK_STATIC_RUNTIME "Link the runtime libs static" OFF)
-
-option(USE_BOOST "build with BOOST support" ON)
-option(USE_CTEST "build with unittests added by CK" ON)
 
 # ----------------------------------------------------------------------
 # Note: do not use WIN32, it is not unique! ck
 # from http://www.cmake.org/Wiki/CMake_Useful_Variables#System_.26_Compiler_Information
 # UNIX : is TRUE on all UNIX-like OS's, including Apple OS X and CygWin
 # WIN32: is TRUE on Windows, including CygWin
+option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 if( NOT UNIX )
   # This variable is a special case of the more-general
   # CMAKE_<CONFIG>_POSTFIX variable for the DEBUG configuration.
@@ -75,6 +76,7 @@ if( NOT UNIX )
   set(CMAKE_INSTALL_PREFIX "C:/usr" CACHE STRING "Install path prefix")
   message( "NOTE: CMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}")
 
+  option(LINK_STATIC_RUNTIME "Link the runtime libs static" OFF)
   if( NOT BUILD_SHARED_LIBS AND LINK_STATIC_RUNTIME)
     message( "MSV: Force cmake to link MSVCR.dll statically!" )
     foreach(flag_var
@@ -115,7 +117,7 @@ endif()
 set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
 
-# Make sure the linker can find the library once it is built.
+# Make sure the linker can find our the library once it is built.
 link_directories(${LIBRARY_OUTPUT_PATH})
 
 
@@ -131,6 +133,7 @@ endif()
 
 
 set(EXTRA_LIBS)
+option(WARN_PEDANTIC "Compile with security and all extra warnings" ON)
 if(MSVC)
   ###NO! add_definitions(-DWIN32)
   if(NOT WARN_PEDANTIC)
@@ -153,7 +156,7 @@ if(MSVC)
   ## set(CMAKE_STATIC_LIBRARY_PREFIX "lib" CACHE STRING "" FORCE)
 
 else()
-  ### if(CMAKE_COMPILER_IS_GNUCXX)
+  if(GXX_EXECUTABLE)
     # each error message will appear on a single line.
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmessage-length=0")
 
@@ -163,22 +166,24 @@ else()
     add_definitions(-Wall)
     add_definitions(-Wextra)
     if(WARN_PEDANTIC)
+      message("WARN_PEDANTIC: -Wall -Wextra -Wpedantic!")
       add_definitions(-Wpedantic -Wno-unused-parameter -Wno-tautological-compare )
       add_definitions(-Wunknown-pragmas -Woverloaded-virtual -Wtautological-compare )
     else()
       add_definitions(-Wno-unused-parameter -Wno-unknown-pragmas -Wno-tautological-compare)
     endif()
-  ### endif()
+  endif()
 endif()
 
 
 if(MSYS OR MINGW)
   set(EXTRA_LIBS ${EXTRA_LIBS} ws2_32 CACHE PATH "extra libraries used")
   mark_as_advanced(FORCE EXTRA_LIBS)
-  message("XXX crosscompile for windows")
+  message(WARNING "crosscompile for windows, is this indented?")
 endif()
 
 
+option(DISABLE_LOGGING "if you do not want any logging output " OFF)
 if(DISABLE_LOGGING)
   set(WITH_LOGGING OFF CACHE BOOL "NO logging" FORCE)
   add_definitions(-D_NO_LOGGING)
@@ -186,32 +191,37 @@ else()
   set(WITH_LOGGING ON CACHE BOOL "Use logging" FORCE)
   add_definitions(-DDEFAULT_LOG_PROFILE)
 endif()
+mark_as_advanced(FORCE WITH_LOGGING)
 
 
+option(USE_BOOST "build with BOOST support" ON)
 if(USE_BOOST)
-  option(Boost_DEBUG "find boost at verbose mode"     ON)
-  option(Boost_USE_STATIC_LIBS "use static libs only" ON)
+  option(Boost_DEBUG "find boost at verbose mode"      ON)
+  option(Boost_USE_STATIC_LIBS "use static libs only" OFF)
   set(Boost_USE_MULTITHREADED     ON)
   set(Boost_NO_BOOST_CMAKE        ON)
 
   if( NOT $ENV{BOOST_ROOT} STREQUAL "")
     set(BOOST_ROOT $ENV{BOOST_ROOT} CACHE PATH "path to boost install dir")
   else()
-    set(BOOST_ROOT /usr/local CACHE PATH "path to boost install dir")
+    set(BOOST_ROOT /opt/local CACHE PATH "path to boost install dir")
   endif()
 
-  set(BOOST_LIBRARYDIR ${BOOST_ROOT}/stage/lib CACHE PATH "path to boost stage lib dir")
-  set(BOOST_INCLUDEDIR ${BOOST_ROOT} CACHE PATH "path to boost source dir")
+  if(IS_DIRECTORY ${BOOST_ROOT}/stage/lib)
+    set(BOOST_LIBRARYDIR ${BOOST_ROOT}/stage/lib CACHE PATH "path to boost stage lib dir")
+    set(BOOST_INCLUDEDIR ${BOOST_ROOT} CACHE PATH "path to boost source dir")
+  endif()
 
   find_package(Boost 1.65 COMPONENTS chrono atomic thread system
-          unit_test_framework log HINTS /usr/local
+          unit_test_framework log ### HINTS /usr/local /opt/local
   )   # NOTE: Not REQUIRED! CK
   if(Boost_FOUND)
     include_directories(BEFORE SYSTEM ${Boost_INCLUDE_DIR})
-  else()
-    message("BOOST header only usable!")
+  elseif(IS_DIRECTORY ${BOOST_ROOT}/include)
+    message(WARNING "BOOST header only usable!")
     add_definitions(-DBOOST_ALL_NO_LIB)
-    include_directories(BEFORE SYSTEM ${BOOST_ROOT}/include)
+    set(Boost_INCLUDE_DIR ${BOOST_ROOT}/include CACHE PATH "path to boost include dir")
+    include_directories(BEFORE SYSTEM ${Boost_INCLUDE_DIR})
   endif()
 endif()
 
@@ -220,9 +230,11 @@ find_library(PTHREAD_LIBRARY pthread)
 if(PTHREAD_LIBRARY)
   message(STATUS "pthread library found")
   list(APPEND EXTRA_LIBS ${PTHREAD_LIBRARY})
+  add_definitions(-DPOSIX_THREADS)
 endif()
 
 
+option(USE_CTEST "build with unittests added by CK" ON)
 if(USE_BOOST OR USE_CTEST)
 
   # enable ctest
@@ -236,11 +248,11 @@ if(USE_BOOST OR USE_CTEST)
         default_executor
         executor
         lockfree_spsc_queue
-        #TODO make_future
+        make_future
         multi_thread_pass
         parallel_quick_sort
-        #TODO perf_condition_variable
-        #TODO perf_shared_mutex
+        perf_condition_variable
+        perf_shared_mutex
         serial_executor
         shared_monitor
         shared_mutex
@@ -253,9 +265,10 @@ if(USE_BOOST OR USE_CTEST)
     foreach(program ${noinst_PROGRAMS})
         add_executable(${program} ${program}.cpp)
         set_target_properties(${program} PROPERTIES CXX_STANDARD 14)
-        target_compile_definitions(${program} PRIVATE -DBOOST_THREAD_VERSION=4
-            ### -DBOOST_THREAD_PROVIDES_EXECUTORS
-        )
+        # target_compile_definitions(${program} PRIVATE
+        #NO! -DBOOST_THREAD_VERSION=4
+        #### -DBOOST_THREAD_PROVIDES_EXECUTORS
+        #)
         target_link_libraries(${program} ${Boost_LIBRARIES} ${EXTRA_LIBS})
         add_test(NAME ${program} COMMAND ${program})
     endforeach()
@@ -271,7 +284,7 @@ if(USE_BOOST OR USE_CTEST)
 
   endif()
 
-  if(PTHREAD_LIBRARY)
+  if(PTHREAD_LIBRARY AND Boost_INCLUDE_DIR)
     add_executable(test_threads threads_test.cpp
       threadpool.cpp threadpool.hpp
     )

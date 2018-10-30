@@ -12,10 +12,10 @@
 
 #include <boost/chrono/chrono_io.hpp>
 #include <boost/thread/lock_types.hpp>
-#include <boost/thread/thread_only.hpp>
-#include <iostream>
-
 #include <boost/thread/shared_mutex.hpp>
+#include <boost/thread/thread_only.hpp>
+
+#include <iostream>
 
 using namespace boost;
 
@@ -58,8 +58,8 @@ int main()
         t1.join();
         t2.join();
         // t11.join();
-        //    t12.join();
-        //  t13.join();
+        // t12.join();
+        // t13.join();
         boost::chrono::high_resolution_clock::time_point f1 = clock.now();
         // std::cout << "     Time spent:" << (f1 - s1) << std::endl;
         best_time =

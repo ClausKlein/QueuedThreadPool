@@ -17,7 +17,6 @@
 
 #include <condition_variable>
 #include <cstdio>
-// XXX #include <future>
 #include <limits>
 #include <mutex>
 #include <thread>
@@ -32,20 +31,20 @@ namespace
 // class Stopwatch {
 // public:
 //     typedef long long rep;
-// 
+//
 //     static rep now()
 //     {
 //         timespec ts;
-//         // FIXME: nonprotalbe! CK if (clock_gettime(CLOCK_MONOTONIC, &ts)) abort();
-//         return ts.tv_sec * rep(1000000000) + ts.tv_nsec;
+//         // FIXME: NOT portalbe! CK if (clock_gettime(CLOCK_MONOTONIC, &ts))
+//         abort(); return ts.tv_sec * rep(1000000000) + ts.tv_nsec;
 //     }
-// 
+//
 //     Stopwatch()
 //         : start_(now())
 //     {}
-// 
+//
 //     rep elapsed() const { return now() - start_; }
-// 
+//
 // private:
 //     rep start_;
 // };

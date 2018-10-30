@@ -8,7 +8,7 @@
 
 #include <boost/thread/mutex.hpp>
 
-#include <boost/thread/externally_locked.hpp> //TODO: needs tha mutex.hpp is included before? CK
+#include <boost/thread/externally_locked.hpp> //TODO: needs that boost/thread/mutex.hpp is included before? CK
 #include <boost/thread/lock_guard.hpp>
 #include <boost/thread/lock_types.hpp>
 #include <boost/thread/lockable_adapter.hpp>
