@@ -72,7 +72,10 @@ void AccountManager::AMoreComplicatedChecking2Savings(int amount)
     // XXX boost::mutex mtx_; // explicit mutex declaration
 
     if (some_condition()) {
-        guard1.lock();
+        // ERROR: boost unique_lock owns already the mutex: Resource deadlock
+        // avoided  ERROR: guard1.lock();
+    }
+    {
         // TODO: XXX boost::lock_guard<boost::mutex> sopedGuard(mtx_);
         // FIXME: if(checkingAcct_.get(guard).GetBalcance() >= amount)
         {
@@ -80,7 +83,7 @@ void AccountManager::AMoreComplicatedChecking2Savings(int amount)
             checkingAcct_.get(guard).Withdraw(amount);
             savingsAcct_.get(guard).Deposit(amount);
         }
-        guard1.unlock();
+        guard1.unlock(); // NOTE: the guard1 may not locked! CK
     }
 }
 //]

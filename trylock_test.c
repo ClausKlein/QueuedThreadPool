@@ -14,23 +14,23 @@
 
 
 #ifndef _POSIX_C_SOURCE
-    #warning "_POSIX_C_SOURCE not defined"
-    #ifdef __APPLE__
-        #define _POSIX_C_SOURCE 200809L
-        //XXX #define _DARWIN_C_SOURCE
-    #else
-        #define _POSIX_C_SOURCE 200112L
-    #endif
+#warning "_POSIX_C_SOURCE not defined"
+#ifdef __APPLE__
+#define _POSIX_C_SOURCE 200809L
+// XXX #define _DARWIN_C_SOURCE
+#else
+#define _POSIX_C_SOURCE 200112L
+#endif
 #endif
 
 
-#include <unistd.h>
-#include <pthread.h>
+#include <assert.h>
 #include <errno.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
+#include <unistd.h>
 
 #define SPIN 10000000
 
@@ -41,9 +41,9 @@
  * expands to nothing.
  */
 #ifndef NDEBUG
-    #define DPRINTF(arg) printf arg
+#define DPRINTF(arg) printf arg
 #else
-    #define DPRINTF(arg)
+#define DPRINTF(arg)
 #endif
 
 /*
@@ -62,22 +62,24 @@
  * a ";" following the ")" in the do...while construct, err_abort and
  * errno_abort can be used as if they were function calls.
  */
-#define err_abort(code,text) do { \
-        fprintf (stderr, "%s at \"%s\":%d: %s\n", \
-                 text, __FILE__, __LINE__, strerror (code)); \
-        abort (); \
+#define err_abort(code, text) \
+    do { \
+        fprintf(stderr, "%s at \"%s\":%d: %s\n", text, __FILE__, __LINE__, \
+            strerror(code)); \
+        abort(); \
     } while (0)
-#define errno_abort(text) do { \
-        fprintf (stderr, "%s at \"%s\":%d: %s\n", \
-                 text, __FILE__, __LINE__, strerror (errno)); \
-        abort (); \
+#define errno_abort(text) \
+    do { \
+        fprintf(stderr, "%s at \"%s\":%d: %s\n", text, __FILE__, __LINE__, \
+            strerror(errno)); \
+        abort(); \
     } while (0)
 
 //
-//NOTE: static initializer not used (non portable)! CK
+// NOTE: static initializer not used (non portable)! CK
 //
-//pthread_mutex_t mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
-//pthread_mutex_t mutex = PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;
+// pthread_mutex_t mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+// pthread_mutex_t mutex = PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;
 
 pthread_mutex_t mutex;
 pthread_mutexattr_t attr;
@@ -85,13 +87,13 @@ pthread_mutexattr_t attr;
 volatile long counter;
 time_t end_time;
 
-int recursive = 0;        /* Whether to use use the mutex recursive */
+int recursive = 0; /* Whether to use use the mutex recursive */
 
 /*
  * Thread start routine that repeatedly locks a mutex and
  * increments a counter.
  */
-void *counter_thread(void *arg)
+void* counter_thread(void* arg)
 {
     int status;
     int spin;
@@ -157,7 +159,7 @@ void *counter_thread(void *arg)
  * seconds, try to lock the mutex and read the counter. If the
  * trylock fails, skip this cycle.
  */
-void *monitor_thread(void *arg)
+void* monitor_thread(void* arg)
 {
     int status;
     int misses = 0;
@@ -179,7 +181,7 @@ void *monitor_thread(void *arg)
                 err_abort(status, "Unlock mutex");
             }
         } else {
-            misses++;    /* Count "misses" on the lock */
+            misses++; /* Count "misses" on the lock */
         }
     }
     printf("Monitor thread missed update %d times.\n", misses);
@@ -188,7 +190,7 @@ void *monitor_thread(void *arg)
     return NULL;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     int status;
     pthread_t counter_thread_id;
@@ -230,8 +232,8 @@ int main(int argc, char *argv[])
     pthread_mutex_init(&mutex, &attr);
     pthread_mutexattr_destroy(&attr);
 
-    end_time = time(NULL) + 60 / 10;       /* Run for 1/10 minute */
-    status = pthread_create(&counter_thread_id, NULL, counter_thread, NULL);
+    end_time = time(NULL) + 60 / 10; /* Run for 1/10 minute */
+    status   = pthread_create(&counter_thread_id, NULL, counter_thread, NULL);
     if (status != 0) {
         err_abort(status, "Create counter thread");
     }

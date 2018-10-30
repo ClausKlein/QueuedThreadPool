@@ -36,8 +36,8 @@ option(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE "name object files as main.o instead o
 
 option(CMAKE_DEPENDS_IN_PROJECT_ONLY "do not use system header files" ON)
 if(CMAKE_DEPENDS_IN_PROJECT_ONLY)
-  set(CMAKE_DEPFILE_FLAGS_C "-MD" CACHE STRING "dependency flag" FORCE)
-  set(CMAKE_DEPFILE_FLAGS_CXX "-MD" CACHE STRING "dependency flag" FORCE)
+  set(CMAKE_DEPFILE_FLAGS_C "-MMD" CACHE STRING "dependency flag" FORCE)
+  set(CMAKE_DEPFILE_FLAGS_CXX "-MMD" CACHE STRING "dependency flag" FORCE)
 endif()
 
 option(USE_CXX_CPPCHECK "run clang-tidy along with the compiler and report any problems" ON)
@@ -213,11 +213,16 @@ if(USE_BOOST OR USE_CTEST)
   if(Boost_FOUND)
     # additional single file examples from boost/thread and boost/asio
     set(noinst_PROGRAMS
-        bank_account
         ba_externallly_locked
+        bank_account
         default_executor
         executor
+        lockfree_spsc_queue
+        #TODO make_future
+        multi_thread_pass
         parallel_quick_sort
+        #TODO perf_condition_variable
+        #TODO perf_shared_mutex
         serial_executor
         shared_monitor
         shared_mutex
