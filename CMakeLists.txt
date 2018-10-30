@@ -36,8 +36,13 @@ option(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE "name object files as main.o instead o
 
 option(CMAKE_DEPENDS_IN_PROJECT_ONLY "do not use system header files" ON)
 if(CMAKE_DEPENDS_IN_PROJECT_ONLY)
-  set(CMAKE_DEPFILE_FLAGS_C "-MMD" CACHE STRING "dependency flag" FORCE)
-  set(CMAKE_DEPFILE_FLAGS_CXX "-MMD" CACHE STRING "dependency flag" FORCE)
+  if (CMAKE_COMPILER_IS_GNUCXX)
+    set(CMAKE_DEPFILE_FLAGS_C "-MMD" CACHE STRING "dependency flag" FORCE)
+    set(CMAKE_DEPFILE_FLAGS_CXX "-MMD" CACHE STRING "dependency flag" FORCE)
+  elseif(GHSMULTI)
+    set(CMAKE_DEPFILE_FLAGS_C "-MD" CACHE STRING "dependency flag" FORCE)
+    set(CMAKE_DEPFILE_FLAGS_CXX "-MD" CACHE STRING "dependency flag" FORCE)
+  endif()
 endif()
 
 option(USE_CXX_CPPCHECK "run clang-tidy along with the compiler and report any problems" ON)
@@ -141,7 +146,12 @@ if(MSVC)
     message("MSVC: no obsolete warnings!")
   endif()
   set(EXTRA_LIBS ${EXTRA_LIBS} ws2_32 CACHE PATH "extra libraries used")
-  mark_as_advanced(FORCE EXTRA_LIBS)
+  mark_as_advanced(FORCE EXTRA_LIB)
+
+  ###TODO: set(CMAKE_STATIC_LIBRARY_PREFIX lib)  # libboost_chrono-vc141-mt-x32-1_67.lib
+  ## set(CMAKE_FIND_LIBRARY_PREFIXES "lib" CACHE STRING "" FORCE)
+  ## set(CMAKE_STATIC_LIBRARY_PREFIX "lib" CACHE STRING "" FORCE)
+
 else()
   ### if(CMAKE_COMPILER_IS_GNUCXX)
     # each error message will appear on a single line.
@@ -161,6 +171,7 @@ else()
   ### endif()
 endif()
 
+
 if(MSYS OR MINGW)
   set(EXTRA_LIBS ${EXTRA_LIBS} ws2_32 CACHE PATH "extra libraries used")
   mark_as_advanced(FORCE EXTRA_LIBS)
@@ -178,16 +189,23 @@ endif()
 
 
 if(USE_BOOST)
-  option(Boost_DEBUG  "find boost at verbose mod"     ON)
+  option(Boost_DEBUG "find boost at verbose mode"     ON)
+  option(Boost_USE_STATIC_LIBS "use static libs only" ON)
   set(Boost_USE_MULTITHREADED     ON)
   set(Boost_NO_BOOST_CMAKE        ON)
+
   if( NOT $ENV{BOOST_ROOT} STREQUAL "")
     set(BOOST_ROOT $ENV{BOOST_ROOT} CACHE PATH "path to boost install dir")
   else()
     set(BOOST_ROOT /usr/local CACHE PATH "path to boost install dir")
   endif()
 
-  find_package(Boost 1.65 COMPONENTS unit_test_framework chrono atomic thread log system)   # Not REQUIRED!
+  set(BOOST_LIBRARYDIR ${BOOST_ROOT}/stage/lib CACHE PATH "path to boost stage lib dir")
+  set(BOOST_INCLUDEDIR ${BOOST_ROOT} CACHE PATH "path to boost source dir")
+
+  find_package(Boost 1.65 COMPONENTS chrono atomic thread system
+          unit_test_framework log HINTS /usr/local
+  )   # NOTE: Not REQUIRED! CK
   if(Boost_FOUND)
     include_directories(BEFORE SYSTEM ${Boost_INCLUDE_DIR})
   else()
