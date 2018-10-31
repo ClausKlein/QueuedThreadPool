@@ -10,6 +10,7 @@
 #define BOOST_THREAD_USES_LOG
 #define BOOST_THREAD_USES_LOG_THREAD_ID
 #define BOOST_THREAD_QUEUE_DEPRECATE_OLD
+
 #if !defined BOOST_NO_CXX11_DECLTYPE
 #define BOOST_RESULT_OF_USE_DECLTYPE
 #endif
@@ -61,7 +62,7 @@ int main()
                              << BOOST_THREAD_END_LOG;
             return 1;
         } catch (...) {
-            BOOST_THREAD_LOG << " ERRORRRRR exception thrown"
+            BOOST_THREAD_LOG << "ERRORRRRR exception thrown"
                              << BOOST_THREAD_END_LOG;
             return 2;
         }

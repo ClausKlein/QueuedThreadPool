@@ -5,6 +5,7 @@
 //  http://www.boost.org/LICENSE_1_0.txt)
 
 #include <boost/config.hpp>
+
 #if !defined BOOST_NO_CXX11_DECLTYPE
 #define BOOST_RESULT_OF_USE_DECLTYPE
 #endif
