@@ -1,4 +1,5 @@
-BOOST_ROOT:=/opt/local
+BOOST_ROOT:=/usr/local
+#TODO MT:=-mt
 
 #NO! CK
 ### USE_AGENTPP:=1
@@ -8,15 +9,15 @@ BOOST_ROOT:=/opt/local
 CPPFLAGS+=-DBOOST_TEST_NO_LIB -DPOSIX_THREADS #NO! -DBOOST_THREAD_VERSION=4
 CPPFLAGS+=-I$(BOOST_ROOT)/include
 LDFLAGS+= -L$(BOOST_ROOT)/lib
-LDLIBS:= -lboost_thread-mt -lboost_chrono-mt -lboost_system-mt
+LDLIBS:= -lboost_thread$(MT) -lboost_chrono$(MT) -lboost_system$(MT)
 
 
-CXXFLAGS+=-g
-### CXXFLAGS+=-O2 -DNDEBUG
+### CXXFLAGS+=-g
+CXXFLAGS+=-O2 -DNDEBUG
 CXXFLAGS+=-Wpedantic -Wextra -Wno-unused-parameter -Wno-c++11-long-long
 
 .PHONY: all cmake ctest test clean distclean cppcheck format
-all: default_executor shared_mutex lockfree_spsc_queue.o thread_tss_test # trylock_test ## cmake ### threads_test
+all: default_executor shared_mutex lockfree_spsc_queue thread_tss_test # trylock_test ## cmake ### threads_test
 
 cmake: build
 	cd build && cmake --build .
@@ -27,6 +28,11 @@ build: CMakeLists.txt
 
 ctest: cmake
 	cd build && ctest -C debug
+
+lockfree_spsc_queue: CXXFLAGS+=--std=c++03
+lockfree_spsc_queue.o: lockfree_spsc_queue.cpp simple_stopwatch.hpp
+lockfree_spsc_queue: lockfree_spsc_queue.o
+	$(LINK.cc) $^ -o $@ $(LDLIBS)
 
 default_executor: CXXFLAGS+=--std=c++03
 default_executor: default_executor.cpp
@@ -47,7 +53,7 @@ threadpool.o: threadpool.hpp
 
 ifdef USE_AGENTPP
 threads_test: CPPFLAGS+=-DUSE_AGENTPP
-threads_test: LDLIBS+= -lboost_unit_test_framework-mt
+threads_test: LDLIBS+= -lboost_unit_test_framework$(MT)
 threads_test: LDLIBS:= -lsnmp++ -lagent++ -lcrypto
 threads_test: threads_test.o
 else
@@ -63,12 +69,12 @@ thread_tss_test: thread_tss_test.cpp
 
 
 clean:
-	$(RM) default_executor threads_test thread_tss_test trylock_test *.o *.exe
+	$(RM) lockfree_spsc_queue default_executor threads_test thread_tss_test trylock_test *.o *.exe
 
 distclean: clean
 	$(RM) -r build *.bak *.orig *~ *.stackdump *.dSYM
 
-test: thread_tss_test default_executor shared_mutex threads_test
+test: lockfree_spsc_queue thread_tss_test default_executor shared_mutex threads_test
 	#./threads_test -l message --random
 	# ./threads_test --run_test=ThreadPool_test -25
 	# ./threads_test --run_test=QueuedThreadPoolLoad_test -25
@@ -78,6 +84,7 @@ test: thread_tss_test default_executor shared_mutex threads_test
 	./thread_tss_test
 	./default_executor
 	./shared_mutex
+	./lockfree_spsc_queue
 
 #NOTE: bash for loop:
 #	i=0 && while test $$i -lt 1000 && ./threads_test -t QueuedThreadPoolLoad_test ; do \

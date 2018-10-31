@@ -198,13 +198,13 @@ option(USE_BOOST "build with BOOST support" ON)
 if(USE_BOOST)
   option(Boost_DEBUG "find boost at verbose mode"      ON)
   option(Boost_USE_STATIC_LIBS "use static libs only" OFF)
-  set(Boost_USE_MULTITHREADED     ON)
+  option(Boost_USE_MULTITHREADED "use -mt libs only"   ON)
   set(Boost_NO_BOOST_CMAKE        ON)
 
   if( NOT $ENV{BOOST_ROOT} STREQUAL "")
     set(BOOST_ROOT $ENV{BOOST_ROOT} CACHE PATH "path to boost install dir")
   else()
-    set(BOOST_ROOT /opt/local CACHE PATH "path to boost install dir")
+    set(BOOST_ROOT /usr/local CACHE PATH "path to boost install dir")
   endif()
 
   if(IS_DIRECTORY ${BOOST_ROOT}/stage/lib)
@@ -212,8 +212,8 @@ if(USE_BOOST)
     set(BOOST_INCLUDEDIR ${BOOST_ROOT} CACHE PATH "path to boost source dir")
   endif()
 
-  find_package(Boost 1.65 COMPONENTS chrono atomic thread system
-          unit_test_framework log ### HINTS /usr/local /opt/local
+  find_package(Boost 1.67 COMPONENTS chrono atomic thread system
+          unit_test_framework ## log ### HINTS /usr/local /opt/local
   )   # NOTE: Not REQUIRED! CK
   if(Boost_FOUND)
     include_directories(BEFORE SYSTEM ${Boost_INCLUDE_DIR})
