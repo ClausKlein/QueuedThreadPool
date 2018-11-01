@@ -9,8 +9,7 @@
 
 #define BOOST_THREAD_DONT_PROVIDE_INTERRUPTIONS
 
-// TODO: not found! #include <boost/chrono/stopwatches/simple_stopwatch.hpp>
-#include "simple_stopwatch.hpp"
+#include <boost/chrono/stopwatches/simple_stopwatch.hpp>
 
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
@@ -35,7 +34,7 @@ namespace
 //     static rep now()
 //     {
 //         timespec ts;
-//         // FIXME: NOT portalbe! CK if (clock_gettime(CLOCK_MONOTONIC, &ts))
+//         // FIXME: NOT portable! CK if (clock_gettime(CLOCK_MONOTONIC, &ts))
 //         abort(); return ts.tv_sec * rep(1000000000) + ts.tv_nsec;
 //     }
 //
@@ -137,7 +136,7 @@ Stopwatch::rep benchmark_ping_pong(unsigned consumer_count)
 
     // Run the benchmark 10 times and report the best time.
     for (int times = 10; times--;) {
-        S shared_data{ 100000, consumer_count };
+        S shared_data{ 1000, consumer_count };
 
         // Start the consumers.
         for (unsigned i = 0; i < consumer_count; ++i)

@@ -14,7 +14,6 @@
 
 
 #ifndef _POSIX_C_SOURCE
-#warning "_POSIX_C_SOURCE not defined"
 #ifdef __APPLE__
 #define _POSIX_C_SOURCE 200809L
 // XXX #define _DARWIN_C_SOURCE

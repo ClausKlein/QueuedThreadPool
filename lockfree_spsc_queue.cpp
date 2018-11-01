@@ -1,3 +1,6 @@
+#define BOOST_CHRONO_VERSION 2
+#include "simple_stopwatch.hpp"
+
 #include <boost/atomic.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
 #include <boost/thread/thread.hpp>
@@ -5,7 +8,6 @@
 #include <cassert>
 #include <iostream>
 
-#include "simple_stopwatch.hpp"
 
 const size_t iterations = 10000000;
 
@@ -19,8 +21,8 @@ boost::lockfree::spsc_queue<data_type, boost::lockfree::capacity<1024> >
 boost::atomic<bool> done(false);
 
 typedef boost::chrono::system_simple_stopwatch Stopwatch;
-
 using namespace boost::chrono;
+
 
 void producer(void)
 {
@@ -33,8 +35,8 @@ void producer(void)
         }
     }
 
-    std::cout << BOOST_CURRENT_FUNCTION
-              << duration_cast<milliseconds>(timer.elapsed()).count() << " ms"
+    std::cout << BOOST_CURRENT_FUNCTION << ": "
+              << duration_fmt(duration_style::symbol) << timer.elapsed()
               << std::endl;
 }
 
@@ -55,8 +57,8 @@ void consumer(void)
         ++consumer_count;
     }
 
-    std::cout << BOOST_CURRENT_FUNCTION
-              << duration_cast<milliseconds>(timer.elapsed()).count() << " ms"
+    std::cout << BOOST_CURRENT_FUNCTION << ": "
+              << duration_fmt(duration_style::symbol) << timer.elapsed()
               << std::endl;
 }
 
@@ -70,18 +72,20 @@ int main(int, char**)
     }
     std::cout << "lockfree" << std::endl;
 
-    Stopwatch timer;
     {
+        Stopwatch timer;
+
         boost::thread producer_thread(producer);
         boost::thread consumer_thread(consumer);
 
         producer_thread.join();
         done = true;
         consumer_thread.join();
+
+        std::cout << BOOST_CURRENT_FUNCTION << ": "
+                  << duration_fmt(duration_style::symbol) << timer.elapsed()
+                  << std::endl;
     }
-    std::cout << BOOST_CURRENT_FUNCTION
-              << duration_cast<milliseconds>(timer.elapsed()).count() << " ms"
-              << std::endl;
 
     std::cout << "produced " << producer_count << " objects." << std::endl;
     std::cout << "consumed " << consumer_count << " objects." << std::endl;

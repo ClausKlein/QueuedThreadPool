@@ -11,8 +11,9 @@
 This code was adapted by Vicente J. Botet Escriba from Hinnant's html
 documentation. Many thanks to Howard for making his code available under the
 Boost license.
-
 */
+
+#define BOOST_CHRONO_VERSION 2
 
 #include <boost/chrono/chrono_io.hpp>
 #include <boost/chrono/config.hpp>
@@ -38,6 +39,7 @@ int main()
     cout << "ClockTick(3) + nanoseconds(10) = "
          << ClockTick(3) + nanoseconds(10) << '\n';
 
+    //========================================
     cout << "\nSet cout to use short names:\n";
 
 #if BOOST_CHRONO_VERSION == 2
@@ -55,27 +57,31 @@ int main()
          << ClockTick(3) + nanoseconds(10) << '\n';
 
     cout << "\nsystem_clock::now() = " << system_clock::now() << '\n';
+    //>>>>>>>> system_clock::now() = 2018-11-01 20:40:04.126208000 +0100
 
-#if defined _MSC_VER && _MSC_VER == 1700
-#else
 #if BOOST_CHRONO_VERSION == 2
     cout << "\nsystem_clock::now() = " << time_fmt(chrono::timezone::local)
          << system_clock::now() << '\n';
+    //>>>>> steady_clock::now() = 3622313527196 ns since boot
     cout << "\nsystem_clock::now() = "
          << time_fmt(chrono::timezone::local, "%Y/%m/%d")
          << system_clock::now() << '\n';
-#endif
+    //>>>>> system_clock::now() = 2018/11/01
 #endif
 
 #ifdef BOOST_CHRONO_HAS_CLOCK_STEADY
     cout << "steady_clock::now() = " << steady_clock::now() << '\n';
+    //>>>>>> steady_clock::now() = 3622313527196 ns since boot
 #endif
 
 #if BOOST_CHRONO_VERSION == 2
+    //========================================
     cout << "\nSet cout to use long names:\n"
          << duration_fmt(duration_style::prefix)
          << "high_resolution_clock::now() = " << high_resolution_clock::now()
          << '\n';
+    //>>>>>> high_resolution_clock::now() = 3622313562363 nanoseconds since
+    // boot
 #else
     cout << "\nSet cout to use long names:\n"
          << duration_long
@@ -85,11 +91,14 @@ int main()
 
 #if defined(BOOST_CHRONO_HAS_THREAD_CLOCK)
     cout << "\nthread_clock::now() = " << thread_clock::now() << '\n';
+    //>>>>>> thread_clock::now() = 5556000 nanoseconds since thread start-up
 #endif
 
 #if defined(BOOST_CHRONO_HAS_PROCESS_CLOCKS)
     cout << "\nprocess_real_cpu_clock::now() = "
          << process_real_cpu_clock::now() << '\n';
+    //>>>>> process_real_cpu_clock::now() = 1541101204120000000 nanoseconds
+    // since process start-up
 
 #if BOOST_PLAT_WINDOWS_DESKTOP
     cout << "\nprocess_user_cpu_clock::now() = "

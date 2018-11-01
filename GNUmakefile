@@ -23,6 +23,7 @@ PROGRAMS:= \
 chrono_io_ex1 \
 default_executor \
 lockfree_spsc_queue \
+perf_shared_mutex \
 shared_mutex \
 stopwatch_reporter_example \
 thread_tss_test \
@@ -63,6 +64,9 @@ stopwatch_reporter_example: stopwatch_reporter_example.cpp
 
 thread_tss_test: CXXFLAGS+=--std=c++03
 thread_tss_test: thread_tss_test.cpp
+
+perf_shared_mutex: CXXFLAGS+=--std=c++03
+perf_shared_mutex: perf_shared_mutex.cpp
 
 
 # test using boost unit test framework
@@ -108,6 +112,7 @@ test: $(PROGRAMS)
 	./shared_mutex
 	./stopwatch_reporter_example
 	./thread_tss_test
+	./perf_shared_mutex
 
 #NOTE: bash for loop:
 #	i=0 && while test $$i -lt 1000 && ./threads_test -t QueuedThreadPoolLoad_test ; do \

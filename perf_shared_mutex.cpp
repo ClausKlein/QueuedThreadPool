@@ -8,19 +8,23 @@
 // This performance test is based on the performance test provided by
 // maxim.yegorushkin at https://svn.boost.org/trac/boost/ticket/7422
 
+#define BOOST_CHRONO_VERSION 2
 #define BOOST_THREAD_USES_CHRONO
 
-#include <boost/chrono/chrono_io.hpp>
+#include "simple_stopwatch.hpp"
+
 #include <boost/thread/lock_types.hpp>
 #include <boost/thread/shared_mutex.hpp>
 #include <boost/thread/thread_only.hpp>
 
 #include <iostream>
 
+typedef boost::chrono::system_simple_stopwatch Stopwatch;
+using namespace boost::chrono;
 using namespace boost;
 
 shared_mutex mtx;
-const int cycles = 10000;
+const int cycles = 1000;
 
 void shared()
 {
@@ -40,13 +44,13 @@ void unique()
 
 int main()
 {
-    boost::chrono::high_resolution_clock::duration best_time(
-        std::numeric_limits<
-            boost::chrono::high_resolution_clock::duration::rep>::max
+    chrono::high_resolution_clock::duration best_time(
+        std::numeric_limits<chrono::high_resolution_clock::duration::rep>::max
             BOOST_PREVENT_MACRO_SUBSTITUTION());
+
     for (int i = 100; i > 0; --i) {
-        boost::chrono::high_resolution_clock clock;
-        boost::chrono::high_resolution_clock::time_point s1 = clock.now();
+        Stopwatch timer;
+
         thread t0(shared);
         thread t1(shared);
         thread t2(unique);
@@ -60,12 +64,16 @@ int main()
         // t11.join();
         // t12.join();
         // t13.join();
-        boost::chrono::high_resolution_clock::time_point f1 = clock.now();
-        // std::cout << "     Time spent:" << (f1 - s1) << std::endl;
+
+        chrono::high_resolution_clock::duration elapsed(timer.elapsed());
+        // std::cout << "     Time spent: "
+        //           << duration_fmt(duration_style::symbol) << elapsed
+        //           << std::endl;
         best_time =
-            std::min BOOST_PREVENT_MACRO_SUBSTITUTION(best_time, f1 - s1);
+            std::min BOOST_PREVENT_MACRO_SUBSTITUTION(best_time, elapsed);
     }
-    std::cout << "Best Time spent:" << best_time << std::endl;
+
+    std::cout << "Best Time spent: " << best_time << std::endl;
     std::cout << "Time spent/cycle:" << best_time / cycles / 3 << std::endl;
 
     return 0;

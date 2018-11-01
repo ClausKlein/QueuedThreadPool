@@ -72,7 +72,7 @@ void reader()
 {
     typedef boost::chrono::steady_clock Clock;
     unsigned count          = 0;
-    Clock::time_point until = Clock::now() + boost::chrono::seconds(3);
+    Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         mut.lock_shared();
         assert(state == reading);
@@ -86,7 +86,7 @@ void writer()
 {
     typedef boost::chrono::steady_clock Clock;
     unsigned count          = 0;
-    Clock::time_point until = Clock::now() + boost::chrono::seconds(3);
+    Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         mut.lock();
         state = writing;
@@ -102,7 +102,7 @@ void try_reader()
 {
     typedef boost::chrono::steady_clock Clock;
     unsigned count          = 0;
-    Clock::time_point until = Clock::now() + boost::chrono::seconds(3);
+    Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock_shared()) {
             assert(state == reading);
@@ -117,7 +117,7 @@ void try_writer()
 {
     typedef boost::chrono::steady_clock Clock;
     unsigned count          = 0;
-    Clock::time_point until = Clock::now() + boost::chrono::seconds(3);
+    Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock()) {
             state = writing;
@@ -134,7 +134,7 @@ void try_for_reader()
 {
     typedef boost::chrono::steady_clock Clock;
     unsigned count          = 0;
-    Clock::time_point until = Clock::now() + boost::chrono::seconds(3);
+    Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock_shared_for(boost::chrono::microseconds(5))) {
             assert(state == reading);
@@ -149,7 +149,7 @@ void try_for_writer()
 {
     typedef boost::chrono::steady_clock Clock;
     unsigned count          = 0;
-    Clock::time_point until = Clock::now() + boost::chrono::seconds(3);
+    Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock_for(boost::chrono::microseconds(5))) {
             state = writing;
@@ -204,7 +204,7 @@ void reader()
 {
     typedef boost::chrono::steady_clock Clock;
     unsigned count          = 0;
-    Clock::time_point until = Clock::now() + boost::chrono::seconds(3);
+    Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         mut.lock_shared();
         assert(state == reading);
@@ -218,7 +218,7 @@ void writer()
 {
     typedef boost::chrono::steady_clock Clock;
     unsigned count          = 0;
-    Clock::time_point until = Clock::now() + boost::chrono::seconds(3);
+    Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         mut.lock();
         state = writing;
@@ -234,7 +234,7 @@ void try_reader()
 {
     typedef boost::chrono::steady_clock Clock;
     unsigned count          = 0;
-    Clock::time_point until = Clock::now() + boost::chrono::seconds(3);
+    Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock_shared()) {
             assert(state == reading);
@@ -249,7 +249,7 @@ void try_writer()
 {
     typedef boost::chrono::steady_clock Clock;
     unsigned count          = 0;
-    Clock::time_point until = Clock::now() + boost::chrono::seconds(3);
+    Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock()) {
             state = writing;
@@ -266,7 +266,7 @@ void try_for_reader()
 {
     typedef boost::chrono::steady_clock Clock;
     unsigned count          = 0;
-    Clock::time_point until = Clock::now() + boost::chrono::seconds(3);
+    Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock_shared_for(boost::chrono::microseconds(5))) {
             assert(state == reading);
@@ -281,7 +281,7 @@ void try_for_writer()
 {
     typedef boost::chrono::steady_clock Clock;
     unsigned count          = 0;
-    Clock::time_point until = Clock::now() + boost::chrono::seconds(3);
+    Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock_for(boost::chrono::microseconds(5))) {
             state = writing;
@@ -298,7 +298,7 @@ void upgradable()
 {
     typedef boost::chrono::steady_clock Clock;
     unsigned count          = 0;
-    Clock::time_point until = Clock::now() + boost::chrono::seconds(3);
+    Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         mut.lock_upgrade();
         assert(state == reading);
@@ -312,7 +312,7 @@ void try_upgradable()
 {
     typedef boost::chrono::steady_clock Clock;
     unsigned count          = 0;
-    Clock::time_point until = Clock::now() + boost::chrono::seconds(3);
+    Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock_upgrade()) {
             assert(state == reading);
@@ -327,7 +327,7 @@ void try_for_upgradable()
 {
     typedef boost::chrono::steady_clock Clock;
     unsigned count          = 0;
-    Clock::time_point until = Clock::now() + boost::chrono::seconds(3);
+    Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock_upgrade_for(boost::chrono::microseconds(5))) {
             assert(state == reading);
@@ -342,7 +342,7 @@ void clockwise()
 {
     typedef boost::chrono::steady_clock Clock;
     unsigned count          = 0;
-    Clock::time_point until = Clock::now() + boost::chrono::seconds(3);
+    Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         mut.lock_shared();
         assert(state == reading);
@@ -372,7 +372,7 @@ void counter_clockwise()
 {
     typedef boost::chrono::steady_clock Clock;
     unsigned count          = 0;
-    Clock::time_point until = Clock::now() + boost::chrono::seconds(3);
+    Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         mut.lock_upgrade();
         assert(state == reading);
@@ -393,7 +393,7 @@ void try_clockwise()
 {
     typedef boost::chrono::steady_clock Clock;
     unsigned count          = 0;
-    Clock::time_point until = Clock::now() + boost::chrono::seconds(3);
+    Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock_shared()) {
             assert(state == reading);
@@ -424,7 +424,7 @@ void try_for_clockwise()
 {
     typedef boost::chrono::steady_clock Clock;
     unsigned count          = 0;
-    Clock::time_point until = Clock::now() + boost::chrono::seconds(3);
+    Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock_shared_for(boost::chrono::microseconds(5))) {
             assert(state == reading);
@@ -457,7 +457,7 @@ void try_counter_clockwise()
 {
     typedef boost::chrono::steady_clock Clock;
     unsigned count          = 0;
-    Clock::time_point until = Clock::now() + boost::chrono::seconds(3);
+    Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock_upgrade()) {
             assert(state == reading);
@@ -482,7 +482,7 @@ void try_for_counter_clockwise()
 {
     typedef boost::chrono::steady_clock Clock;
     unsigned count          = 0;
-    Clock::time_point until = Clock::now() + boost::chrono::seconds(3);
+    Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock_upgrade_for(boost::chrono::microseconds(5))) {
             assert(state == reading);

@@ -9,9 +9,11 @@
 #ifndef BOOST_CHRONO_STOPWATCHES_SIMPLE_STOPWATCH__HPP
 #define BOOST_CHRONO_STOPWATCHES_SIMPLE_STOPWATCH__HPP
 
+
 #include <boost/chrono/config.hpp>
 
 #include <boost/chrono/chrono.hpp>
+#include <boost/chrono/chrono_io.hpp>
 #include <boost/chrono/process_cpu_clocks.hpp>
 #include <boost/chrono/thread_clock.hpp>
 #include <boost/system/error_code.hpp>
