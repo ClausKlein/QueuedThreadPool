@@ -1,34 +1,49 @@
-BOOST_ROOT:=/usr/local
-#TODO MT:=-mt
+#=====================
+#   configure part
+BOOST_ROOT?=/usr/local
+MT?=-mt
+CXXFLAGS+=-O2 -DNDEBUG
+### CXXFLAGS+=-g
+#=====================
 
 #NO! CK
 ### USE_AGENTPP:=1
 
 #NO! CK
 ## CPPFLAGS+=-D_POSIX_C_SOURCE=200809L
-CPPFLAGS+=-DBOOST_TEST_NO_LIB -DPOSIX_THREADS #NO! -DBOOST_THREAD_VERSION=4
+## CPPFLAGS+=-DBOOST_ALL_NO_LIB
+CPPFLAGS+=-DPOSIX_THREADS #NO! -DBOOST_THREAD_VERSION=4
 CPPFLAGS+=-I$(BOOST_ROOT)/include
 LDFLAGS+= -L$(BOOST_ROOT)/lib
-LDLIBS:= -lboost_thread$(MT) -lboost_chrono$(MT) -lboost_system$(MT)
+LDLIBS:= -lboost_chrono$(MT) -lboost_thread$(MT) -lboost_system$(MT)
 
-
-### CXXFLAGS+=-g
-CXXFLAGS+=-O2 -DNDEBUG
 CXXFLAGS+=-Wpedantic -Wextra -Wno-unused-parameter -Wno-c++11-long-long
 
+PROGRAMS:= \
+chrono_io_ex1 \
+default_executor \
+lockfree_spsc_queue \
+shared_mutex \
+stopwatch_reporter_example \
+thread_tss_test \
+trylock_test \
+### threads_test
+
+
 .PHONY: all cmake ctest test clean distclean cppcheck format
-all: default_executor shared_mutex lockfree_spsc_queue thread_tss_test # trylock_test ## cmake ### threads_test
+all: $(PROGRAMS)
 
 cmake: build
 	cd build && cmake --build .
 
 build: CMakeLists.txt
 	mkdir -p build
-	cd build && cmake -G Ninja ..
+	cd build && cmake -G Ninja -DBOOST_ROOT=${BOOST_ROOT} ..
 
 ctest: cmake
 	cd build && ctest -C debug
 
+# examples using boost libs
 lockfree_spsc_queue: CXXFLAGS+=--std=c++03
 lockfree_spsc_queue.o: lockfree_spsc_queue.cpp simple_stopwatch.hpp
 lockfree_spsc_queue: lockfree_spsc_queue.o
@@ -36,16 +51,24 @@ lockfree_spsc_queue: lockfree_spsc_queue.o
 
 default_executor: CXXFLAGS+=--std=c++03
 default_executor: default_executor.cpp
-	$(LINK.cc) $^ -o $@ $(LDLIBS)
 
 shared_mutex: CXXFLAGS+=--std=c++03
 shared_mutex: shared_mutex.cpp
-	$(LINK.cc) $^ -o $@ $(LDLIBS)
 
+chrono_io_ex1: CXXFLAGS+=--std=c++03
+chrono_io_ex1: chrono_io_ex1.cpp
+
+stopwatch_reporter_example: CXXFLAGS+=--std=c++03
+stopwatch_reporter_example: stopwatch_reporter_example.cpp
+
+thread_tss_test: CXXFLAGS+=--std=c++03
+thread_tss_test: thread_tss_test.cpp
+
+
+# test using boost unit test framework
 threads_test.o: CXXFLAGS+=--std=c++14
 threads_test.o: threads_test.cpp
 threads_test.o: threadpool.hpp
-
 
 threadpool.o: CPPFLAGS+=-D_NO_LOGGING
 threadpool.o: threadpool.cpp
@@ -62,29 +85,29 @@ endif
 	$(LINK.cc) $^ -o $@ $(LDLIBS)
 
 
+# plain old posix used!
 trylock_test: trylock_test.c
 
 
-thread_tss_test: thread_tss_test.cpp
-
-
 clean:
-	$(RM) lockfree_spsc_queue default_executor threads_test thread_tss_test trylock_test *.o *.exe
+	$(RM) $(PROGRAMS) *.o *.exe
 
 distclean: clean
 	$(RM) -r build *.bak *.orig *~ *.stackdump *.dSYM
 
-test: lockfree_spsc_queue thread_tss_test default_executor shared_mutex threads_test
+test: $(PROGRAMS)
 	#./threads_test -l message --random
 	# ./threads_test --run_test=ThreadPool_test -25
 	# ./threads_test --run_test=QueuedThreadPoolLoad_test -25
 	#TODO ./threads_test --run_test=QueuedThreadPoolLoad_test -1000
-	# ./trylock_test +1
-	# ./trylock_test -1
-	./thread_tss_test
+	./trylock_test +1
+	./trylock_test -1
+	./chrono_io_ex1
 	./default_executor
-	./shared_mutex
 	./lockfree_spsc_queue
+	./shared_mutex
+	./stopwatch_reporter_example
+	./thread_tss_test
 
 #NOTE: bash for loop:
 #	i=0 && while test $$i -lt 1000 && ./threads_test -t QueuedThreadPoolLoad_test ; do \

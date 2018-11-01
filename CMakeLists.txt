@@ -245,6 +245,7 @@ if(USE_BOOST OR USE_CTEST)
     set(noinst_PROGRAMS
         ba_externallly_locked
         bank_account
+        chrono_io_ex1
         default_executor
         executor
         lockfree_spsc_queue
@@ -256,6 +257,7 @@ if(USE_BOOST OR USE_CTEST)
         serial_executor
         shared_monitor
         shared_mutex
+        stopwatch_reporter_example
         strict_lock
         synchronized_person
         thread_pool
