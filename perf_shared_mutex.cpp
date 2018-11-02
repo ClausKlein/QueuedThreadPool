@@ -8,19 +8,15 @@
 // This performance test is based on the performance test provided by
 // maxim.yegorushkin at https://svn.boost.org/trac/boost/ticket/7422
 
-#define BOOST_CHRONO_VERSION 2
-#define BOOST_THREAD_USES_CHRONO
-
 #include "simple_stopwatch.hpp"
 
+#define BOOST_THREAD_USES_CHRONO
 #include <boost/thread/lock_types.hpp>
 #include <boost/thread/shared_mutex.hpp>
 #include <boost/thread/thread_only.hpp>
 
 #include <iostream>
 
-typedef boost::chrono::system_simple_stopwatch Stopwatch;
-using namespace boost::chrono;
 using namespace boost;
 
 shared_mutex mtx;

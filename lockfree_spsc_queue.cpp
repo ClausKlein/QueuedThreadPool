@@ -1,4 +1,3 @@
-#define BOOST_CHRONO_VERSION 2
 #include "simple_stopwatch.hpp"
 
 #include <boost/atomic.hpp>
@@ -20,7 +19,6 @@ boost::lockfree::spsc_queue<data_type, boost::lockfree::capacity<1024> >
     spsc_queue;
 boost::atomic<bool> done(false);
 
-typedef boost::chrono::system_simple_stopwatch Stopwatch;
 using namespace boost::chrono;
 
 

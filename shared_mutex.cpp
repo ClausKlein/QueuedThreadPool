@@ -7,21 +7,24 @@
 #define BOOST_THREAD_PROVIDES_SHARED_MUTEX_UPWARDS_CONVERSIONS
 #define BOOST_THREAD_PROVIDES_EXPLICIT_LOCK_CONVERSION
 #define BOOST_THREAD_PROVIDES_GENERIC_SHARED_MUTEX_ON_WIN
+#define BOOST_CHRONO_VERSION 2
 
+#include <boost/chrono/chrono_io.hpp>
+#include <boost/chrono/stopwatches/reporters/stopwatch_reporter.hpp>
+#include <boost/chrono/stopwatches/strict_stopwatch.hpp>
 #include <boost/thread/lock_algorithms.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/shared_mutex.hpp>
 #include <boost/thread/thread_only.hpp>
+
 #include <iostream>
 #include <vector>
-
-#include <boost/chrono/chrono_io.hpp>
 
 
 enum { reading, writing };
 int state = reading;
 
-#if 1
+#ifdef VERBOSE
 
 boost::mutex& cout_mut()
 {
@@ -35,7 +38,7 @@ void print(const char* tag, unsigned count, char ch)
     std::cout << tag << count << ch;
 }
 
-#elif 0
+#elif defined(FIXME)
 
 boost::recursive_mutex& cout_mut()
 {
@@ -650,7 +653,7 @@ public:
 
 } // Assignment
 
-void temp()
+static void temp()
 {
     using namespace boost;
     static upgrade_mutex mut;
@@ -662,17 +665,16 @@ void temp()
 
 int main()
 {
+    using namespace boost::chrono;
+
     std::cout << __FILE__ << "[" << __LINE__ << "]" << std::endl;
-    typedef boost::chrono::high_resolution_clock Clock;
-    typedef boost::chrono::duration<double> sec;
-    Clock::time_point t0 = Clock::now();
+    stopwatch_reporter<strict_stopwatch<> > sw;
 
     std::cout << __FILE__ << "[" << __LINE__ << "]" << std::endl;
     S::test_shared_mutex();
     std::cout << __FILE__ << "[" << __LINE__ << "]" << std::endl;
     U::test_upgrade_mutex();
     std::cout << __FILE__ << "[" << __LINE__ << "]" << std::endl;
-    Clock::time_point t1 = Clock::now();
-    std::cout << sec(t1 - t0) << '\n';
+
     return 0;
 }

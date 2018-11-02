@@ -7,10 +7,12 @@
 // This performance test is based on the performance test provided by
 // maxim.yegorushkin at https://svn.boost.org/trac/boost/ticket/7422
 
+// TODO: prevent use of auto, foreach, lambda, ..., and other new C++11
+// keywords! CK
+
+#include "simple_stopwatch.hpp"
+
 #define BOOST_THREAD_DONT_PROVIDE_INTERRUPTIONS
-
-#include <boost/chrono/stopwatches/simple_stopwatch.hpp>
-
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
 
@@ -22,34 +24,8 @@
 #include <vector>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
-
 namespace
 {
-////////////////////////////////////////////////////////////////////////////////////////////////
-
-// class Stopwatch {
-// public:
-//     typedef long long rep;
-//
-//     static rep now()
-//     {
-//         timespec ts;
-//         // FIXME: NOT portable! CK if (clock_gettime(CLOCK_MONOTONIC, &ts))
-//         abort(); return ts.tv_sec * rep(1000000000) + ts.tv_nsec;
-//     }
-//
-//     Stopwatch()
-//         : start_(now())
-//     {}
-//
-//     rep elapsed() const { return now() - start_; }
-//
-// private:
-//     rep start_;
-// };
-
-typedef boost::chrono::simple_stopwatch<> Stopwatch;
-////////////////////////////////////////////////////////////////////////////////////////////////
 
 struct BoostTypes {
     typedef boost::condition_variable condition_variable;
@@ -78,9 +54,8 @@ template <class Types> struct SharedData : Types {
         , producer_time()
     {}
 };
-
-
 ////////////////////////////////////////////////////////////////////////////////////////////////
+
 
 template <class S> void producer_thread(S* shared_data)
 {
