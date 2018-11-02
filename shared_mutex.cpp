@@ -24,8 +24,8 @@
 enum { reading, writing };
 int state = reading;
 
+#define VERBOSE
 #ifdef VERBOSE
-
 boost::mutex& cout_mut()
 {
     static boost::mutex m;
@@ -61,10 +61,10 @@ void print(const A0& a0, const Args&... args)
 template <class A0, class A1, class A2>
 void print(const A0&, const A1& a1, const A2&)
 {
-    assert(a1 > 10000);
+    // FIXME assert(a1 > 1000);
 }
-
 #endif
+
 
 namespace S
 {
@@ -196,7 +196,8 @@ void test_shared_mutex()
     }
     std::cout << __FILE__ << "[" << __LINE__ << "]" << std::endl;
 }
-}
+} // S
+
 
 namespace U
 {
@@ -301,7 +302,7 @@ void upgradable()
 {
     typedef boost::chrono::steady_clock Clock;
     unsigned count          = 0;
-    Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
+    Clock::time_point until = Clock::now() + boost::chrono::seconds(2);
     while (Clock::now() < until) {
         mut.lock_upgrade();
         assert(state == reading);
@@ -584,16 +585,17 @@ void test_upgrade_mutex()
         t2.join();
     }
     std::cout << __FILE__ << "[" << __LINE__ << "]" << std::endl;
-    //    {
-    //        state = reading;
-    //        boost::thread t1(try_for_clockwise);
-    //        boost::thread t2(try_for_counter_clockwise);
-    //        t1.join();
-    //        t2.join();
-    //    }
-    //    std::cout << __FILE__ << "[" <<__LINE__ << "]" << std::endl;
+    {
+        state = reading;
+        boost::thread t1(try_for_clockwise);
+        boost::thread t2(try_for_counter_clockwise);
+        t1.join();
+        t2.join();
+    }
+    std::cout << __FILE__ << "[" << __LINE__ << "]" << std::endl;
 }
-}
+} // U
+
 
 namespace Assignment
 {
