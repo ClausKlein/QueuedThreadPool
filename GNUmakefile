@@ -55,6 +55,12 @@ lockfree_spsc_queue.o: lockfree_spsc_queue.cpp simple_stopwatch.hpp
 lockfree_spsc_queue: lockfree_spsc_queue.o
 	$(LINK.cc) $^ -o $@ $(LDLIBS)
 
+async_server: CXXFLAGS+=--std=c++03
+async_server: async_server.cpp
+
+daytime_client: CXXFLAGS+=--std=c++03
+daytime_client: daytime_client.cpp
+
 default_executor: CXXFLAGS+=--std=c++03
 default_executor: default_executor.cpp
 
