@@ -243,9 +243,12 @@ if(USE_BOOST OR USE_CTEST)
   if(Boost_FOUND)
     # additional single file examples from boost/thread and boost/asio
     set(noinst_PROGRAMS
+        async_future
+        async_server
         ba_externallly_locked
         bank_account
         chrono_io_ex1
+        daytime_client
         default_executor
         executor
         lockfree_spsc_queue

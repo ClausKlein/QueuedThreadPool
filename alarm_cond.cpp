@@ -64,7 +64,6 @@ static void TRACE(const std::string& msg)
     lock_guard<mutex> lk(_mut);
     std::cerr << msg << std::endl;
 }
-#else
 #define DEBUG
 #endif
 

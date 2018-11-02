@@ -20,7 +20,9 @@ CXXFLAGS+=-Wpedantic -Wextra -Wno-unused-parameter -Wno-c++11-long-long
 
 PROGRAMS:= \
 alarm_cond \
+async_server \
 chrono_io_ex1 \
+daytime_client \
 default_executor \
 enable_shared_from_this \
 lockfree_spsc_queue \
