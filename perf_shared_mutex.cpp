@@ -17,6 +17,10 @@
 
 #include <iostream>
 
+#ifdef DEBUG
+#define VERBOSE
+#endif
+
 using namespace boost;
 
 shared_mutex mtx;
@@ -40,8 +44,7 @@ void unique()
 
 int main()
 {
-    chrono::high_resolution_clock::duration best_time(
-        std::numeric_limits<chrono::high_resolution_clock::duration::rep>::max
+    Stopwatch::duration best_time(std::numeric_limits<Stopwatch::rep>::max
             BOOST_PREVENT_MACRO_SUBSTITUTION());
 
     for (int i = 100; i > 0; --i) {
@@ -61,10 +64,14 @@ int main()
         // t12.join();
         // t13.join();
 
-        chrono::high_resolution_clock::duration elapsed(timer.elapsed());
-        // std::cout << "     Time spent: "
-        //           << duration_fmt(duration_style::symbol) << elapsed
-        //           << std::endl;
+        Stopwatch::duration elapsed(timer.elapsed());
+
+#ifdef VERBOSE
+        std::cout << "     Time spent: "
+                  << chrono::duration_fmt(chrono::duration_style::symbol)
+                  << elapsed << std::endl;
+#endif
+
         best_time =
             std::min BOOST_PREVENT_MACRO_SUBSTITUTION(best_time, elapsed);
     }
