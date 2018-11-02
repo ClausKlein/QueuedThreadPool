@@ -1,0 +1,15 @@
+invalid input
+dito 0
+0815
+0
+
+3 tree seconds
+20 last
+ 2 first
+ 5 after five sec.
+10 midd1
+10 midd2
+10 midd3
+ 1 at one sec. delay
+ 0 now
+-5 too late!
