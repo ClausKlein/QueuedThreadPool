@@ -17,7 +17,7 @@
 
 #include <stdlib.h> // exit()
 
-#include <cassert>  // assert()
+#include <cassert> // assert()
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -35,7 +35,8 @@ using std::chrono::steady_clock;
 using std::chrono::system_clock;
 using std::chrono::time_point;
 using namespace std;
-#else
+
+#else //##########################################
 
 #include <boost/thread.hpp>
 #include <boost/thread/condition_variable.hpp>
@@ -47,16 +48,11 @@ using boost::chrono::steady_clock;
 using boost::chrono::system_clock;
 using boost::chrono::time_point;
 using namespace boost;
-#endif
+#endif //##########################################
 
 
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/current_function.hpp>
-
-
-#ifndef NDEBUG
-#define DEBUG
-#endif
 
 
 #ifdef NDEBUG
@@ -68,6 +64,8 @@ static void TRACE(const std::string& msg)
     lock_guard<mutex> lk(_mut);
     std::cerr << msg << std::endl;
 }
+#else
+#define DEBUG
 #endif
 
 
@@ -86,6 +84,7 @@ typedef struct alarm_tag {
     std::string message;
 } alarm_t;
 }
+
 
 //==================================
 // shared data, mutex, and condition
@@ -257,7 +256,7 @@ void alarm_thread(void)
 int main(int arc, char** argv)
 {
     std::string line;
-    Alarm::alarm_t* alarm; //TODO use shared ptr! CK
+    Alarm::alarm_t* alarm; // TODO use shared ptr! CK
     time_point<steady_clock> last = ZERO;
 
     thread scheduler(&alarm_thread);

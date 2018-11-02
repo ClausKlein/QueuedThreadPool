@@ -257,11 +257,13 @@ if(USE_BOOST OR USE_CTEST)
         serial_executor
         shared_monitor
         shared_mutex
+        shared_ptr
         stopwatch_reporter_example
         strict_lock
         synchronized_person
         thread_pool
         thread_tss_test
+        volatile
     )
 
     foreach(program ${noinst_PROGRAMS})

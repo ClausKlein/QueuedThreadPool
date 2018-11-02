@@ -2,8 +2,8 @@
 #   configure part
 BOOST_ROOT?=/usr/local
 MT?=-mt
-CXXFLAGS+=-O2 -DNDEBUG
-### CXXFLAGS+=-g
+## CXXFLAGS+=-O2 -DNDEBUG
+CXXFLAGS+=-g
 #=====================
 
 #NO! CK
@@ -19,14 +19,18 @@ LDLIBS:= -lboost_chrono$(MT) -lboost_thread$(MT) -lboost_system$(MT)
 CXXFLAGS+=-Wpedantic -Wextra -Wno-unused-parameter -Wno-c++11-long-long
 
 PROGRAMS:= \
+alarm_cond \
 chrono_io_ex1 \
 default_executor \
+enable_shared_from_this \
 lockfree_spsc_queue \
 perf_shared_mutex \
 shared_mutex \
+shared_ptr \
 stopwatch_reporter_example \
 thread_tss_test \
 trylock_test \
+volatile \
 ### threads_test
 
 
@@ -67,6 +71,15 @@ thread_tss_test: thread_tss_test.cpp
 perf_shared_mutex: CXXFLAGS+=--std=c++03
 perf_shared_mutex: perf_shared_mutex.cpp
 
+volatile: CXXFLAGS+=--std=c++03
+volatile: volatile.cpp
+
+alarm_cond: CXXFLAGS+=--std=c++03
+alarm_cond: alarm_cond.cpp
+
+enable_shared_from_this: CXXFLAGS+=--std=c++03
+enable_shared_from_this: enable_shared_from_this.cpp
+
 
 # test using boost unit test framework
 threads_test.o: CXXFLAGS+=--std=c++14
@@ -96,22 +109,25 @@ clean:
 	$(RM) $(PROGRAMS) *.o *.exe
 
 distclean: clean
-	$(RM) -r build *.bak *.orig *~ *.stackdump *.dSYM
+	$(RM) -r build *.d *.bak *.orig *~ *.stackdump *.dSYM
 
 test: $(PROGRAMS)
 	#./threads_test -l message --random
 	# ./threads_test --run_test=ThreadPool_test -25
 	# ./threads_test --run_test=QueuedThreadPoolLoad_test -25
 	#TODO ./threads_test --run_test=QueuedThreadPoolLoad_test -1000
-	./trylock_test +1
-	./trylock_test -1
 	./chrono_io_ex1
 	./default_executor
 	./lockfree_spsc_queue
+	./perf_shared_mutex
 	./shared_mutex
+	./shared_ptr
 	./stopwatch_reporter_example
 	./thread_tss_test
-	./perf_shared_mutex
+	./trylock_test +1
+	./trylock_test -1
+	./volatile
+	cat alarm_cond.txt | ./alarm_cond --wait
 
 #NOTE: bash for loop:
 #	i=0 && while test $$i -lt 1000 && ./threads_test -t QueuedThreadPoolLoad_test ; do \

@@ -23,22 +23,24 @@ boost::shared_ptr is now part of the C++11 Standard, as std::shared_ptr.
 #include <cstdlib>
 #include <iostream>
 
+// NOTE: prevent used of C++11 features! ck
 // XXX #include <memory>
-
 #include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/shared_ptr.hpp>
-
-// NOTE: prevent used of C++11 features! ck
 // #include <boost/move/unique_ptr.hpp>
+
 
 void foo(boost::shared_ptr<int> i) { (*i)++; }
 
+
 int main()
 {
-    boost::shared_ptr<int> sp = boost::make_shared<int>(12);
-    foo(sp);
-    std::cout << *sp << std::endl;
+    {
+        boost::shared_ptr<int> sp = boost::make_shared<int>(12);
+        foo(sp);
+        std::cout << *sp << std::endl;
+    }
 
     // C++11 only!
     // auto deleter = [](FILE * ptr)
