@@ -40,5 +40,11 @@ namespace
 
 typedef boost::chrono::simple_stopwatch<> Stopwatch;
 typedef boost::chrono::stopwatch_reporter<Stopwatch> StopwatchReporter;
+typedef boost::chrono::high_resolution_clock Clock;
+
+typedef Clock::time_point time_point;
+typedef Clock::duration duration;
+typedef boost::chrono::milliseconds ms;
+typedef boost::chrono::nanoseconds ns;
 
 #endif

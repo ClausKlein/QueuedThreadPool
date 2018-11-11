@@ -109,8 +109,9 @@ endif
 	$(LINK.cc) $^ -o $@ $(LDLIBS)
 
 
-# plain old posix used!
-trylock_test: trylock_test.c
+# plain old posix not longer used!
+trylock_test: trylock_test.cpp
+	$(LINK.cc) $^ -o $@ $(LDLIBS)
 
 
 clean:
@@ -132,8 +133,8 @@ test: $(PROGRAMS)
 	./shared_ptr
 	./stopwatch_reporter_example
 	./thread_tss_test
-	./trylock_test +1
-	./trylock_test -1
+	# ./trylock_test +1
+	# ./trylock_test -1
 	./volatile
 	cat alarm_cond.txt | ./alarm_cond --wait
 

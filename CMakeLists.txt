@@ -266,6 +266,7 @@ if(USE_BOOST OR USE_CTEST)
         synchronized_person
         thread_pool
         thread_tss_test
+        trylock_test
         volatile
     )
 
