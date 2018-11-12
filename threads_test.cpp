@@ -5,6 +5,8 @@
 // clang-format -style=file -i thread*.{cpp,hpp}
 //
 
+#include "simple_stopwatch.hpp"
+
 #ifdef USE_AGENTPP
 #include "agent_pp/threads.h" // ThreadPool, QueuedThreadPool
 #else
@@ -17,12 +19,9 @@
 #include <atomic>
 typedef std::atomic_size_t test_counter_t;
 #else
-typedef volatile std::size_t test_counter_t;
+#include <boost/atomic.hpp>
+typedef boost::atomic_size_t test_counter_t;
 #endif
-
-#include <iostream>
-#include <string>
-#include <vector>
 
 #define BOOST_TEST_MODULE Threads
 #define BOOST_TEST_NO_MAIN
@@ -30,6 +29,10 @@ typedef volatile std::size_t test_counter_t;
 #include <boost/lexical_cast.hpp>
 #include <boost/lockfree/queue.hpp>
 #include <boost/test/included/unit_test.hpp>
+
+#include <iostream>
+#include <string>
+#include <vector>
 
 
 typedef boost::lockfree::queue<size_t, boost::lockfree::capacity<20> >
@@ -96,6 +99,7 @@ private:
 Agentpp::Synchronized TestTask::lock;
 test_counter_t TestTask::run_cnt(0);
 test_counter_t TestTask::counter(0);
+
 
 BOOST_AUTO_TEST_CASE(ThreadPool_test)
 {
@@ -385,7 +389,7 @@ BOOST_AUTO_TEST_CASE(Synchronized_test)
     using namespace Agentpp;
     Synchronized sync;
     {
-        //TODO prevent deadlock Lock l(sync);
+        //FIXME: prevent deadlock! Lock l(sync);
         BOOST_TEST(sync.lock());
         BOOST_TEST(sync.unlock());
         BOOST_TEST(!sync.unlock(), "second unlock() returns no error");
@@ -394,46 +398,38 @@ BOOST_AUTO_TEST_CASE(Synchronized_test)
         !sync.unlock(), "unlock() without previous lock() returns no error");
 }
 
-BOOST_AUTO_TEST_CASE(Trylock_test)
+BOOST_AUTO_TEST_CASE(SyncTrylock_test)
 {
     using namespace Agentpp;
     Synchronized sync;
     {
         Lock l(sync);
-        //FIXME BOOST_TEST(sync.trylock() == Synchronized::OWNED);
-        BOOST_TEST(sync.trylock() == Synchronized::BUSY);
+        BOOST_TEST(sync.trylock() == Synchronized::OWNED);
     }
     BOOST_TEST(!sync.unlock(), "second unlock() returns no error");
 }
 
-BOOST_AUTO_TEST_CASE(Wait_test)
+BOOST_AUTO_TEST_CASE(SyncWait_test)
 {
     using namespace Agentpp;
     Synchronized sync;
     {
-        //TODO prevent deadlock Lock l(sync);
+        Lock l(sync);
         BOOST_TEST(sync.wait(42), "no timeout occurred on wait!");
     }
 }
 
-#if defined(_POSIX_TIMERS) && _POSIX_TIMERS > 0
-BOOST_AUTO_TEST_CASE(Thread_test)
+BOOST_AUTO_TEST_CASE(SleepThread_test)
 {
     using namespace Agentpp;
 
-    struct timespec startTime;
-    clock_gettime(CLOCK_REALTIME, &startTime);
-    startTime.tv_sec += 2;
-
+    Stopwatch sw;
     Thread::sleep(2000); // ms
 
-    struct timespec endTime;
-    clock_gettime(CLOCK_REALTIME, &endTime);
-    BOOST_TEST(endTime.tv_sec >= startTime.tv_sec);
+    BOOST_TEST(sw.elapsed() >= ms(2000));
 }
-#endif
 
-#ifdef BOOST_TEST_NO_MAIN
+
 int main(int argc, char* argv[])
 {
     // prototype for user's unit test init function
@@ -472,7 +468,6 @@ int main(int argc, char* argv[])
 
     return error;
 }
-#endif
 
 /***
  * OUTPUT:

@@ -95,6 +95,7 @@ threads_test.o: threads_test.cpp
 threads_test.o: threadpool.hpp
 
 ###XXX threadpool.o: CPPFLAGS+=-D_NO_LOGGING
+threadpool.o: CXXFLAGS+=--std=c++03
 threadpool.o: threadpool.cpp
 threadpool.o: threadpool.hpp
 

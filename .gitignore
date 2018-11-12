@@ -11,6 +11,8 @@ shared_ptr
 stopwatch_reporter_example
 strict_lock
 thread_tss_test
+threads_test
 trylock_test
 volatile
+
 build/

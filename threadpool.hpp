@@ -31,24 +31,13 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #include <integrity.h>
 #endif
 
-#ifdef _WIN32
-#define HAVE_STRUCT_TIMESPEC
-#else
-#ifndef _POSIX_C_SOURCE
-#define _POSIX_C_SOURCE 200112L
-#endif
-#include <unistd.h> // _POSIX_MONOTONIC_CLOCK _POSIX_TIMEOUTS _POSIX_TIMERS _POSIX_THREADS ...
-#endif
-
-//XXX #include <pthread.h>
-//XXX #include <time.h>
-
 #include <iostream>
 #include <list>
 #include <queue>
 #include <vector>
 
 #define BOOST_THREAD_VERSION 4
+#define BOOST_CHRONO_VERSION 2
 
 #include <boost/core/noncopyable.hpp>
 #include <boost/current_function.hpp>
@@ -63,7 +52,11 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #define AGENTX_DEFAULT_PRIORITY 32
 #define AGENTX_DEFAULT_THREAD_NAME "ThreadPool::Thread"
 #define AGENTPP_DECL
+
+#ifndef BOOST_OVERRIDE
 #define BOOST_OVERRIDE
+#endif
+
 
 #if !defined(_NO_LOGGING) && !defined(NDEBUG)
 #define DEBUG
@@ -135,7 +128,7 @@ public:
      * method to be called in that separately executing thread.
      */
     virtual void run() = 0;
-    void operator() () { run(); };
+    void operator()() { run(); };
 };
 
 
@@ -230,19 +223,16 @@ public:
 
 
 private:
-
 #ifndef _NO_LOGGING
     static unsigned int next_id;
     unsigned int id;
 #endif
 
     int cond_timed_wait(const timespec*);
-    //XXX pthread_cond_t cond;
-    //XXX pthread_mutex_t mutex;
     boost::condition_variable cond;
     boost::mutex mutex;
     volatile bool isLocked;
-    volatile bool flag;
+    volatile bool signal;
 };
 
 
@@ -429,7 +419,7 @@ private:
     Runnable* runnable;
     ThreadStatus status;
     size_t stackSize;
-    //XXX pthread_t tid;
+    // XXX pthread_t tid;
     static ThreadList threadList;
     static void nsleep(time_t secs, long nanos);
 };

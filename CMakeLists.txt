@@ -297,7 +297,7 @@ if(USE_BOOST OR USE_CTEST)
       threadpool.cpp threadpool.hpp
     )
     set_target_properties(test_threads PROPERTIES CXX_STANDARD 14)
-    target_link_libraries(test_threads ${EXTRA_LIBS})
+    target_link_libraries(test_threads ${Boost_LIBRARIES} ${EXTRA_LIBS})
     add_test(NAME test_threads COMMAND test_threads)
   endif()
 
