@@ -67,6 +67,8 @@ int Synchronized::cond_timed_wait(const struct timespec* ts)
 {
     std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
+    assert(isLocked);
+
     boost::unique_lock<boost::mutex> l(mutex, boost::adopt_lock);
     signal = false;
     if (!ts) {
@@ -88,6 +90,8 @@ bool Synchronized::wait(unsigned long timeout)
 {
     std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
+    assert(isLocked);
+
     duration d = ms(timeout);
     boost::unique_lock<boost::mutex> l(mutex, boost::adopt_lock);
     signal = false;
@@ -103,6 +107,8 @@ void Synchronized::notify()
 {
     std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
+    assert(isLocked);
+
     boost::unique_lock<boost::mutex> l(mutex, boost::adopt_lock);
     signal = true;
     cond.notify_one();
@@ -111,6 +117,8 @@ void Synchronized::notify()
 void Synchronized::notify_all()
 {
     std::cout << BOOST_CURRENT_FUNCTION << std::endl;
+
+    assert(isLocked);
 
     boost::unique_lock<boost::mutex> l(mutex, boost::adopt_lock);
     signal = true;
@@ -121,27 +129,28 @@ bool Synchronized::lock()
 {
     std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
+    assert(!isLocked);
+
     mutex.lock();
     return (isLocked = true);
 }
 
+#if HAVE_TIMED_MUTEX
 bool Synchronized::lock(unsigned long timeout)
 {
     std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
-    duration d = ms(timeout);
-    boost::unique_lock<boost::mutex> l(mutex);
-    signal = false;
-    while (!signal) {
-        if (cond.wait_for(l, d) == boost::cv_status::timeout) {
-            return false;
-        }
-    }
-    isLocked = true;
-    l.release();
+    assert(!isLocked);
 
+    duration d = ms(timeout);
+    if (!mutex.try_lock_for(d)) {
+        return false;
+    }
+
+    isLocked = true;
     return true; // OK
 }
+#endif
 
 bool Synchronized::unlock()
 {
@@ -160,12 +169,17 @@ Synchronized::TryLockResult Synchronized::trylock()
 {
     std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
+    if (isLocked) {
+        return OWNED;
+    }
+
     boost::unique_lock<boost::mutex> l(mutex, boost::defer_lock);
     if (l.try_lock()) {
         isLocked = true;
         l.release();
         return LOCKED;
     }
+
     return BUSY;
 }
 
