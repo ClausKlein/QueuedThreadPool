@@ -33,7 +33,7 @@ stopwatch_reporter_example \
 thread_tss_test \
 trylock_test \
 volatile \
-### threads_test
+threads_test
 
 
 .PHONY: all cmake ctest test clean distclean cppcheck format
@@ -94,7 +94,7 @@ threads_test.o: CXXFLAGS+=--std=c++14
 threads_test.o: threads_test.cpp
 threads_test.o: threadpool.hpp
 
-threadpool.o: CPPFLAGS+=-D_NO_LOGGING
+###XXX threadpool.o: CPPFLAGS+=-D_NO_LOGGING
 threadpool.o: threadpool.cpp
 threadpool.o: threadpool.hpp
 

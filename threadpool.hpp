@@ -40,16 +40,21 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #include <unistd.h> // _POSIX_MONOTONIC_CLOCK _POSIX_TIMEOUTS _POSIX_TIMERS _POSIX_THREADS ...
 #endif
 
-#include <pthread.h>
-#include <time.h>
+//XXX #include <pthread.h>
+//XXX #include <time.h>
 
 #include <iostream>
 #include <list>
 #include <queue>
 #include <vector>
 
+#define BOOST_THREAD_VERSION 4
+
 #include <boost/core/noncopyable.hpp>
 #include <boost/current_function.hpp>
+#include <boost/thread/condition_variable.hpp>
+#include <boost/thread/locks.hpp>
+#include <boost/thread/mutex.hpp>
 
 #undef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
 
@@ -58,6 +63,7 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #define AGENTX_DEFAULT_PRIORITY 32
 #define AGENTX_DEFAULT_THREAD_NAME "ThreadPool::Thread"
 #define AGENTPP_DECL
+#define BOOST_OVERRIDE
 
 #if !defined(_NO_LOGGING) && !defined(NDEBUG)
 #define DEBUG
@@ -87,6 +93,14 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 namespace Agentpp
 {
 
+typedef boost::chrono::high_resolution_clock Clock;
+typedef Clock::time_point time_point;
+typedef Clock::duration duration;
+typedef boost::chrono::seconds sec;
+typedef boost::chrono::milliseconds ms;
+typedef boost::chrono::microseconds us;
+typedef boost::chrono::nanoseconds ns;
+
 /**
  * The Runnable interface should be implemented by any class whose
  * instances are intended to be executed by a thread. The class must
@@ -109,7 +123,6 @@ namespace Agentpp
  * @author Frank Fock
  * @version 3.5
  */
-
 class AGENTPP_DECL Runnable {
 
 public:
@@ -122,7 +135,9 @@ public:
      * method to be called in that separately executing thread.
      */
     virtual void run() = 0;
+    void operator() () { run(); };
 };
+
 
 /**
  * The Synchronized class implements services for synchronizing
@@ -160,12 +175,12 @@ public:
 
     /**
      * Wakes up a single thread that is waiting on this
-     * object's monitor.
+     * object's mutex.
      */
     void notify();
     /**
      * Wakes up all threads that are waiting on this object's
-     * monitor.
+     * mutex.
      */
     void notify_all();
 
@@ -215,15 +230,21 @@ public:
 
 
 private:
+
 #ifndef _NO_LOGGING
     static unsigned int next_id;
     unsigned int id;
 #endif
+
     int cond_timed_wait(const timespec*);
-    pthread_cond_t cond;
-    pthread_mutex_t monitor;
-    bool isLocked;
+    //XXX pthread_cond_t cond;
+    //XXX pthread_mutex_t mutex;
+    boost::condition_variable cond;
+    boost::mutex mutex;
+    volatile bool isLocked;
+    volatile bool flag;
 };
+
 
 /**
  * The Lock class implements a synchronization object, that
@@ -277,7 +298,7 @@ public:
 
     /**
      * Wakes up a single thread that is waiting on this
-     * object's monitor.
+     * object's mutex.
      */
     void notify() { sync.notify(); }
 
@@ -358,7 +379,7 @@ public:
      *
      * Subclasses of Thread should override this method.
      */
-    virtual void run() override;
+    virtual void run() BOOST_OVERRIDE;
 
     /**
      * Get the Runnable object used for thread execution.
@@ -408,7 +429,7 @@ private:
     Runnable* runnable;
     ThreadStatus status;
     size_t stackSize;
-    pthread_t tid;
+    //XXX pthread_t tid;
     static ThreadList threadList;
     static void nsleep(time_t secs, long nanos);
 };
@@ -598,7 +619,7 @@ public:
      * Execute a task. The task will be deleted after call of
      * its run() method.
      */
-    virtual void execute(Runnable*) override;
+    virtual void execute(Runnable*) BOOST_OVERRIDE;
 
     /**
      * Gets the current number of queued tasks.
@@ -613,7 +634,7 @@ public:
     /**
      * Runs the queue processing loop.
      */
-    void run() override;
+    void run() BOOST_OVERRIDE;
 
     /**
      * Stop queue processing.
@@ -623,7 +644,7 @@ public:
     /**
      * Notifies the thread pool about an idle thread.
      */
-    virtual void idle_notification() override;
+    virtual void idle_notification() BOOST_OVERRIDE;
 
     /**
      * Check whether QueuedThreadPool is idle or not.
@@ -632,7 +653,7 @@ public:
      *    TRUE if non of the threads in the pool is currently
      *    executing any task and the queue is emtpy().
      */
-    virtual bool is_idle() override;
+    virtual bool is_idle() BOOST_OVERRIDE;
 
     /**
      * Check whether the ThreadPool is busy (i.e., all threads are
@@ -642,7 +663,7 @@ public:
      *    TRUE if non of the threads in the pool is currently
      *    idle (not executing any task).
      */
-    virtual bool is_busy() override;
+    virtual bool is_busy() BOOST_OVERRIDE;
 
 
 private:

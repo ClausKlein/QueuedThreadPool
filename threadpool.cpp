@@ -29,12 +29,9 @@ src/threads.cpp > threadpool.cpp
 
 #include "threadpool.hpp"
 
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
+// #include <errno.h>
+// #include <stdlib.h>
 
-
-#include <sys/time.h> // gettimeofday()
 
 namespace Agentpp
 {
@@ -43,8 +40,6 @@ namespace Agentpp
 static const char* loggerModuleName = "agent++.threads";
 #endif
 
-static const unsigned AGENTPP_SYNCHRONIZED_UNLOCK_RETRIES(1000);
-
 
 /*--------------------- class Synchronized -------------------------*/
 
@@ -52,434 +47,123 @@ static const unsigned AGENTPP_SYNCHRONIZED_UNLOCK_RETRIES(1000);
 unsigned int Synchronized::next_id = 0;
 #endif
 
-#define ERR_CHK_WITHOUT_EXCEPTIONS(x) \
-    do { \
-        int err = (x); \
-        if (err) { \
-            LOG_BEGIN(loggerModuleName, ERROR_LOG | 0); \
-            LOG("Constructing Synchronized failed at '" #x "' with (err)"); \
-            LOG(err); \
-            LOG_END; \
-        } \
-    } while (0)
 
 Synchronized::Synchronized()
-{
-
-#ifndef _NO_LOGGING
-    id = next_id++;
-    if (id
-        > 1) // static initialization order fiasco: Do not log on first calls
-    {
-        LOG_BEGIN(loggerModuleName, DEBUG_LOG | 9);
-        LOG("Synchronized created (id)(ptr)");
-        LOG(id);
-        LOG((void*)this);
-        LOG_END;
-    }
-#endif
-
-    pthread_mutexattr_t attr;
-    ERR_CHK_WITHOUT_EXCEPTIONS(pthread_mutexattr_init(&attr));
-
-#ifdef AGENTPP_PTHREAD_RECURSIVE
-#warning "PTHREAD_MUTEX_RECURSIVE used!"
-    ERR_CHK_WITHOUT_EXCEPTIONS(
-        pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE));
-#else
-#warning "PTHREAD_MUTEX_ERRORCHECK used!"
-    ERR_CHK_WITHOUT_EXCEPTIONS(
-        pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK));
-#endif
-
-    memset(&monitor, 0, sizeof(monitor));
-    ERR_CHK_WITHOUT_EXCEPTIONS(pthread_mutex_init(&monitor, &attr));
-    ERR_CHK_WITHOUT_EXCEPTIONS(pthread_mutexattr_destroy(&attr));
-
-    memset(&cond, 0, sizeof(cond));
-    ERR_CHK_WITHOUT_EXCEPTIONS(pthread_cond_init(&cond, 0));
-
-    isLocked = false;
-}
+    : isLocked(false)
+    , flag(false)
+{}
 
 Synchronized::~Synchronized()
 {
-    int error = pthread_cond_destroy(&cond);
-    if (error) {
-        LOG_BEGIN(loggerModuleName, ERROR_LOG | 2);
-        LOG("Synchronized cond_destroy failed with (error)(ptr)");
-        LOG(error);
-        LOG((void*)this);
-        LOG_END;
-    }
-    error = pthread_mutex_destroy(&monitor);
-
-    if (error == EBUSY) {
-        // wait for other threads ...
-        if (EBUSY == pthread_mutex_trylock(&monitor)) {
-            pthread_mutex_lock(
-                &monitor); // another thread owns the mutex, let's wait ...
-        }
-        unsigned retries = 0;
-        do {
-            (void)pthread_mutex_unlock(&monitor);
-            error = pthread_mutex_destroy(&monitor);
-
-#ifdef DEBUG
-            if (error) {
-                throw std::runtime_error("pthread_mutex_destroy: failed");
-            }
-#endif
-
-        } while ((EBUSY == error)
-            && (retries++ < AGENTPP_SYNCHRONIZED_UNLOCK_RETRIES));
-    }
-
-    if (error) {
-        LOG_BEGIN(loggerModuleName, ERROR_LOG | 2);
-        LOG("Synchronized mutex_destroy failed with (error)(ptr)");
-        LOG(error);
-        LOG((void*)this);
-        LOG_END;
-
-#ifdef DEBUG
-        throw std::runtime_error("pthread_mutex_destroy: failed");
-#endif
+    if (isLocked) {
+        flag = false;
+        mutex.unlock();
+        isLocked = false;
     }
 }
 
 void Synchronized::wait() { cond_timed_wait(0); }
 
+
 int Synchronized::cond_timed_wait(const struct timespec* ts)
 {
-    int result;
-    isLocked = false;
-    if (ts) {
-        result = pthread_cond_timedwait(&cond, &monitor, ts);
+    std::cout << BOOST_CURRENT_FUNCTION << std::endl;
+
+    if (!ts) {
+        boost::unique_lock<boost::mutex> l(mutex);
+        while (!flag) {
+            cond.wait(l);
+        }
     } else {
-        result = pthread_cond_wait(&cond, &monitor);
+        duration d = sec(ts->tv_sec) + ns(ts->tv_nsec);
+        boost::unique_lock<boost::mutex> l(mutex);
+        while (!flag) {
+            if (cond.wait_for(l, d) == boost::cv_status::timeout) {
+                return -1;
+            }
+        }
     }
-    isLocked = true;
-    return result;
+    return flag;
 }
 
 bool Synchronized::wait(unsigned long timeout)
 {
-    bool timeoutOccurred = false;
+    std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
-    struct timespec ts;
-
-#if defined(_POSIX_TIMERS) && _POSIX_TIMERS > 0
-    clock_gettime(CLOCK_REALTIME, &ts);
-    ts.tv_sec += (time_t)timeout / 1000;
-    int millis = ts.tv_nsec / 1000000 + (timeout % 1000);
-    if (millis >= 1000) {
-        ts.tv_sec += 1;
-    }
-    ts.tv_nsec = (millis % 1000) * 1000000;
-#else
-    struct timeval tv;
-    gettimeofday(&tv, 0);
-    ts.tv_sec  = tv.tv_sec + (time_t)timeout / 1000;
-    int millis = tv.tv_usec / 1000 + (timeout % 1000);
-    if (millis >= 1000) {
-        ts.tv_sec += 1;
-    }
-    ts.tv_nsec = (millis % 1000) * 1000000;
-#endif
-
-    isLocked = false;
-    int err  = cond_timed_wait(&ts);
-    if (err) {
-        switch (err) {
-        case EINVAL:
-            LOG_BEGIN(loggerModuleName, WARNING_LOG | 1);
-            LOG("Synchronized: wait with timeout returned (EINVAL)");
-            LOG_END;
-        // fallthrough
-        case ETIMEDOUT:
-            timeoutOccurred = true;
-            break;
-        default:
-            LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
-            LOG("Synchronized: wait with timeout returned (error)");
-            LOG(err);
-            LOG_END;
-            break;
+    duration d = ms(timeout);
+    boost::unique_lock<boost::mutex> l(mutex);
+    while (!flag) {
+        if (cond.wait_for(l, d) == boost::cv_status::timeout) {
+            return -1;
         }
     }
-    isLocked = true;
-
-    return timeoutOccurred;
+    return flag;
 }
 
 void Synchronized::notify()
 {
-    int err = pthread_cond_signal(&cond);
-    if (err) {
-        LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
-        LOG("Synchronized: notify failed (err)");
-        LOG(err);
-        LOG_END;
+    std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
-#ifdef DEBUG
-        throw std::runtime_error("notify: failed");
-#endif
-    }
+    boost::unique_lock<boost::mutex> l(mutex);
+    flag = true;
+    cond.notify_all();
 }
 
 void Synchronized::notify_all()
 {
-    int err = pthread_cond_broadcast(&cond);
-    if (err) {
-        LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
-        LOG("Synchronized: notify_all failed (err)");
-        LOG(err);
-        LOG_END;
+    std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
-#ifdef DEBUG
-        throw std::runtime_error("notify_all: failed");
-#endif
-    }
+    boost::unique_lock<boost::mutex> l(mutex);
+    flag = true;
+    cond.notify_all();
 }
 
 bool Synchronized::lock()
 {
-    int err = pthread_mutex_lock(&monitor);
+    std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
-#ifndef AGENTPP_PTHREAD_RECURSIVE
-    if (!err) {
-        isLocked = true;
-        return true;
-    } else if (err == EDEADLK) {
-        // This thread owns already the lock, but
-        // we do not like recursive locking and print a warning!
-        LOG_BEGIN(loggerModuleName, WARNING_LOG | 5);
-        LOG("Synchronized: recursive lock detected (id)!");
-        LOG(id);
-        LOG_END;
-        return true;
-    }
-#else
-    if (!err) {
-        if (isLocked) {
-            // This thread owns already the lock, but
-            // we do not like recursive locking. Thus
-            // release it immediately and print a warning!
-            if (pthread_mutex_unlock(&monitor) != 0) {
-                LOG_BEGIN(loggerModuleName, WARNING_LOG | 0);
-                LOG("Synchronized: unlock failed on recursive lock (id)");
-                LOG(id);
-                LOG_END;
-
-#ifdef DEBUG
-                throw std::runtime_error("lock: unlock failed");
-#endif
-
-            } else {
-                LOG_BEGIN(loggerModuleName, WARNING_LOG | 5);
-                LOG("Synchronized: recursive locking detected (id)!");
-                LOG(id);
-                LOG_END;
-            }
-        } else {
-            isLocked = true;
-            // no logging because otherwise deep (virtual endless) recursion
-        }
-        return true;
-    }
-#endif
-
-    else {
-        LOG_BEGIN(loggerModuleName, DEBUG_LOG | 8);
-        LOG("Synchronized: lock failed (id)(err)");
-        LOG(id);
-        LOG(err);
-        LOG_END;
-
-#ifdef DEBUG
-        throw std::runtime_error("lock: failed");
-#endif
-
-        return false;
-    }
+    mutex.lock();
+    return (isLocked = true);
 }
 
 bool Synchronized::lock(unsigned long timeout)
 {
-    struct timespec ts;
+    std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
-#if defined(_POSIX_TIMERS) && _POSIX_TIMERS > 0
-    clock_gettime(CLOCK_REALTIME, &ts);
-    ts.tv_sec += (time_t)timeout / 1000;
-    int millis = ts.tv_nsec / 1000000 + (timeout % 1000);
-    if (millis >= 1000) {
-        ts.tv_sec += 1;
-    }
-    ts.tv_nsec = (millis % 1000) * 1000000;
-#else
-    struct timeval tv;
-    gettimeofday(&tv, 0);
-    ts.tv_sec  = tv.tv_sec + (time_t)timeout / 1000;
-    int millis = tv.tv_usec / 1000 + (timeout % 1000);
-    if (millis >= 1000) {
-        ts.tv_sec += 1;
-    }
-    ts.tv_nsec            = (millis % 1000) * 1000000;
-#endif
-
-#ifdef HAVE_PTHREAD_MUTEX_TIMEDLOCK
-    int error = pthread_mutex_timedlock(&monitor, &ts);
-    if (!error)
-#else
-    long remaining_millis = timeout;
-    int error;
-    do {
-        error = pthread_mutex_trylock(&monitor);
-        if (error == EBUSY) {
-            Thread::sleep(10);
-            remaining_millis -= 10;
+    duration d = ms(timeout);
+    boost::unique_lock<boost::mutex> l(mutex);
+    while (!flag) {
+        if (cond.wait_for(l, d) == boost::cv_status::timeout) {
+            return false;
         }
-    } while (error == EBUSY && (remaining_millis > 0));
-    if (error == 0)
-#endif
-
-    {
-
-#ifndef AGENTPP_PTHREAD_RECURSIVE
-        isLocked = true;
-        return true;
-#else
-        if (isLocked) {
-            // This thread owns already the lock, but
-            // we do not like recursive locking. Thus
-            // release it immediately and print a warning!
-            if (pthread_mutex_unlock(&monitor) != 0) {
-                LOG_BEGIN(loggerModuleName, WARNING_LOG | 0);
-                LOG("Synchronized: unlock failed on recursive lock (id)");
-                LOG(id);
-                LOG_END;
-
-#ifdef DEBUG
-                throw std::runtime_error("timedlock: unlock failed");
-#endif
-
-            } else {
-                LOG_BEGIN(loggerModuleName, WARNING_LOG | 5);
-                LOG("Synchronized: recursive lock detected (id)!");
-                LOG(id);
-                LOG_END;
-            }
-        } else {
-            isLocked = true;
-            // no logging because otherwise deep (virtual endless) recursion
-        }
-        return true;
-#endif
-
-    } else {
-        LOG_BEGIN(loggerModuleName, DEBUG_LOG | 8);
-        LOG("Synchronized: lock failed (id)(error)");
-        LOG(id);
-        LOG(error);
-        LOG_END;
-
-#ifdef DEBUG
-        throw std::runtime_error("timedlock: lock failed");
-#endif
-
-        return false;
     }
+    return true; // OK
 }
 
 bool Synchronized::unlock()
 {
-    bool wasLocked = isLocked;
-    isLocked       = false;
-    int err        = pthread_mutex_unlock(&monitor);
-    if (err) {
-        LOG_BEGIN(loggerModuleName, WARNING_LOG | 1);
-        LOG("Synchronized: unlock failed (id)(error)(wasLocked)");
-        LOG(id);
-        LOG(err);
-        LOG(wasLocked);
-        LOG_END;
-        isLocked = wasLocked;
+    std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
-#ifdef DEBUG
-// TBD: throw std::runtime_error("ulock: unlock failed");
-#endif
-
-        return false;
+    if (isLocked) {
+        isLocked = false;
+        mutex.unlock();
+        return true;
     }
 
-    return true;
+    return false;
 }
 
 Synchronized::TryLockResult Synchronized::trylock()
 {
+    std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
-#ifndef AGENTPP_PTHREAD_RECURSIVE
-    int err = pthread_mutex_trylock(&monitor);
-    if (!err) {
+    boost::unique_lock<boost::mutex> l(mutex, boost::defer_lock);
+    if (l.try_lock()) {
         isLocked = true;
-        LOG_BEGIN(loggerModuleName, DEBUG_LOG | 8);
-        LOG("Synchronized: trylock success (id)(ptr)");
-        LOG(id);
-        LOG((long)this);
-        LOG_END;
-        return LOCKED;
-    } else if ((isLocked) && (err == EBUSY)) {
-        // This thread owns already the lock, but
-        // we do not like recursive locking and print a warning!
-        LOG_BEGIN(loggerModuleName, WARNING_LOG | 5);
-        LOG("Synchronized: recursive trylock detected (id)(ptr)!");
-        LOG(id);
-        LOG((long)this);
-        LOG_END;
-        return OWNED;
-    }
-#else
-    if (pthread_mutex_trylock(&monitor) == 0) {
-        if (isLocked) {
-            // This thread owns already the lock, but
-            // we do not like true recursive locking. Thus
-            // release it immediately and print a warning!
-            if (pthread_mutex_unlock(&monitor) != 0) {
-                LOG_BEGIN(loggerModuleName, WARNING_LOG | 0);
-                LOG("Synchronized: unlock failed on recursive trylock "
-                    "(id)(ptr)");
-                LOG(id);
-                LOG((long)this);
-                LOG_END;
-            } else {
-                LOG_BEGIN(loggerModuleName, WARNING_LOG | 5);
-                LOG("Synchronized: recursive trylock detected (id)(ptr)!");
-                LOG(id);
-                LOG((long)this);
-                LOG_END;
-            }
-            return OWNED;
-        } else {
-            isLocked = true;
-            LOG_BEGIN(loggerModuleName, DEBUG_LOG | 8);
-            LOG("Synchronized: trylock success (id)(ptr)");
-            LOG(id);
-            LOG((long)this);
-            LOG_END;
-        }
+        l.release();
         return LOCKED;
     }
-#endif
-
-    else {
-        LOG_BEGIN(loggerModuleName, DEBUG_LOG | 9);
-        LOG("Synchronized: trylock busy (id)(ptr)");
-        LOG(id);
-        LOG((long)this);
-        LOG_END;
-        return BUSY;
-    }
+    return BUSY;
 }
 
 
@@ -492,21 +176,21 @@ void* thread_starter(void* t)
     Thread* thread = static_cast<Thread*>(t);
     Thread::threadList.add(thread);
 
-    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-    LOG("Thread: started (tid)");
-    LOG((AGENTPP_OPAQUE_PTHREAD_T)(thread->tid));
-    LOG_END;
+    // LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
+    // LOG("Thread: started (tid)");
+    // LOG((AGENTPP_OPAQUE_PTHREAD_T)(thread->tid));
+    // LOG_END;
 
 #if defined(__APPLE__) && defined(_DARWIN_C_SOURCE)
-    pthread_setname_np(AGENTX_DEFAULT_THREAD_NAME);
+    // XXX pthread_setname_np(AGENTX_DEFAULT_THREAD_NAME);
 #endif
 
     thread->get_runnable()->run();
 
-    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-    LOG("Thread: ended (tid)");
-    LOG((AGENTPP_OPAQUE_PTHREAD_T)(thread->tid));
-    LOG_END;
+    // LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
+    // LOG("Thread: ended (tid)");
+    // LOG((AGENTPP_OPAQUE_PTHREAD_T)(thread->tid));
+    // LOG_END;
 
     Thread::threadList.remove(thread);
     thread->status = Thread::FINISHED;
@@ -517,7 +201,7 @@ void* thread_starter(void* t)
 Thread::Thread()
     : status(IDLE)
     , stackSize(AGENTPP_DEFAULT_STACKSIZE)
-    , tid(0)
+// XXX , tid(0)
 {
     runnable = static_cast<Runnable*>(this);
 }
@@ -525,7 +209,7 @@ Thread::Thread()
 Thread::Thread(Runnable* r)
     : status(IDLE)
     , stackSize(AGENTPP_DEFAULT_STACKSIZE)
-    , tid(0)
+// XXX , tid(0)
 {
     runnable = r;
 }
@@ -548,117 +232,27 @@ Thread::~Thread()
 
 Runnable* Thread::get_runnable() { return runnable; }
 
-void Thread::join()
-{
-    // TODO: check this! CK
-    if (status != IDLE) {
-        void* retstat;
-        int err = pthread_join(tid, &retstat);
-        if (err) {
-            LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
-            LOG("Thread: join failed (error)");
-            LOG(err);
-            LOG_END;
-        }
-        status = IDLE;
-        LOG_BEGIN(loggerModuleName, DEBUG_LOG | 4);
-        LOG("Thread: joined thread successfully (tid)");
-        LOG((AGENTPP_OPAQUE_PTHREAD_T)tid);
-        LOG_END;
-    } else {
-        LOG_BEGIN(loggerModuleName, WARNING_LOG | 1);
-        LOG("Thread: thread not running (tid)");
-        LOG((AGENTPP_OPAQUE_PTHREAD_T)tid);
-        LOG_END;
-    }
-}
+void Thread::join() {}
 
-void Thread::start()
-{
-    if (status == IDLE) {
-        int policy = 0;
-        struct sched_param param;
-        pthread_getschedparam(pthread_self(), &policy, &param);
-        param.sched_priority = AGENTX_DEFAULT_PRIORITY;
-
-        pthread_attr_t attr;
-        pthread_attr_init(&attr);
-        pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
-        pthread_attr_setschedpolicy(&attr, policy);
-        pthread_attr_setschedparam(&attr, &param);
-
-#if defined(__linux__) && defined(_GNU_SOURCE)
-        pthread_attr_setthreadname_np(&attr, AGENTX_DEFAULT_THREAD_NAME);
-#elif defined(__INTEGRITY)
-        pthread_attr_setthreadname(&attr, AGENTX_DEFAULT_THREAD_NAME);
-#elif defined(__APPLE__)
-// NOTE: must be set from within the thread (can't specify thread ID)
-// XXX pthread_setname_np(AGENTX_DEFAULT_THREAD_NAME);
-#endif
-
-        pthread_attr_setstacksize(&attr, stackSize);
-        int err = pthread_create(&tid, &attr, thread_starter, this);
-        if (err) {
-            LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
-            LOG("Thread: cannot start thread (error)");
-            LOG(err);
-            LOG_END;
-
-            DTRACE("Error: cannot start thread!");
-            status = FINISHED; // NOTE: we are not started, see join()! CK
-        } else {
-            status = RUNNING;
-        }
-        pthread_attr_destroy(&attr);
-    } else {
-        LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
-        LOG("Thread: thread already running!");
-        LOG_END;
-    }
-}
+void Thread::start() {}
 
 void Thread::sleep(long millis)
 {
-    nsleep((time_t)(millis / 1000), (millis % 1000) * 1000000);
+    // XXX nsleep((time_t)(millis / 1000), (millis % 1000) * 1000000);
+    boost::this_thread::sleep_for(ms(millis));
 }
 
 void Thread::sleep(long millis, long nanos)
 {
-    nsleep((time_t)(millis / 1000), (millis % 1000) * 1000000 + nanos);
+    // XXX nsleep((time_t)(millis / 1000), (millis % 1000) * 1000000 + nanos);
+    boost::this_thread::sleep_for(ms(millis) + ns(nanos));
 }
 
 void Thread::nsleep(time_t secs, long nanos)
 {
-    time_t s = secs + nanos / 1000000000;
-    long n   = nanos % 1000000000;
-
-#ifdef _POSIX_TIMERS
-    struct timespec interval, remainder;
-    interval.tv_sec  = s;
-    interval.tv_nsec = n;
-    if (nanosleep(&interval, &remainder) == -1) {
-        if (errno == EINTR) {
-            LOG_BEGIN(loggerModuleName, EVENT_LOG | 3);
-            LOG("Thread: sleep interrupted");
-            LOG_END;
-        }
-    }
-#else
-    struct timeval interval;
-    interval.tv_sec  = s;
-    interval.tv_usec = n / 1000;
-    fd_set writefds, readfds, exceptfds;
-    FD_ZERO(&writefds);
-    FD_ZERO(&readfds);
-    FD_ZERO(&exceptfds);
-    if (select(0, &writefds, &readfds, &exceptfds, &interval) == -1) {
-        if (errno == EINTR) {
-            LOG_BEGIN(loggerModuleName, EVENT_LOG | 3);
-            LOG("Thread: sleep interrupted");
-            LOG_END;
-        }
-    }
-#endif
+    // XXX time_t s = secs + nanos / 1000000000;
+    // XXX long n   = nanos % 1000000000;
+    boost::this_thread::sleep_for(sec(secs) + ns(nanos));
 }
 
 
