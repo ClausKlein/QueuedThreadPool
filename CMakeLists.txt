@@ -213,7 +213,7 @@ if(USE_BOOST)
   endif()
 
   find_package(Boost 1.67 COMPONENTS chrono atomic thread system
-          unit_test_framework ## log ### HINTS /usr/local /opt/local
+          regex unit_test_framework ## log ### HINTS /usr/local /opt/local
   )   # NOTE: Not REQUIRED! CK
   if(Boost_FOUND)
     include_directories(BEFORE SYSTEM ${Boost_INCLUDE_DIR})
@@ -292,14 +292,12 @@ if(USE_BOOST OR USE_CTEST)
 
   endif()
 
-  if(PTHREAD_LIBRARY AND Boost_INCLUDE_DIR)
-    add_executable(test_threads threads_test.cpp
-      threadpool.cpp threadpool.hpp
-    )
-    set_target_properties(test_threads PROPERTIES CXX_STANDARD 14)
-    target_link_libraries(test_threads ${Boost_LIBRARIES} ${EXTRA_LIBS})
-    add_test(NAME test_threads COMMAND test_threads)
-  endif()
+  add_executable(test_threads threads_test.cpp
+    threadpool.cpp threadpool.hpp
+  )
+  set_target_properties(test_threads PROPERTIES CXX_STANDARD 98)
+  target_link_libraries(test_threads ${Boost_LIBRARIES} ${EXTRA_LIBS})
+  add_test(NAME test_threads COMMAND test_threads)
 
 endif()
 

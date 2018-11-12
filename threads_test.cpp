@@ -41,7 +41,7 @@ typedef boost::lockfree::queue<size_t, boost::lockfree::capacity<20> >
 class TestTask : public Agentpp::Runnable {
 public:
     explicit TestTask(
-        const std::string& msg, result_queue_t& rslt, size_t ms_delay = 11)
+        const std::string& msg, result_queue_t& rslt, unsigned ms_delay = 11)
         : text(msg)
         , result(rslt)
         , delay(ms_delay)
@@ -93,7 +93,7 @@ protected:
 private:
     const std::string text;
     result_queue_t& result;
-    size_t delay;
+    unsigned delay;
 };
 
 Agentpp::Synchronized TestTask::lock;
@@ -172,9 +172,9 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
 
         std::srand(static_cast<unsigned>(
             std::time(0))); // use current time as seed for random generator
-        size_t i = 4;
+        unsigned i = 4;
         do {
-            size_t delay = std::rand() % 100;
+            unsigned delay = std::rand() % 100;
             std::string msg(boost::lexical_cast<std::string>(i));
             queuedThreadPool.execute(
                 new TestTask(msg + " Queuing ...", result, delay));
@@ -233,10 +233,10 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolLoad_test)
         defaultThreadPool.execute(new TestTask("Started ...", result));
         BOOST_CHECK(!defaultThreadPool.is_idle());
 
-        size_t i = 20;
+        unsigned i = 20;
         do {
             if (i > 5) {
-                size_t delay = std::rand() % 100;
+                unsigned delay = std::rand() % 100;
                 defaultThreadPool.execute(
                     new TestTask("Running ...", result, delay));
                 Thread::sleep(i / 2); // ms
@@ -415,7 +415,7 @@ BOOST_AUTO_TEST_CASE(SyncWait_test)
     Synchronized sync;
     {
         Lock l(sync);
-        BOOST_TEST(sync.wait(42), "no timeout occurred on wait!");
+        BOOST_TEST(!sync.wait(42), "no timeout occurred on wait!");
     }
 }
 

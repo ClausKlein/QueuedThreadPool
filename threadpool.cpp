@@ -45,7 +45,11 @@ unsigned int Synchronized::next_id = 0;
 Synchronized::Synchronized()
     : isLocked(false)
     , signal(false)
-{}
+#ifndef _NO_LOGGING
+    , id(0)
+#endif
+{
+}
 
 Synchronized::~Synchronized()
 {
@@ -89,7 +93,7 @@ bool Synchronized::wait(unsigned long timeout)
     signal = false;
     while (!signal) {
         if (cond.wait_for(l, d) == boost::cv_status::timeout) {
-            return -1;
+            return false;
         }
     }
     return signal;
@@ -133,6 +137,9 @@ bool Synchronized::lock(unsigned long timeout)
             return false;
         }
     }
+    isLocked = true;
+    l.release();
+
     return true; // OK
 }
 
@@ -446,7 +453,7 @@ ThreadPool::~ThreadPool()
 /*--------------------- class QueuedThreadPool --------------------------*/
 
 QueuedThreadPool::QueuedThreadPool(size_t size)
-    : ThreadPool(size)
+    : ThreadPool(size), go(false)
 {
 #ifdef USE_IMPLIZIT_START
     go = true;
@@ -456,7 +463,7 @@ QueuedThreadPool::QueuedThreadPool(size_t size)
 }
 
 QueuedThreadPool::QueuedThreadPool(size_t size, size_t stack_size)
-    : ThreadPool(size, stack_size)
+    : ThreadPool(size, stack_size), go(false)
 {
 #ifdef USE_IMPLIZIT_START
     go = true;
