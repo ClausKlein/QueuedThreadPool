@@ -26,6 +26,17 @@ src/threads.cpp > threadpool.cpp
 
 #include "threadpool.hpp"
 
+#ifdef _WIN32
+#define HAVE_STRUCT_TIMESPEC
+#else
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200112L
+#endif
+#include <unistd.h> // _POSIX_MONOTONIC_CLOCK _POSIX_TIMEOUTS _POSIX_TIMERS _POSIX_THREADS ...
+#endif
+
+#include <pthread.h>
+
 
 namespace Agentpp
 {
@@ -48,8 +59,7 @@ Synchronized::Synchronized()
 #ifndef _NO_LOGGING
     , id(0)
 #endif
-{
-}
+{}
 
 Synchronized::~Synchronized()
 {
@@ -72,18 +82,20 @@ int Synchronized::cond_timed_wait(const struct timespec* ts)
     boost::unique_lock<boost::mutex> l(mutex, boost::adopt_lock);
     signal = false;
     if (!ts) {
-        while (!signal) {
+        // TODO: while (!signal)
+        {
             cond.wait(l);
         }
     } else {
         duration d = sec(ts->tv_sec) + ns(ts->tv_nsec);
-        while (!signal) {
+        // TODO: while (!signal)
+        {
             if (cond.wait_for(l, d) == boost::cv_status::timeout) {
                 return -1;
             }
         }
     }
-    return signal;
+    return true;
 }
 
 bool Synchronized::wait(unsigned long timeout)
@@ -95,12 +107,13 @@ bool Synchronized::wait(unsigned long timeout)
     duration d = ms(timeout);
     boost::unique_lock<boost::mutex> l(mutex, boost::adopt_lock);
     signal = false;
-    while (!signal) {
+    // TODO: while (!signal)
+    {
         if (cond.wait_for(l, d) == boost::cv_status::timeout) {
             return false;
         }
     }
-    return signal;
+    return true;
 }
 
 void Synchronized::notify()
@@ -129,7 +142,10 @@ bool Synchronized::lock()
 {
     std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
-    assert(!isLocked);
+    // TODO assert(!isLocked);
+    if (isLocked) {
+        throw std::runtime_error("Synchronized::lock(): recursive used!");
+    }
 
     mutex.lock();
     return (isLocked = true);
@@ -193,21 +209,21 @@ void* thread_starter(void* t)
     Thread* thread = static_cast<Thread*>(t);
     Thread::threadList.add(thread);
 
-    // LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-    // LOG("Thread: started (tid)");
-    // LOG((AGENTPP_OPAQUE_PTHREAD_T)(thread->tid));
-    // LOG_END;
+    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
+    LOG("Thread: started (tid)");
+    LOG((AGENTPP_OPAQUE_PTHREAD_T)(thread->tid));
+    LOG_END;
 
 #if defined(__APPLE__) && defined(_DARWIN_C_SOURCE)
-    // XXX pthread_setname_np(AGENTX_DEFAULT_THREAD_NAME);
+    pthread_setname_np(AGENTX_DEFAULT_THREAD_NAME);
 #endif
 
     thread->get_runnable()->run();
 
-    // LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-    // LOG("Thread: ended (tid)");
-    // LOG((AGENTPP_OPAQUE_PTHREAD_T)(thread->tid));
-    // LOG_END;
+    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
+    LOG("Thread: ended (tid)");
+    LOG((AGENTPP_OPAQUE_PTHREAD_T)(thread->tid));
+    LOG_END;
 
     Thread::threadList.remove(thread);
     thread->status = Thread::FINISHED;
@@ -218,7 +234,7 @@ void* thread_starter(void* t)
 Thread::Thread()
     : status(IDLE)
     , stackSize(AGENTPP_DEFAULT_STACKSIZE)
-// XXX , tid(0)
+    , tid(0)
 {
     runnable = static_cast<Runnable*>(this);
 }
@@ -226,7 +242,7 @@ Thread::Thread()
 Thread::Thread(Runnable* r)
     : status(IDLE)
     , stackSize(AGENTPP_DEFAULT_STACKSIZE)
-// XXX , tid(0)
+    , tid(0)
 {
     runnable = r;
 }
@@ -251,12 +267,72 @@ Runnable* Thread::get_runnable() { return runnable; }
 
 void Thread::join()
 {
-    // TODO!
+    // TODO: check this! CK
+    if (status != IDLE) {
+        void* retstat;
+        int err = pthread_join(tid, &retstat);
+        if (err) {
+            LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
+            LOG("Thread: join failed (error)");
+            LOG(err);
+            LOG_END;
+        }
+        status = IDLE;
+        LOG_BEGIN(loggerModuleName, DEBUG_LOG | 4);
+        LOG("Thread: joined thread successfully (tid)");
+        LOG((AGENTPP_OPAQUE_PTHREAD_T)tid);
+        LOG_END;
+    } else {
+        LOG_BEGIN(loggerModuleName, WARNING_LOG | 1);
+        LOG("Thread: thread not running (tid)");
+        LOG((AGENTPP_OPAQUE_PTHREAD_T)tid);
+        LOG_END;
+    }
 }
 
 void Thread::start()
 {
-    // TODO!
+    // TODO: check this! CK
+    if (status == IDLE) {
+        int policy = 0;
+        struct sched_param param;
+        pthread_getschedparam(pthread_self(), &policy, &param);
+        param.sched_priority = AGENTX_DEFAULT_PRIORITY;
+
+        pthread_attr_t attr;
+        pthread_attr_init(&attr);
+        pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
+        pthread_attr_setschedpolicy(&attr, policy);
+        pthread_attr_setschedparam(&attr, &param);
+
+#if defined(__linux__) && defined(_GNU_SOURCE)
+        pthread_attr_setthreadname_np(&attr, AGENTX_DEFAULT_THREAD_NAME);
+#elif defined(__INTEGRITY)
+        pthread_attr_setthreadname(&attr, AGENTX_DEFAULT_THREAD_NAME);
+#elif defined(__APPLE__)
+// NOTE: must be set from within the thread (can't specify thread ID)
+// XXX pthread_setname_np(AGENTX_DEFAULT_THREAD_NAME);
+#endif
+
+        pthread_attr_setstacksize(&attr, stackSize);
+        int err = pthread_create(&tid, &attr, thread_starter, this);
+        if (err) {
+            LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
+            LOG("Thread: cannot start thread (error)");
+            LOG(err);
+            LOG_END;
+
+            DTRACE("Error: cannot start thread!");
+            status = FINISHED; // NOTE: we are not started, see join()! CK
+        } else {
+            status = RUNNING;
+        }
+        pthread_attr_destroy(&attr);
+    } else {
+        LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
+        LOG("Thread: thread already running!");
+        LOG_END;
+    }
 }
 
 void Thread::sleep(long millis)
@@ -371,13 +447,15 @@ void ThreadPool::execute(Runnable* t)
                 LOG_END;
 
                 unlock();
+                //==============================
                 if (tm->set_task(t)) {
                     return; // done
                 } else {
                     // task could not be assigned
                     tm = 0;
-                    lock();
                 }
+                //==============================
+                lock();
             }
             tm = 0;
         }
@@ -386,6 +464,7 @@ void ThreadPool::execute(Runnable* t)
             wait(1234); // NOTE: (ms) for idle_notification ... CK
         }
     }
+    unlock();
 }
 
 void ThreadPool::idle_notification()
@@ -398,16 +477,13 @@ void ThreadPool::idle_notification()
 /// task.
 bool ThreadPool::is_idle()
 {
-    // XXX lock();
     Lock l(*this);
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
          cur != taskList.end(); ++cur) {
         if (!(*cur)->is_idle()) {
-            unlock();
             return false;
         }
     }
-    // XXX unlock();
     return true; // NOTE: all threads are idle
 }
 
@@ -415,16 +491,13 @@ bool ThreadPool::is_idle()
 /// any task.
 bool ThreadPool::is_busy()
 {
-    lock();
     Lock l(*this);
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
          cur != taskList.end(); ++cur) {
         if ((*cur)->is_idle()) {
-            unlock();
             return false;
         }
     }
-    unlock();
     return true; // NOTE: all threads are busy
 }
 
@@ -467,7 +540,8 @@ ThreadPool::~ThreadPool()
 /*--------------------- class QueuedThreadPool --------------------------*/
 
 QueuedThreadPool::QueuedThreadPool(size_t size)
-    : ThreadPool(size), go(false)
+    : ThreadPool(size)
+    , go(false)
 {
 #ifdef USE_IMPLIZIT_START
     go = true;
@@ -477,7 +551,8 @@ QueuedThreadPool::QueuedThreadPool(size_t size)
 }
 
 QueuedThreadPool::QueuedThreadPool(size_t size, size_t stack_size)
-    : ThreadPool(size, stack_size), go(false)
+    : ThreadPool(size, stack_size)
+    , go(false)
 {
 #ifdef USE_IMPLIZIT_START
     go = true;
@@ -516,7 +591,9 @@ bool QueuedThreadPool::assign(Runnable* t, bool withQueuing)
             LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
             LOG("QueuedThreadPool::assign(IDLE):: task manager found");
             LOG_END;
+
             Thread::unlock();
+            //==============================
             if (!tm->set_task(t)) {
                 tm = 0;
                 Thread::lock();
@@ -525,6 +602,7 @@ bool QueuedThreadPool::assign(Runnable* t, bool withQueuing)
                 DTRACE("task manager found");
                 return true; // OK
             }
+            //==============================
         }
         tm = 0;
     }

@@ -419,7 +419,7 @@ private:
     Runnable* runnable;
     ThreadStatus status;
     size_t stackSize;
-    // XXX pthread_t tid;
+    pthread_t tid;
     static ThreadList threadList;
     static void nsleep(time_t secs, long nanos);
 };
