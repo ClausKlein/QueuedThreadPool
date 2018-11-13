@@ -142,14 +142,17 @@ bool Synchronized::lock()
 {
     std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
-    // TODO assert(!isLocked);
     if (isLocked) {
-        throw std::runtime_error("Synchronized::lock(): recursive used!");
+        if (!unlock()) {
+            ; // TODO: throw std::runtime_error("Synchronized::lock():
+              // recursive used!");
+        }
     }
 
     mutex.lock();
     return (isLocked = true);
 }
+
 
 #if HAVE_TIMED_MUTEX
 bool Synchronized::lock(unsigned long timeout)
@@ -167,6 +170,7 @@ bool Synchronized::lock(unsigned long timeout)
     return true; // OK
 }
 #endif
+
 
 bool Synchronized::unlock()
 {
@@ -393,13 +397,13 @@ void TaskManager::run()
             delete task;
             task = 0;
 
-            unlock(); // NOTE: prevent deadlock! CK
+            // FIXME: unlock(); // NOTE: prevent deadlock! CK
             //==============================
-            // NOTE: may direct call set_task()
+            // NOTE: may end in a direct call to set_task()
             // via QueuedThreadPool::run() => QueuedThreadPool::assign()
             threadPool->idle_notification();
             //==============================
-            lock(); // NOTE: needed! CK
+            // FIXME: lock(); // NOTE: needed! CK
         } else {
             wait(); // NOTE: idle, wait until notify signal CK
         }
@@ -412,9 +416,10 @@ void TaskManager::run()
     unlock();
 }
 
+// NOTE: asserted to be called with lock! CK
 bool TaskManager::set_task(Runnable* t)
 {
-    Lock l(*this);
+    // FIXME: deadlock! Lock l(*this);
     if (!task) {
         task = t;
         notify();
@@ -435,7 +440,8 @@ bool TaskManager::set_task(Runnable* t)
 
 void ThreadPool::execute(Runnable* t)
 {
-    lock();
+    // FIXME: lock();
+    Lock l(*this);
     TaskManager* tm = 0;
     while (!tm) {
         for (std::vector<TaskManager*>::iterator cur = taskList.begin();
@@ -446,7 +452,7 @@ void ThreadPool::execute(Runnable* t)
                 LOG("TaskManager: task manager found");
                 LOG_END;
 
-                unlock();
+                // FIXME: unlock();
                 //==============================
                 if (tm->set_task(t)) {
                     return; // done
@@ -455,7 +461,7 @@ void ThreadPool::execute(Runnable* t)
                     tm = 0;
                 }
                 //==============================
-                lock();
+                // FIXME: lock();
             }
             tm = 0;
         }
@@ -464,7 +470,7 @@ void ThreadPool::execute(Runnable* t)
             wait(1234); // NOTE: (ms) for idle_notification ... CK
         }
     }
-    unlock();
+    // FIXME: unlock();
 }
 
 void ThreadPool::idle_notification()
@@ -592,13 +598,13 @@ bool QueuedThreadPool::assign(Runnable* t, bool withQueuing)
             LOG("QueuedThreadPool::assign(IDLE):: task manager found");
             LOG_END;
 
-            Thread::unlock();
+            // FIXME: Thread::unlock();
             //==============================
             if (!tm->set_task(t)) {
                 tm = 0;
-                Thread::lock();
+                // FIXME: Thread::lock();
             } else {
-                Thread::lock();
+                // FIXME: Thread::lock();
                 DTRACE("task manager found");
                 return true; // OK
             }
@@ -607,6 +613,7 @@ bool QueuedThreadPool::assign(Runnable* t, bool withQueuing)
         tm = 0;
     }
 
+#ifndef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
     // NOTE: no idle thread found, push to queue if allowed! CK
     if (!tm && withQueuing) {
         LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
@@ -619,6 +626,7 @@ bool QueuedThreadPool::assign(Runnable* t, bool withQueuing)
 
         return true;
     }
+#endif
 
     return false;
 }
@@ -694,7 +702,7 @@ void QueuedThreadPool::idle_notification()
     Thread::notify();
     Thread::unlock();
 
-    // FIXME: why? CK
+    // TODO: why? CK
     ThreadPool::idle_notification();
 }
 
