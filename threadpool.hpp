@@ -61,9 +61,9 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 
 #if !defined(_NO_LOGGING) && !defined(NDEBUG)
 #define DEBUG
-#define LOG_BEGIN(x, y) std::cerr << BOOST_CURRENT_FUNCTION << ": "
-#define LOG(x) std::cerr << x << ' '
-#define LOG_END std::cerr << std::endl
+#define LOG_BEGIN(x, y) std::cout << BOOST_CURRENT_FUNCTION << ": "
+#define LOG(x) std::cout << x << ' '
+#define LOG_END std::cout << std::endl
 #else
 #define LOG_BEGIN(x, y)
 #define LOG(x)
@@ -78,7 +78,7 @@ clang-format -i -style=file threadpool.{cpp,hpp}
  */
 #ifdef DEBUG
 #define DTRACE(arg) \
-    std::cout << BOOST_CURRENT_FUNCTION << ": " arg << std::endl
+    std::cout << BOOST_CURRENT_FUNCTION << ": " << arg << std::endl
 #else
 #define DTRACE(arg)
 #endif

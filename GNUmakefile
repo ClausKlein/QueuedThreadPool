@@ -2,8 +2,8 @@
 #   configure part
 BOOST_ROOT?=/usr/local
 MT?=-mt
-## CXXFLAGS+=-O2 -DNDEBUG
-CXXFLAGS+=-g
+CXXFLAGS+=-O2 -DNDEBUG
+## CXXFLAGS+=-g
 #=====================
 
 #NO! CK

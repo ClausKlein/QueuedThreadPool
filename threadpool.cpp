@@ -26,16 +26,17 @@ src/threads.cpp > threadpool.cpp
 
 #include "threadpool.hpp"
 
-#ifdef _WIN32
-#define HAVE_STRUCT_TIMESPEC
-#else
+#ifndef _MSC_VER 
+
 #ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 200112L
 #endif
-#include <unistd.h> // _POSIX_MONOTONIC_CLOCK _POSIX_TIMEOUTS _POSIX_TIMERS _POSIX_THREADS ...
-#endif
+
+#include <unistd.h> // _POSIX_THREADS ...
 
 #include <pthread.h>
+
+#endif
 
 
 namespace Agentpp
@@ -43,14 +44,11 @@ namespace Agentpp
 
 #ifndef _NO_LOGGING
 static const char* loggerModuleName = "agent++.threads";
+unsigned int Synchronized::next_id = 0;
 #endif
 
 
 /*--------------------- class Synchronized -------------------------*/
-
-#ifndef _NO_LOGGING
-unsigned int Synchronized::next_id = 0;
-#endif
 
 //XXX boost::thread_specific_ptr<bool> Synchronized::isLocked;
 
@@ -82,7 +80,7 @@ void Synchronized::wait() { cond_timed_wait(0); }
 
 int Synchronized::cond_timed_wait(const struct timespec* ts)
 {
-    std::cout << BOOST_CURRENT_FUNCTION << std::endl;
+    DTRACE(signal); 
 
     //XXX assert(isLocked.get() && *isLocked);
 
@@ -108,7 +106,7 @@ int Synchronized::cond_timed_wait(const struct timespec* ts)
 
 bool Synchronized::wait(unsigned long timeout)
 {
-    std::cout << BOOST_CURRENT_FUNCTION << std::endl;
+    DTRACE(signal);
 
     //XXX assert(isLocked.get() && *isLocked);
 
@@ -128,7 +126,7 @@ bool Synchronized::wait(unsigned long timeout)
 
 void Synchronized::notify()
 {
-    std::cout << BOOST_CURRENT_FUNCTION << std::endl;
+    DTRACE(signal);
 
     //XXX assert(isLocked.get() && *isLocked);
 
@@ -140,7 +138,7 @@ void Synchronized::notify()
 
 void Synchronized::notify_all()
 {
-    std::cout << BOOST_CURRENT_FUNCTION << std::endl;
+    DTRACE(signal);
 
     //XXX assert(isLocked.get() && *isLocked);
 
@@ -152,7 +150,7 @@ void Synchronized::notify_all()
 
 bool Synchronized::lock()
 {
-    std::cout << BOOST_CURRENT_FUNCTION << std::endl;
+    DTRACE("");
 
 #ifdef XXX
     if (isLocked.get()) {
@@ -179,7 +177,7 @@ bool Synchronized::lock()
 #if HAVE_TIMED_MUTEX
 bool Synchronized::lock(unsigned long timeout)
 {
-    std::cout << BOOST_CURRENT_FUNCTION << std::endl;
+    DTRACE(timeout);
 
     //XXX assert(isLocked.get() && (*isLocked == false));
 
@@ -196,7 +194,7 @@ bool Synchronized::lock(unsigned long timeout)
 
 bool Synchronized::unlock()
 {
-    std::cout << BOOST_CURRENT_FUNCTION << std::endl;
+    DTRACE("");
 
     //XXX if (isLocked.get() && *isLocked) {
         //XXX *isLocked = false;
@@ -209,7 +207,7 @@ bool Synchronized::unlock()
 
 Synchronized::TryLockResult Synchronized::trylock()
 {
-    std::cout << BOOST_CURRENT_FUNCTION << std::endl;
+    DTRACE("");
 
 #ifdef XXX
     if (isLocked.get() && *isLocked) {
@@ -430,7 +428,7 @@ void TaskManager::run()
             //==============================
             lock(); // NOTE: needed! CK
         } else {
-            wait(rand() % 11235); // NOTE: idle, wait until notify signal CK
+            wait(); // NOTE: idle, wait until notify signal CK
         }
     }
     if (task) {
@@ -441,10 +439,10 @@ void TaskManager::run()
     unlock();
 }
 
-// NOTE: asserted to be called with lock! CK
+// FIXME: asserted to be called with lock! CK
 bool TaskManager::set_task(Runnable* t)
 {
-    //FIXME! Lock l(*this);
+    Lock l(*this);
     if (!task) {
         task = t;
         notify();
@@ -477,7 +475,7 @@ void ThreadPool::execute(Runnable* t)
                 LOG("TaskManager: task manager found");
                 LOG_END;
 
-                //FIXME unlock();
+                unlock();
                 //==============================
                 if (tm->set_task(t)) {
                     return; // done
@@ -485,7 +483,7 @@ void ThreadPool::execute(Runnable* t)
                     tm = 0; // task could not be assigned
                 }
                 //==============================
-                // FIXME lock();
+                lock();
             }
             tm = 0;
         }
@@ -709,7 +707,7 @@ void QueuedThreadPool::run()
         }
 
         // NOTE: for idle_notification ... CK
-        Thread::wait(1234); // ms
+        Thread::wait(); // ms
     }
 
     Thread::unlock();
