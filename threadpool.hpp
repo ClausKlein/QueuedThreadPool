@@ -44,6 +44,7 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/thread/tss.hpp> // tss -> tls: thread local storage
 
 #undef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
 
@@ -231,7 +232,8 @@ private:
     int cond_timed_wait(const timespec*);
     boost::condition_variable cond;
     boost::mutex mutex;
-    volatile bool isLocked;
+    //XXX volatile bool isLocked;
+    //XXX static boost::thread_specific_ptr<bool> isLocked;
     volatile bool signal;
 };
 

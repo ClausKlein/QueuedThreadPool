@@ -52,22 +52,29 @@ static const char* loggerModuleName = "agent++.threads";
 unsigned int Synchronized::next_id = 0;
 #endif
 
+//XXX boost::thread_specific_ptr<bool> Synchronized::isLocked;
+
 
 Synchronized::Synchronized()
-    : isLocked(false)
-    , signal(false)
+    : signal(false)
+
 #ifndef _NO_LOGGING
     , id(0)
 #endif
-{}
+
+{
+    //XXX if (!isLocked.get()) {
+        //XXX isLocked.reset(new bool(false));
+    //XXX }
+}
 
 Synchronized::~Synchronized()
 {
-    if (isLocked) {
-        signal = false;
+    //XXX if (isLocked.get() && *isLocked) {
+        signal    = true;
+        //XXX *isLocked = false;
         mutex.unlock();
-        isLocked = false;
-    }
+    //XXX }
 }
 
 void Synchronized::wait() { cond_timed_wait(0); }
@@ -77,24 +84,25 @@ int Synchronized::cond_timed_wait(const struct timespec* ts)
 {
     std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
-    assert(isLocked);
+    //XXX assert(isLocked.get() && *isLocked);
 
     boost::unique_lock<boost::mutex> l(mutex, boost::adopt_lock);
-    signal = false;
     if (!ts) {
-        // TODO: while (!signal)
-        {
+        while (!signal) {
             cond.wait(l);
         }
     } else {
         duration d = sec(ts->tv_sec) + ns(ts->tv_nsec);
-        // TODO: while (!signal)
-        {
+        while (!signal) {
             if (cond.wait_for(l, d) == boost::cv_status::timeout) {
+                l.release();
                 return -1;
             }
         }
     }
+
+    signal = false;
+    l.release();
     return true;
 }
 
@@ -102,17 +110,19 @@ bool Synchronized::wait(unsigned long timeout)
 {
     std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
-    assert(isLocked);
+    //XXX assert(isLocked.get() && *isLocked);
 
-    duration d = ms(timeout);
     boost::unique_lock<boost::mutex> l(mutex, boost::adopt_lock);
-    signal = false;
-    // TODO: while (!signal)
-    {
+    duration d = ms(timeout);
+    while (!signal) {
         if (cond.wait_for(l, d) == boost::cv_status::timeout) {
+            l.release();
             return false;
         }
     }
+
+    signal = false;
+    l.release();
     return true;
 }
 
@@ -120,37 +130,49 @@ void Synchronized::notify()
 {
     std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
-    assert(isLocked);
+    //XXX assert(isLocked.get() && *isLocked);
 
     boost::unique_lock<boost::mutex> l(mutex, boost::adopt_lock);
     signal = true;
     cond.notify_one();
+    l.release();
 }
 
 void Synchronized::notify_all()
 {
     std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
-    assert(isLocked);
+    //XXX assert(isLocked.get() && *isLocked);
 
     boost::unique_lock<boost::mutex> l(mutex, boost::adopt_lock);
     signal = true;
     cond.notify_all();
+    l.release();
 }
 
 bool Synchronized::lock()
 {
     std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
-    if (isLocked) {
-        if (!unlock()) {
-            ; // TODO: throw std::runtime_error("Synchronized::lock():
-              // recursive used!");
+#ifdef XXX
+    if (isLocked.get()) {
+        if (*isLocked) {
+
+#ifdef DEBUG
+            throw std::runtime_error("Synchronized::lock(): recursive used!");
+#endif
+
+            // TODO: This thread owns already the lock, but we do not like
+            // recursive locking. Thus release it immediately and print a
+            // warning!
+            return false;
         }
     }
+#endif
 
     mutex.lock();
-    return (isLocked = true);
+    //XXX isLocked.reset(new bool(true));
+    return true;
 }
 
 
@@ -159,14 +181,14 @@ bool Synchronized::lock(unsigned long timeout)
 {
     std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
-    assert(!isLocked);
+    //XXX assert(isLocked.get() && (*isLocked == false));
 
     duration d = ms(timeout);
     if (!mutex.try_lock_for(d)) {
         return false;
     }
 
-    isLocked = true;
+    //XXX *isLocked = true;
     return true; // OK
 }
 #endif
@@ -176,26 +198,28 @@ bool Synchronized::unlock()
 {
     std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
-    if (isLocked) {
-        isLocked = false;
+    //XXX if (isLocked.get() && *isLocked) {
+        //XXX *isLocked = false;
         mutex.unlock();
         return true;
-    }
+    //XXX }
 
-    return false;
+    //XXX return false;
 }
 
 Synchronized::TryLockResult Synchronized::trylock()
 {
     std::cout << BOOST_CURRENT_FUNCTION << std::endl;
 
-    if (isLocked) {
+#ifdef XXX
+    if (isLocked.get() && *isLocked) {
         return OWNED;
     }
+#endif
 
     boost::unique_lock<boost::mutex> l(mutex, boost::defer_lock);
     if (l.try_lock()) {
-        isLocked = true;
+        //XXX isLocked.reset(new bool(true));
         l.release();
         return LOCKED;
     }
@@ -390,6 +414,7 @@ TaskManager::~TaskManager()
 
 void TaskManager::run()
 {
+    // TODO: Lock l(*this);
     lock();
     while (go) {
         if (task) {
@@ -397,15 +422,15 @@ void TaskManager::run()
             delete task;
             task = 0;
 
-            // FIXME: unlock(); // NOTE: prevent deadlock! CK
+            unlock(); // NOTE: prevent deadlock! CK
             //==============================
             // NOTE: may end in a direct call to set_task()
             // via QueuedThreadPool::run() => QueuedThreadPool::assign()
             threadPool->idle_notification();
             //==============================
-            // FIXME: lock(); // NOTE: needed! CK
+            lock(); // NOTE: needed! CK
         } else {
-            wait(); // NOTE: idle, wait until notify signal CK
+            wait(rand() % 11235); // NOTE: idle, wait until notify signal CK
         }
     }
     if (task) {
@@ -419,7 +444,7 @@ void TaskManager::run()
 // NOTE: asserted to be called with lock! CK
 bool TaskManager::set_task(Runnable* t)
 {
-    // FIXME: deadlock! Lock l(*this);
+    //FIXME! Lock l(*this);
     if (!task) {
         task = t;
         notify();
@@ -440,8 +465,8 @@ bool TaskManager::set_task(Runnable* t)
 
 void ThreadPool::execute(Runnable* t)
 {
-    // FIXME: lock();
-    Lock l(*this);
+    // TODO: Lock l(*this);
+    lock();
     TaskManager* tm = 0;
     while (!tm) {
         for (std::vector<TaskManager*>::iterator cur = taskList.begin();
@@ -452,30 +477,29 @@ void ThreadPool::execute(Runnable* t)
                 LOG("TaskManager: task manager found");
                 LOG_END;
 
-                // FIXME: unlock();
+                //FIXME unlock();
                 //==============================
                 if (tm->set_task(t)) {
                     return; // done
                 } else {
-                    // task could not be assigned
-                    tm = 0;
+                    tm = 0; // task could not be assigned
                 }
                 //==============================
-                // FIXME: lock();
+                // FIXME lock();
             }
             tm = 0;
         }
         if (!tm) {
             DTRACE("busy! Synchronized::wait()");
-            wait(1234); // NOTE: (ms) for idle_notification ... CK
+            wait(); // NOTE: (ms) for idle_notification ... CK
         }
     }
-    // FIXME: unlock();
+    unlock();
 }
 
 void ThreadPool::idle_notification()
 {
-    Lock l(*this);
+    // FIXME: needed? CK Lock l(*this);
     notify();
 }
 
@@ -483,13 +507,16 @@ void ThreadPool::idle_notification()
 /// task.
 bool ThreadPool::is_idle()
 {
-    Lock l(*this);
+    //TODO: use Lock l(*this);
+    lock();
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
          cur != taskList.end(); ++cur) {
         if (!(*cur)->is_idle()) {
+            unlock();
             return false;
         }
     }
+    unlock();
     return true; // NOTE: all threads are idle
 }
 
@@ -497,24 +524,29 @@ bool ThreadPool::is_idle()
 /// any task.
 bool ThreadPool::is_busy()
 {
-    Lock l(*this);
+    //TODO: use Lock l(*this);
+    lock();
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
          cur != taskList.end(); ++cur) {
         if ((*cur)->is_idle()) {
+            unlock();
             return false;
         }
     }
+    unlock();
     return true; // NOTE: all threads are busy
 }
 
 void ThreadPool::terminate()
 {
-    Lock l(*this);
+    //TODO: use Lock l(*this);
+    lock();
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
          cur != taskList.end(); ++cur) {
         (*cur)->stop();
     }
     notify(); // NOTE: for wait() at execute()
+    unlock();
 }
 
 ThreadPool::ThreadPool(size_t size)
@@ -598,13 +630,13 @@ bool QueuedThreadPool::assign(Runnable* t, bool withQueuing)
             LOG("QueuedThreadPool::assign(IDLE):: task manager found");
             LOG_END;
 
-            // FIXME: Thread::unlock();
+            Thread::unlock();
             //==============================
             if (!tm->set_task(t)) {
                 tm = 0;
-                // FIXME: Thread::lock();
+                Thread::lock();
             } else {
-                // FIXME: Thread::lock();
+                Thread::lock();
                 DTRACE("task manager found");
                 return true; // OK
             }
@@ -669,7 +701,7 @@ void QueuedThreadPool::run()
 
                 } else {
                     DTRACE("busy! Thread::sleep()");
-                    // NOTE: wait some ms to prevent notify() loops while busy!
+                    // NOTE: Wait some ms to prevent notify() loops while busy!
                     // CK
                     Thread::sleep(rand() % 113); // ms
                 }

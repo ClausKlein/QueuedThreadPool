@@ -284,7 +284,6 @@ if(USE_BOOST OR USE_CTEST)
     if(asio_FOUND)
       add_executable(test_priority_scheduler priority_scheduler.cpp)
       target_include_directories(test_priority_scheduler SYSTEM BEFORE PRIVATE ${asio_INCLUDE_DIR})
-      #XXX target_compile_definitions(test_priority_scheduler PRIVATE -std=c++03)
       set_target_properties(test_priority_scheduler PROPERTIES CXX_STANDARD 98)
       target_link_libraries(test_priority_scheduler ${Boost_LIBRARIES} ${EXTRA_LIBS})
       add_test(NAME test_priority_scheduler COMMAND test_priority_scheduler)
@@ -295,7 +294,7 @@ if(USE_BOOST OR USE_CTEST)
   add_executable(test_threads threads_test.cpp
     threadpool.cpp threadpool.hpp
   )
-  set_target_properties(test_threads PROPERTIES CXX_STANDARD 98)
+  set_target_properties(test_threads PROPERTIES CXX_STANDARD 14)
   target_link_libraries(test_threads ${Boost_LIBRARIES} ${EXTRA_LIBS})
   add_test(NAME test_threads COMMAND test_threads)
 

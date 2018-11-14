@@ -46,13 +46,13 @@ public:
         , result(rslt)
         , delay(ms_delay)
     {
-        Agentpp::Lock l(lock);
+        //FIXME use boost::mutex! Agentpp::Lock l(lock);
         ++counter;
     }
 
     virtual ~TestTask()
     {
-        Agentpp::Lock l(lock);
+        //FIXME use boost::mutex! Agentpp::Lock l(lock);
         --counter;
     }
 
@@ -60,7 +60,7 @@ public:
     {
         Agentpp::Thread::sleep(delay); // ms
 
-        Agentpp::Lock l(lock);
+        //FIXME use boost::mutex! Agentpp::Lock l(lock);
         // TODO BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << " called with: "
         // << text);
         size_t hash = boost::hash_value(text);
@@ -70,17 +70,17 @@ public:
 
     static size_t run_count()
     {
-        Agentpp::Lock l(lock);
+        //FIXME use boost::mutex! Agentpp::Lock l(lock);
         return run_cnt;
     }
     static size_t task_count()
     {
-        Agentpp::Lock l(lock);
+        //FIXME use boost::mutex! Agentpp::Lock l(lock);
         return counter;
     }
     static void reset_counter()
     {
-        Agentpp::Lock l(lock);
+        //FIXME use boost::mutex! Agentpp::Lock l(lock);
         counter = 0;
         run_cnt = 0;
     }
@@ -96,7 +96,7 @@ private:
     unsigned delay;
 };
 
-Agentpp::Synchronized TestTask::lock;
+//FIXME use boost::mutex! Agentpp::Synchronized TestTask::lock;
 test_counter_t TestTask::run_cnt(0);
 test_counter_t TestTask::counter(0);
 
@@ -389,7 +389,7 @@ BOOST_AUTO_TEST_CASE(Synchronized_test)
     using namespace Agentpp;
     Synchronized sync;
     {
-        //FIXME: prevent deadlock! Lock l(sync);
+        //FIXME: do NOT test deadlock! Lock l(sync);
         BOOST_TEST(sync.lock());
         BOOST_TEST(sync.unlock());
         BOOST_TEST(!sync.unlock(), "second unlock() returns no error");
