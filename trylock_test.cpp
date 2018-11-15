@@ -10,9 +10,12 @@
 
 #include "simple_stopwatch.hpp"
 
+#define BOOST_THREAD_VERSION 4
 #define BOOST_THREAD_USES_CHRONO
+
+#include <boost/thread/lock_guard.hpp>
 #include <boost/thread/lock_types.hpp>
-#include <boost/thread/shared_mutex.hpp>
+#include <boost/thread/mutex.hpp>
 #include <boost/thread/thread_only.hpp>
 
 #include <iostream>
@@ -23,24 +26,39 @@
 
 using namespace boost;
 
-shared_mutex mtx;
+mutex mtx;
+int counter      = 0;
 const int cycles = 1000;
+const int worker = 2;
 
-void shared()
+
+void monitor()
 {
-    int cycle(0);
-    while (++cycle < cycles) {
-        shared_lock<shared_mutex> lock(mtx);
-    }
+    do {
+        boost::this_thread::sleep_for(ns(50));
+        {
+            unique_lock<mutex> lock(mtx, defer_lock);
+            if (lock.try_lock()) {
+                std::cout << counter << std::endl;
+
+                if (counter >= (worker * cycles)) {
+                    break;
+                }
+            }
+        }
+    } while (true);
 }
+
 
 void unique()
 {
     int cycle(0);
-    while (++cycle < cycles) {
-        unique_lock<shared_mutex> lock(mtx);
+    while (++cycle <= cycles) {
+        unique_lock<mutex> lock(mtx);
+        ++counter;
     }
 }
+
 
 int main()
 {
@@ -50,19 +68,13 @@ int main()
     for (int i = 100; i > 0; --i) {
         Stopwatch timer;
 
-        thread t0(shared);
-        thread t1(shared);
+        thread t1(unique);
         thread t2(unique);
-        // thread t11(shared);
-        // thread t12(shared);
-        // thread t13(shared);
+        thread tm(monitor);
 
-        t0.join();
         t1.join();
         t2.join();
-        // t11.join();
-        // t12.join();
-        // t13.join();
+        tm.join();
 
         Stopwatch::duration elapsed(timer.elapsed());
 
@@ -77,7 +89,8 @@ int main()
     }
 
     std::cout << "Best Time spent: " << best_time << std::endl;
-    std::cout << "Time spent/cycle:" << best_time / cycles / 3 << std::endl;
+    std::cout << "Time spent/cycle:" << best_time / cycles / worker
+              << std::endl;
 
     return 0;
 }
