@@ -2,8 +2,8 @@
 #   configure part
 BOOST_ROOT?=/usr/local
 MT?=-mt
-CXXFLAGS+=-O2 -DNDEBUG
-## CXXFLAGS+=-g
+## CXXFLAGS+=-O2 -DNDEBUG
+CXXFLAGS+=-g
 #=====================
 
 #NO! CK
@@ -35,6 +35,7 @@ trylock_test \
 volatile \
 threads_test
 
+DEP:=$(PROGRAMS:=.d)
 
 .PHONY: all cmake ctest test clean distclean cppcheck format
 all: $(PROGRAMS)
@@ -53,7 +54,7 @@ ctest: cmake
 lockfree_spsc_queue: CXXFLAGS+=--std=c++03
 lockfree_spsc_queue.o: lockfree_spsc_queue.cpp simple_stopwatch.hpp
 lockfree_spsc_queue: lockfree_spsc_queue.o
-	$(LINK.cc) $^ -o $@ $(LDLIBS)
+	$(LINK.cc) $< -o $@ $(LDLIBS)
 
 async_server: CXXFLAGS+=--std=c++03
 async_server: async_server.cpp
@@ -107,12 +108,15 @@ threads_test: threads_test.o
 else
 threads_test: threadpool.o threads_test.o
 endif
-	$(LINK.cc) $^ -o $@ $(LDLIBS)
+	$(LINK.cc) $< $@.o -o $@ $(LDLIBS)
 
 
 # plain old posix not longer used!
-trylock_test: trylock_test.cpp
-	$(LINK.cc) $^ -o $@ $(LDLIBS)
+trylock_test: trylock_test.o
+	$(LINK.cc) $< -o $@ $(LDLIBS)
+
+%.o: %.cpp
+	$(COMPILE.cc) $< -o $@
 
 
 clean:
@@ -122,7 +126,8 @@ distclean: clean
 	$(RM) -r build *.d *.bak *.orig *~ *.stackdump *.dSYM
 
 test: $(PROGRAMS)
-	#./threads_test -l message --random
+	./threads_test --log_level=all --run_test='S*'
+	./threads_test --log_level=test_suite --random
 	# ./threads_test --run_test=ThreadPool_test -25
 	# ./threads_test --run_test=QueuedThreadPoolLoad_test -25
 	#TODO ./threads_test --run_test=QueuedThreadPoolLoad_test -1000
@@ -148,3 +153,14 @@ cppcheck:
 
 format:
 	clang-format -i -style=file *.cpp *.hpp *.c
+
+ifneq ($(MAKECMDGOALS),distclean)
+-include $(DEP)
+endif
+
+GNUmakefile::;
+%.d::;
+%.hpp::;
+%.cpp::;
+
+

@@ -39,15 +39,17 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #define BOOST_THREAD_VERSION 4
 #define BOOST_CHRONO_VERSION 2
 
-#undef TODO_IS_DONE
-#ifdef TODO_IS_DONE
+//NOTE: Mutex nested lock types are deprecated! CK
+#if defined BOOST_THREAD_PROVIDES_NESTED_LOCKS
 #include "boost/testable_mutex.hpp"
 #endif
 
+#include <boost/atomic.hpp>
 #include <boost/core/noncopyable.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/thread/thread_only.hpp>
 
 #undef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
 
@@ -203,23 +205,33 @@ public:
 
 
 private:
-    bool is_locked_by_this_thread();
+    bool is_locked_by_this_thread() const
+    {
+      return boost::this_thread::get_id() == id_;
+    }
+    bool is_locked() const
+    {
+      return ! (boost::thread::id() == id_);
+    }
+
     int cond_timed_wait(const timespec*);
 
     boost::condition_variable cond;
-    //XXX typedef boost::timed_mutex mutex_type;
+    //NOTE: the type of the wrapped lockable
+    //XXX typedef boost::timed_mutex lockable_type;
 
-#ifdef TODO_IS_DONE
-    typedef boost::testable_mutex<boost::mutex> mutex_type;
+#if defined BOOST_THREAD_PROVIDES_NESTED_LOCKS
+    typedef boost::testable_mutex<boost::mutex> lockable_type;
 #else
-    typedef boost::mutex mutex_type;
+    typedef boost::mutex lockable_type;
 #endif
 
-    mutex_type mutex;
-    typedef boost::unique_lock<mutex_type> scoped_lock;
+    lockable_type mutex;
+    typedef boost::unique_lock<lockable_type> scoped_lock;
 
     volatile bool isLocked;
     volatile bool signal;
+    boost::atomic<boost::thread::id> id_;
 
 #ifndef _NO_LOGGING
     static unsigned int next_id;

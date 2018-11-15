@@ -78,6 +78,7 @@ unsigned int Synchronized::next_id  = 0;
 Synchronized::Synchronized()
     : signal(false)
     , isLocked(false)
+    , id_(boost::thread::id())
 
 #ifndef _NO_LOGGING
     , id(0)
@@ -87,40 +88,47 @@ Synchronized::Synchronized()
 
 Synchronized::~Synchronized()
 {
-    // FIXME if (isLocked)
-    {
+    if (is_locked()) {
+        notify_all();
         signal = true;
         unlock();
+        // NOTE: give other waiting threads a time window to unlock the mutex
+        boost::this_thread::sleep_for(ms(50));
     }
 }
 
-
-#ifndef TODO_IS_DONE
 void Synchronized::wait() { cond_timed_wait(0); }
-
 
 int Synchronized::cond_timed_wait(const struct timespec* ts)
 {
     DTRACE(signal);
-
-    // XXX assert(is_locked_by_this_thread());
+    BOOST_ASSERT(is_locked_by_this_thread());
 
     scoped_lock l(mutex, boost::adopt_lock);
     if (!ts) {
         while (!signal) {
+            //=================================
+            id_ = boost::thread::id();
             cond.wait(l);
+            id_ = boost::this_thread::get_id();
+            //=================================
         }
     } else {
         duration d = sec(ts->tv_sec) + ns(ts->tv_nsec);
         while (!signal) {
+            //=================================
+            id_ = boost::thread::id();
             if (cond.wait_for(l, d) == boost::cv_status::timeout) {
+                id_ = boost::this_thread::get_id();
                 l.release();
                 return -1;
             }
+            //=================================
         }
     }
 
     signal = false;
+    id_    = boost::this_thread::get_id();
     l.release();
     return true;
 }
@@ -128,29 +136,30 @@ int Synchronized::cond_timed_wait(const struct timespec* ts)
 bool Synchronized::wait(unsigned long timeout)
 {
     DTRACE(signal);
-
-    // XXX assert(is_locked_by_this_thread());
+    BOOST_ASSERT(is_locked_by_this_thread());
 
     scoped_lock l(mutex, boost::adopt_lock);
     duration d = ms(timeout);
     while (!signal) {
+        //=================================
+        id_ = boost::thread::id();
         if (cond.wait_for(l, d) == boost::cv_status::timeout) {
+            id_ = boost::this_thread::get_id();
             l.release();
             return false;
         }
+        //=================================
     }
 
     signal = false;
     l.release();
     return true;
 }
-#endif
 
 void Synchronized::notify()
 {
     DTRACE(signal);
-
-    // XXX assert(is_locked_by_this_thread());
+    BOOST_ASSERT(is_locked_by_this_thread());
 
     scoped_lock l(mutex, boost::adopt_lock);
     signal = true;
@@ -161,8 +170,7 @@ void Synchronized::notify()
 void Synchronized::notify_all()
 {
     DTRACE(signal);
-
-    // XXX assert(is_locked_by_this_thread());
+    BOOST_ASSERT(is_locked_by_this_thread());
 
     scoped_lock l(mutex, boost::adopt_lock);
     signal = true;
@@ -174,7 +182,6 @@ bool Synchronized::lock()
 {
     DTRACE("");
 
-#ifdef TODO_IS_DONE
     if (is_locked_by_this_thread()) {
 
 #ifdef DEBUG
@@ -186,10 +193,10 @@ bool Synchronized::lock()
         // warning!
         return false;
     }
-#endif
 
     mutex.lock();
     isLocked = true;
+    id_      = boost::this_thread::get_id();
     return true;
 }
 
@@ -198,8 +205,7 @@ bool Synchronized::lock()
 bool Synchronized::lock(unsigned long timeout)
 {
     DTRACE(timeout);
-
-    // XXX assert(!is_locked_by_this_thread());
+    BOOST_ASSERT(!is_locked_by_this_thread());
 
     duration d = ms(timeout);
     if (!mutex.try_lock_for(d)) {
@@ -207,6 +213,7 @@ bool Synchronized::lock(unsigned long timeout)
     }
 
     isLocked = true;
+    id_      = boost::this_thread::get_id();
     return true; // OK
 }
 #endif
@@ -216,46 +223,42 @@ bool Synchronized::unlock()
 {
     DTRACE("");
 
-    // FIXME if (isLocked)
-    {
+    if (is_locked_by_this_thread()) {
         isLocked = false;
+        id_      = boost::thread::id();
         mutex.unlock();
         return true;
     }
 
-    // FIXME return false;
+    return false;
 }
 
 Synchronized::TryLockResult Synchronized::trylock()
 {
     DTRACE("");
 
-#ifdef TODO_IS_DONE
     if (is_locked_by_this_thread()) {
-        return OWNED;
+        return OWNED; // true
     }
-#endif
 
-    scoped_lock l(mutex, boost::defer_lock);
-    if (l.try_lock()) {
-        l.release();
+    scoped_lock l(mutex, boost::try_to_lock);
+    if (l.owns_lock()) {
         isLocked = true;
-        return LOCKED;
+        id_      = boost::this_thread::get_id();
+        l.release();
+        return LOCKED; // true
     }
 
-    return BUSY;
+    return BUSY; // false
 }
 
+
+#if defined BOOST_THREAD_PROVIDES_NESTED_LOCKS
 bool Synchronized::is_locked_by_this_thread()
 {
-#ifdef TODO_IS_DONE
-    DTRACE("");
-
     return mutex.is_locked_by_this_thread();
-#else
-    return false;
-#endif
 }
+#endif
 
 
 /*------------------------ class Thread ----------------------------*/
