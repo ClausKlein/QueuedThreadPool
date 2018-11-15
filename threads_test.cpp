@@ -5,7 +5,6 @@
 // clang-format -style=file -i thread*.{cpp,hpp}
 //
 
-#include "simple_stopwatch.hpp"
 
 #ifdef USE_AGENTPP
 #include "agent_pp/threads.h" // ThreadPool, QueuedThreadPool
@@ -13,28 +12,25 @@
 #include "threadpool.hpp" // ThreadPool, QueuedThreadPool
 #endif
 
-#if (defined(_MSVC_LANG) && __has_include(<atomic>))                          \
-    || (defined(__cplusplus) && (__cplusplus >= 201103L))
-#define _ENABLE_ATOMIC_ALIGNMENT_FIX
-#include <atomic>
-typedef std::atomic_size_t test_counter_t;
-#else
-#include <boost/atomic.hpp>
-typedef boost::atomic_size_t test_counter_t;
-#endif
 
 #define BOOST_TEST_MODULE Threads
 #define BOOST_TEST_NO_MAIN
+#include <boost/test/included/unit_test.hpp>
+
+#include <boost/atomic.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/lockfree/queue.hpp>
-#include <boost/test/included/unit_test.hpp>
+
+#include "boost/testable_mutex.hpp"
+#include "simple_stopwatch.hpp"
 
 #include <iostream>
 #include <string>
 #include <vector>
 
 
+typedef boost::atomic_size_t test_counter_t;
 typedef boost::lockfree::queue<size_t, boost::lockfree::capacity<20> >
     result_queue_t;
 
@@ -46,13 +42,13 @@ public:
         , result(rslt)
         , delay(ms_delay)
     {
-        //FIXME use boost::mutex! Agentpp::Lock l(lock);
+        // TODO use boost::mutex! Agentpp::Lock l(lock);
         ++counter;
     }
 
     virtual ~TestTask()
     {
-        //FIXME use boost::mutex! Agentpp::Lock l(lock);
+        // TODO use boost::mutex! Agentpp::Lock l(lock);
         --counter;
     }
 
@@ -60,7 +56,7 @@ public:
     {
         Agentpp::Thread::sleep(delay); // ms
 
-        //FIXME use boost::mutex! Agentpp::Lock l(lock);
+        // TODO use boost::mutex! Agentpp::Lock l(lock);
         // TODO BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << " called with: "
         // << text);
         size_t hash = boost::hash_value(text);
@@ -70,17 +66,17 @@ public:
 
     static size_t run_count()
     {
-        //FIXME use boost::mutex! Agentpp::Lock l(lock);
+        // TODO use boost::mutex! Agentpp::Lock l(lock);
         return run_cnt;
     }
     static size_t task_count()
     {
-        //FIXME use boost::mutex! Agentpp::Lock l(lock);
+        // TODO use boost::mutex! Agentpp::Lock l(lock);
         return counter;
     }
     static void reset_counter()
     {
-        //FIXME use boost::mutex! Agentpp::Lock l(lock);
+        // TODO use boost::mutex! Agentpp::Lock l(lock);
         counter = 0;
         run_cnt = 0;
     }
@@ -88,7 +84,7 @@ public:
 protected:
     static test_counter_t run_cnt;
     static test_counter_t counter;
-    static Agentpp::Synchronized lock;
+    // NOTE: not longer used! static Agentpp::Synchronized lock;
 
 private:
     const std::string text;
@@ -96,7 +92,7 @@ private:
     unsigned delay;
 };
 
-//FIXME use boost::mutex! Agentpp::Synchronized TestTask::lock;
+// TODO use boost::mutex! Agentpp::Synchronized TestTask::lock;
 test_counter_t TestTask::run_cnt(0);
 test_counter_t TestTask::counter(0);
 
@@ -389,7 +385,6 @@ BOOST_AUTO_TEST_CASE(Synchronized_test)
     using namespace Agentpp;
     Synchronized sync;
     {
-        //FIXME: do NOT test deadlock! Lock l(sync);
         BOOST_TEST(sync.lock());
         BOOST_TEST(sync.unlock());
         BOOST_TEST(!sync.unlock(), "second unlock() returns no error");
@@ -409,6 +404,22 @@ BOOST_AUTO_TEST_CASE(SyncTrylock_test)
     BOOST_TEST(!sync.unlock(), "second unlock() returns no error");
 }
 
+BOOST_AUTO_TEST_CASE(SyncDeadlock_test)
+{
+    using namespace Agentpp;
+    Synchronized sync;
+    try {
+        Lock l(sync);
+        BOOST_TEST(!sync.lock());
+    } catch (std::exception& e) {
+        BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
+        BOOST_TEST_MESSAGE(e.what());
+        BOOST_TEST(false);
+    }
+    BOOST_TEST(sync.lock());
+    BOOST_TEST(sync.unlock());
+}
+
 BOOST_AUTO_TEST_CASE(SyncWait_test)
 {
     using namespace Agentpp;
@@ -419,7 +430,7 @@ BOOST_AUTO_TEST_CASE(SyncWait_test)
     }
 }
 
-BOOST_AUTO_TEST_CASE(SleepThread_test)
+BOOST_AUTO_TEST_CASE(ThreadSleep_test)
 {
     using namespace Agentpp;
 
@@ -427,6 +438,97 @@ BOOST_AUTO_TEST_CASE(SleepThread_test)
     Thread::sleep(2000); // ms
 
     BOOST_TEST(sw.elapsed() >= ms(2000));
+    BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
+}
+
+
+struct wait_data {
+    typedef boost::mutex lockable_type;
+    typedef boost::unique_lock<lockable_type> scoped_lock;
+
+    bool flag;
+    lockable_type mtx;
+    boost::condition_variable cond;
+
+    wait_data()
+        : flag(false)
+    {}
+
+    // NOTE: return false if condition waiting for is not true! CK
+    bool predicate() { return flag; }
+
+    void wait()
+    {
+        scoped_lock l(mtx);
+        while (!predicate()) {
+            cond.wait(l);
+        }
+    }
+
+    template <typename Duration> bool timed_wait(Duration d)
+    {
+        scoped_lock l(mtx);
+        while (!predicate()) {
+            if (cond.wait_for(l, d) == boost::cv_status::timeout) {
+                return false;
+            }
+        }
+        return true; // OK
+    }
+
+    void signal()
+    {
+        scoped_lock l(mtx);
+        flag = true;
+        cond.notify_all();
+    }
+};
+
+
+typedef boost::testable_mutex<boost::mutex> mutex_type;
+
+void lock_mutexes_slowly(
+    mutex_type* m1, mutex_type* m2, wait_data* locked, wait_data* quit)
+{
+    boost::lock_guard<mutex_type> l1(*m1);
+    boost::this_thread::sleep_for(boost::chrono::milliseconds(500));
+    boost::lock_guard<mutex_type> l2(*m2);
+    BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
+
+    locked->signal();
+    quit->wait();
+}
+
+
+void lock_pair(mutex_type* m1, mutex_type* m2)
+{
+    boost::lock(*m1, *m2);
+    boost::unique_lock<mutex_type> l1(*m1, boost::adopt_lock),
+        l2(*m2, boost::adopt_lock);
+    BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
+
+    BOOST_CHECK(l1.owns_lock());
+    BOOST_CHECK(l2.owns_lock());
+}
+
+
+BOOST_AUTO_TEST_CASE(test_lock_two_other_thread_locks_in_order)
+{
+    mutex_type m1, m2;
+    wait_data locked;
+    wait_data release;
+
+    boost::thread t(lock_mutexes_slowly, &m1, &m2, &locked, &release);
+
+    boost::thread t2(lock_pair, &m1, &m2);
+    BOOST_CHECK(locked.timed_wait(boost::chrono::seconds(1)));
+
+    release.signal();
+
+    BOOST_CHECK(t2.try_join_for(boost::chrono::seconds(1)));
+    t2.join(); // just in case of timeout! CK
+
+    t.join();
 }
 
 
@@ -454,6 +556,8 @@ int main(int argc, char* argv[])
     }
 
     do {
+        StopwatchReporter sw;
+
         error = ::boost::unit_test::unit_test_main(init_func, argc, argv);
 
         if (--loops <= 0) {
@@ -469,96 +573,3 @@ int main(int argc, char* argv[])
     return error;
 }
 
-/***
- * OUTPUT:
-
-MINGW64 /e/workspace/cpp/threadpool $ make test
-g++ -g -O -Wextra --std=c++98 -Wno-unused-parameter -DNDEBUG
--I/opt/local/include   -c -o threads_test.o threads_test.cpp g++ -g -O -Wextra
---std=c++98 -Wno-unused-parameter -DNDEBUG -I/opt/local/include
-threads_test.o threadpool.o -o threads_test
-./threads_test -l message ## --random
-
-Running 4 test cases...
-threadPool.size: 4
-virtual void TestTask::run() called with: ThreadPool is running!
-virtual void TestTask::run() called with: Under full load now!
-virtual void TestTask::run() called with: Generate some load.
-virtual void TestTask::run() called with: Hallo world!
-outstanding tasks: 2
-virtual void TestTask::run() called with: Good by!
-outstanding tasks: 0
-
-queuedThreadPool.size: 1
-virtual void TestTask::run() called with: 1 Hi again.
-queuedThreadPool.queue_length: 8
-virtual void TestTask::run() called with: 2 Queuing starts.
-virtual void TestTask::run() called with: 3 Under full load!
-virtual void TestTask::run() called with: 4 Queuing ...
-virtual void TestTask::run() called with: 5 Queuing ...
-virtual void TestTask::run() called with: 6 Queuing ...
-virtual void TestTask::run() called with: 7 Queuing ...
-virtual void TestTask::run() called with: 8 Queuing ...
-virtual void TestTask::run() called with: 9 Queuing ...
-outstanding tasks: 0
-NOTE: checking the order of execution
-
-emptyThreadPool.size: 4
-defaultThreadPool.queue_length: 0
-virtual void TestTask::run() called with: Started ...
-virtual void TestTask::run() called with: Running ...
-defaultThreadPool.queue_length: 0
-defaultThreadPool.queue_length: 0
-virtual void TestTask::run() called with: Running ...
-virtual void TestTask::run() called with: Running ...
-defaultThreadPool.queue_length: 0
-defaultThreadPool.queue_length: 0
-defaultThreadPool.queue_length: 0
-defaultThreadPool.queue_length: 0
-defaultThreadPool.queue_length: 1
-virtual void TestTask::run() called with: Running ...
-virtual void TestTask::run() called with: Running ...
-virtual void TestTask::run() called with: Running ...
-defaultThreadPool.queue_length: 1
-defaultThreadPool.queue_length: 1
-defaultThreadPool.queue_length: 1
-defaultThreadPool.queue_length: 2
-virtual void TestTask::run() called with: Running ...
-virtual void TestTask::run() called with: Running ...
-virtual void TestTask::run() called with: Running ...
-defaultThreadPool.queue_length: 2
-defaultThreadPool.queue_length: 2
-defaultThreadPool.queue_length: 2
-defaultThreadPool.queue_length: 2
-defaultThreadPool.queue_length: 2
-defaultThreadPool.queue_length: 2
-defaultThreadPool.queue_length: 2
-defaultThreadPool.queue_length: 2
-outstanding tasks: 6
-
-virtual void TestTask::run() called with: Running ...
-virtual void TestTask::run() called with: Running ...
-virtual void TestTask::run() called with: Running ...
-virtual void TestTask::run() called with: Running ...
-virtual void TestTask::run() called with: Running ...
-virtual void TestTask::run() called with: Running ...
-outstanding tasks: 0
-
-emptyThreadPool.size: 0
-emptyThreadPool.queue_length: 2
-emptyThreadPool.queue_length: 3
-emptyThreadPool.queue_length: 4
-emptyThreadPool.queue_length: 5
-emptyThreadPool.queue_length: 6
-emptyThreadPool.queue_length: 6
-emptyThreadPool.queue_length: 6
-emptyThreadPool.queue_length: 6
-emptyThreadPool.queue_length: 6
-emptyThreadPool.queue_length: 6
-outstanding tasks: 6
-
-*** No errors detected
-
-MINGW64 /e/workspace/cpp/threadpool $
-
- ***/

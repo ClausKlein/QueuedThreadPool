@@ -39,7 +39,7 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #define BOOST_THREAD_VERSION 4
 #define BOOST_CHRONO_VERSION 2
 
-//NOTE: Mutex nested lock types are deprecated! CK
+// NOTE: Mutex nested lock types are deprecated! CK
 #if defined BOOST_THREAD_PROVIDES_NESTED_LOCKS
 #include "boost/testable_mutex.hpp"
 #endif
@@ -62,7 +62,6 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #ifndef BOOST_OVERRIDE
 #define BOOST_OVERRIDE
 #endif
-
 
 
 namespace Agentpp
@@ -120,6 +119,9 @@ public:
  *
  * @author Frank Fock
  * @version 4.0
+ *
+ * @note: copy constructor of 'Synchronized' is implicitly deleted
+ *       because field 'cond' has a deleted copy constructor! CK
  */
 class AGENTPP_DECL Synchronized : private boost::noncopyable {
 public:
@@ -207,18 +209,15 @@ public:
 private:
     bool is_locked_by_this_thread() const
     {
-      return boost::this_thread::get_id() == id_;
+        return boost::this_thread::get_id() == id_;
     }
-    bool is_locked() const
-    {
-      return ! (boost::thread::id() == id_);
-    }
+    bool is_locked() const { return !(boost::thread::id() == id_); }
 
     int cond_timed_wait(const timespec*);
 
     boost::condition_variable cond;
-    //NOTE: the type of the wrapped lockable
-    //XXX typedef boost::timed_mutex lockable_type;
+    // NOTE: the type of the wrapped lockable
+    // XXX typedef boost::timed_mutex lockable_type;
 
 #if defined BOOST_THREAD_PROVIDES_NESTED_LOCKS
     typedef boost::testable_mutex<boost::mutex> lockable_type;
@@ -237,7 +236,6 @@ private:
     static unsigned int next_id;
     unsigned int id;
 #endif
-
 };
 
 
