@@ -23,10 +23,6 @@ src/threads.cpp > threadpool.cpp
   _##
   _##########################################################################*/
 
-#include <iostream>
-
-#undef TODO_IS_DONE
-
 #ifndef _MSC_VER
 
 #ifndef _POSIX_C_SOURCE
@@ -41,6 +37,7 @@ src/threads.cpp > threadpool.cpp
 
 #include "threadpool.hpp"
 
+#include <iostream>
 
 #if !defined(_NO_LOGGING) && !defined(NDEBUG)
 #define DEBUG
@@ -97,6 +94,8 @@ Synchronized::~Synchronized()
     }
 }
 
+
+#ifndef TODO_IS_DONE
 void Synchronized::wait() { cond_timed_wait(0); }
 
 
@@ -104,7 +103,7 @@ int Synchronized::cond_timed_wait(const struct timespec* ts)
 {
     DTRACE(signal);
 
-    // XXX assert(isLocked);
+    // XXX assert(is_locked_by_this_thread());
 
     scoped_lock l(mutex, boost::adopt_lock);
     if (!ts) {
@@ -145,6 +144,7 @@ bool Synchronized::wait(unsigned long timeout)
     l.release();
     return true;
 }
+#endif
 
 void Synchronized::notify()
 {
@@ -248,20 +248,12 @@ Synchronized::TryLockResult Synchronized::trylock()
 
 bool Synchronized::is_locked_by_this_thread()
 {
+#ifdef TODO_IS_DONE
     DTRACE("");
 
-    // FIXME return mutex.is_locked_by_this_thread();
-
-#if TODO_IS_DONE
-    boost::testable_mutex<mutex_type> m(mutex);
-    return m.is_locked_by_this_thread();
+    return mutex.is_locked_by_this_thread();
 #else
-    if (trylock()) {
-        unlock();
-        return false;
-    }
-
-    return true;
+    return false;
 #endif
 }
 
@@ -479,7 +471,8 @@ void TaskManager::run()
     unlock();
 }
 
-// FIXME: asserted to be called with lock! CK
+
+// TODO: assert to be called with lock! CK
 bool TaskManager::set_task(Runnable* t)
 {
     Lock l(*this);
@@ -535,9 +528,11 @@ void ThreadPool::execute(Runnable* t)
     unlock();
 }
 
+
+// TODO: assert to be called with lock! CK
 void ThreadPool::idle_notification()
 {
-    // FIXME: needed? CK Lock l(*this);
+    Lock l(*this);
     notify();
 }
 

@@ -39,6 +39,11 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #define BOOST_THREAD_VERSION 4
 #define BOOST_CHRONO_VERSION 2
 
+#undef TODO_IS_DONE
+#ifdef TODO_IS_DONE
+#include "boost/testable_mutex.hpp"
+#endif
+
 #include <boost/core/noncopyable.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/locks.hpp>
@@ -202,9 +207,14 @@ private:
     int cond_timed_wait(const timespec*);
 
     boost::condition_variable cond;
-    //TODO typedef boost::testable_mutex<boost::mutex> mutex_type;
     //XXX typedef boost::timed_mutex mutex_type;
+
+#ifdef TODO_IS_DONE
+    typedef boost::testable_mutex<boost::mutex> mutex_type;
+#else
     typedef boost::mutex mutex_type;
+#endif
+
     mutex_type mutex;
     typedef boost::unique_lock<mutex_type> scoped_lock;
 
