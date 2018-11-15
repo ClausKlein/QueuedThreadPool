@@ -105,7 +105,7 @@ threads_test: LDLIBS+= -lboost_unit_test_framework$(MT)
 threads_test: LDLIBS:= -lsnmp++ -lagent++ -lcrypto
 threads_test: threads_test.o
 else
-threads_test: threads_test.o threadpool.o
+threads_test: threadpool.o threads_test.o
 endif
 	$(LINK.cc) $^ -o $@ $(LDLIBS)
 

@@ -23,10 +23,11 @@ src/threads.cpp > threadpool.cpp
   _##
   _##########################################################################*/
 
+#include <iostream>
 
-#include "threadpool.hpp"
+#undef TODO_IS_DONE
 
-#ifndef _MSC_VER 
+#ifndef _MSC_VER
 
 #ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 200112L
@@ -38,41 +39,62 @@ src/threads.cpp > threadpool.cpp
 
 #endif
 
+#include "threadpool.hpp"
+
+
+#if !defined(_NO_LOGGING) && !defined(NDEBUG)
+#define DEBUG
+#include <boost/current_function.hpp>
+#define LOG_BEGIN(x, y) std::cout << BOOST_CURRENT_FUNCTION << ": "
+#define LOG(x) std::cout << x << ' '
+#define LOG_END std::cout << std::endl
+#else
+#define LOG_BEGIN(x, y)
+#define LOG(x)
+#define LOG_END
+#define _NO_LOGGING 1
+#endif
+/*
+ * Define a macro that can be used for diagnostic output from examples. When
+ * compiled -DDEBUG, it results in writing with the specified argument to
+ * std::cout. When DEBUG is not defined, it expands to nothing.
+ */
+#ifdef DEBUG
+#define DTRACE(arg) \
+    std::cout << BOOST_CURRENT_FUNCTION << ": " << arg << std::endl
+#else
+#define DTRACE(arg)
+#endif
+
 
 namespace Agentpp
 {
 
 #ifndef _NO_LOGGING
 static const char* loggerModuleName = "agent++.threads";
-unsigned int Synchronized::next_id = 0;
+unsigned int Synchronized::next_id  = 0;
 #endif
 
 
 /*--------------------- class Synchronized -------------------------*/
 
-//XXX boost::thread_specific_ptr<bool> Synchronized::isLocked;
-
-
 Synchronized::Synchronized()
     : signal(false)
+    , isLocked(false)
 
 #ifndef _NO_LOGGING
     , id(0)
 #endif
 
-{
-    //XXX if (!isLocked.get()) {
-        //XXX isLocked.reset(new bool(false));
-    //XXX }
-}
+{}
 
 Synchronized::~Synchronized()
 {
-    //XXX if (isLocked.get() && *isLocked) {
-        signal    = true;
-        //XXX *isLocked = false;
-        mutex.unlock();
-    //XXX }
+    // FIXME if (isLocked)
+    {
+        signal = true;
+        unlock();
+    }
 }
 
 void Synchronized::wait() { cond_timed_wait(0); }
@@ -80,11 +102,11 @@ void Synchronized::wait() { cond_timed_wait(0); }
 
 int Synchronized::cond_timed_wait(const struct timespec* ts)
 {
-    DTRACE(signal); 
+    DTRACE(signal);
 
-    //XXX assert(isLocked.get() && *isLocked);
+    // XXX assert(isLocked);
 
-    boost::unique_lock<boost::mutex> l(mutex, boost::adopt_lock);
+    scoped_lock l(mutex, boost::adopt_lock);
     if (!ts) {
         while (!signal) {
             cond.wait(l);
@@ -108,9 +130,9 @@ bool Synchronized::wait(unsigned long timeout)
 {
     DTRACE(signal);
 
-    //XXX assert(isLocked.get() && *isLocked);
+    // XXX assert(is_locked_by_this_thread());
 
-    boost::unique_lock<boost::mutex> l(mutex, boost::adopt_lock);
+    scoped_lock l(mutex, boost::adopt_lock);
     duration d = ms(timeout);
     while (!signal) {
         if (cond.wait_for(l, d) == boost::cv_status::timeout) {
@@ -128,9 +150,9 @@ void Synchronized::notify()
 {
     DTRACE(signal);
 
-    //XXX assert(isLocked.get() && *isLocked);
+    // XXX assert(is_locked_by_this_thread());
 
-    boost::unique_lock<boost::mutex> l(mutex, boost::adopt_lock);
+    scoped_lock l(mutex, boost::adopt_lock);
     signal = true;
     cond.notify_one();
     l.release();
@@ -140,9 +162,9 @@ void Synchronized::notify_all()
 {
     DTRACE(signal);
 
-    //XXX assert(isLocked.get() && *isLocked);
+    // XXX assert(is_locked_by_this_thread());
 
-    boost::unique_lock<boost::mutex> l(mutex, boost::adopt_lock);
+    scoped_lock l(mutex, boost::adopt_lock);
     signal = true;
     cond.notify_all();
     l.release();
@@ -152,24 +174,22 @@ bool Synchronized::lock()
 {
     DTRACE("");
 
-#ifdef XXX
-    if (isLocked.get()) {
-        if (*isLocked) {
+#ifdef TODO_IS_DONE
+    if (is_locked_by_this_thread()) {
 
 #ifdef DEBUG
-            throw std::runtime_error("Synchronized::lock(): recursive used!");
+        throw std::runtime_error("Synchronized::lock(): recursive used!");
 #endif
 
-            // TODO: This thread owns already the lock, but we do not like
-            // recursive locking. Thus release it immediately and print a
-            // warning!
-            return false;
-        }
+        // TODO: This thread owns already the lock, but we do not like
+        // recursive locking. Thus release it immediately and print a
+        // warning!
+        return false;
     }
 #endif
 
     mutex.lock();
-    //XXX isLocked.reset(new bool(true));
+    isLocked = true;
     return true;
 }
 
@@ -179,14 +199,14 @@ bool Synchronized::lock(unsigned long timeout)
 {
     DTRACE(timeout);
 
-    //XXX assert(isLocked.get() && (*isLocked == false));
+    // XXX assert(!is_locked_by_this_thread());
 
     duration d = ms(timeout);
     if (!mutex.try_lock_for(d)) {
         return false;
     }
 
-    //XXX *isLocked = true;
+    isLocked = true;
     return true; // OK
 }
 #endif
@@ -196,33 +216,53 @@ bool Synchronized::unlock()
 {
     DTRACE("");
 
-    //XXX if (isLocked.get() && *isLocked) {
-        //XXX *isLocked = false;
+    // FIXME if (isLocked)
+    {
+        isLocked = false;
         mutex.unlock();
         return true;
-    //XXX }
+    }
 
-    //XXX return false;
+    // FIXME return false;
 }
 
 Synchronized::TryLockResult Synchronized::trylock()
 {
     DTRACE("");
 
-#ifdef XXX
-    if (isLocked.get() && *isLocked) {
+#ifdef TODO_IS_DONE
+    if (is_locked_by_this_thread()) {
         return OWNED;
     }
 #endif
 
-    boost::unique_lock<boost::mutex> l(mutex, boost::defer_lock);
+    scoped_lock l(mutex, boost::defer_lock);
     if (l.try_lock()) {
-        //XXX isLocked.reset(new bool(true));
         l.release();
+        isLocked = true;
         return LOCKED;
     }
 
     return BUSY;
+}
+
+bool Synchronized::is_locked_by_this_thread()
+{
+    DTRACE("");
+
+    // FIXME return mutex.is_locked_by_this_thread();
+
+#if TODO_IS_DONE
+    boost::testable_mutex<mutex_type> m(mutex);
+    return m.is_locked_by_this_thread();
+#else
+    if (trylock()) {
+        unlock();
+        return false;
+    }
+
+    return true;
+#endif
 }
 
 
@@ -505,7 +545,7 @@ void ThreadPool::idle_notification()
 /// task.
 bool ThreadPool::is_idle()
 {
-    //TODO: use Lock l(*this);
+    // TODO: use Lock l(*this);
     lock();
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
          cur != taskList.end(); ++cur) {
@@ -522,7 +562,7 @@ bool ThreadPool::is_idle()
 /// any task.
 bool ThreadPool::is_busy()
 {
-    //TODO: use Lock l(*this);
+    // TODO: use Lock l(*this);
     lock();
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
          cur != taskList.end(); ++cur) {
@@ -537,7 +577,7 @@ bool ThreadPool::is_busy()
 
 void ThreadPool::terminate()
 {
-    //TODO: use Lock l(*this);
+    // TODO: use Lock l(*this);
     lock();
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
          cur != taskList.end(); ++cur) {

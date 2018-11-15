@@ -29,9 +29,9 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 
 #ifdef __INTEGRITY
 #include <integrity.h>
+#include <time.h>
 #endif
 
-#include <iostream>
 #include <list>
 #include <queue>
 #include <vector>
@@ -40,11 +40,9 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #define BOOST_CHRONO_VERSION 2
 
 #include <boost/core/noncopyable.hpp>
-#include <boost/current_function.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/mutex.hpp>
-#include <boost/thread/tss.hpp> // tss -> tls: thread local storage
 
 #undef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
 
@@ -58,30 +56,6 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #define BOOST_OVERRIDE
 #endif
 
-
-#if !defined(_NO_LOGGING) && !defined(NDEBUG)
-#define DEBUG
-#define LOG_BEGIN(x, y) std::cout << BOOST_CURRENT_FUNCTION << ": "
-#define LOG(x) std::cout << x << ' '
-#define LOG_END std::cout << std::endl
-#else
-#define LOG_BEGIN(x, y)
-#define LOG(x)
-#define LOG_END
-#define _NO_LOGGING 1
-#endif
-
-/*
- * Define a macro that can be used for diagnostic output from examples. When
- * compiled -DDEBUG, it results in writing with the specified argument to
- * std::cout. When DEBUG is not defined, it expands to nothing.
- */
-#ifdef DEBUG
-#define DTRACE(arg) \
-    std::cout << BOOST_CURRENT_FUNCTION << ": " << arg << std::endl
-#else
-#define DTRACE(arg)
-#endif
 
 
 namespace Agentpp
@@ -224,17 +198,24 @@ public:
 
 
 private:
+    bool is_locked_by_this_thread();
+    int cond_timed_wait(const timespec*);
+
+    boost::condition_variable cond;
+    //TODO typedef boost::testable_mutex<boost::mutex> mutex_type;
+    //XXX typedef boost::timed_mutex mutex_type;
+    typedef boost::mutex mutex_type;
+    mutex_type mutex;
+    typedef boost::unique_lock<mutex_type> scoped_lock;
+
+    volatile bool isLocked;
+    volatile bool signal;
+
 #ifndef _NO_LOGGING
     static unsigned int next_id;
     unsigned int id;
 #endif
 
-    int cond_timed_wait(const timespec*);
-    boost::condition_variable cond;
-    boost::mutex mutex;
-    //XXX volatile bool isLocked;
-    //XXX static boost::thread_specific_ptr<bool> isLocked;
-    volatile bool signal;
 };
 
 
