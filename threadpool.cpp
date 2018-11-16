@@ -24,15 +24,18 @@ src/threads.cpp > threadpool.cpp
   _##########################################################################*/
 
 #ifndef _MSC_VER
-
-#ifndef _POSIX_C_SOURCE
-#define _POSIX_C_SOURCE 200112L
-#endif
-
 #include <unistd.h> // _POSIX_THREADS ...
 
-#include <pthread.h>
+#ifndef _POSIX_C_SOURCE
+#if defined(__APPLE__) && defined(__DARWIN_C_LEVEL)
+#if __DARWIN_C_LEVEL < 200112L
+#warning "_POSIX_C_SOURCE is undefined!"
+// XXX #define _POSIX_C_SOURCE 200112L
+#endif
+#endif
+#endif
 
+#include <pthread.h>
 #endif
 
 #include "threadpool.hpp"
@@ -78,7 +81,7 @@ unsigned int Synchronized::next_id  = 0;
 Synchronized::Synchronized()
     : signal(false)
     , isLocked(false)
-    , id_(boost::thread::id())
+    , tid_(boost::thread::id())
 
 #ifndef _NO_LOGGING
     , id(0)
@@ -105,21 +108,23 @@ int Synchronized::cond_timed_wait(const struct timespec* ts)
     BOOST_ASSERT(is_locked_by_this_thread());
 
     scoped_lock l(mutex, boost::adopt_lock);
+    signal = false;
     if (!ts) {
         while (!signal) {
             //=================================
-            id_ = boost::thread::id();
+            tid_ = boost::thread::id();
             cond.wait(l);
-            id_ = boost::this_thread::get_id();
+            tid_ = boost::this_thread::get_id();
             //=================================
         }
     } else {
-        duration d = sec(ts->tv_sec) + ns(ts->tv_nsec);
+        duration d   = sec(ts->tv_sec) + ns(ts->tv_nsec);
+        time_point t = Clock::now() + d;
         while (!signal) {
             //=================================
-            id_ = boost::thread::id();
-            if (cond.wait_for(l, d) == boost::cv_status::timeout) {
-                id_ = boost::this_thread::get_id();
+            tid_ = boost::thread::id();
+            if (cond.wait_until(l, t) == boost::cv_status::timeout) {
+                tid_ = boost::this_thread::get_id();
                 l.release();
                 return -1;
             }
@@ -127,8 +132,7 @@ int Synchronized::cond_timed_wait(const struct timespec* ts)
         }
     }
 
-    signal = false;
-    id_    = boost::this_thread::get_id();
+    tid_   = boost::this_thread::get_id();
     l.release();
     return true;
 }
@@ -139,19 +143,20 @@ bool Synchronized::wait(unsigned long timeout)
     BOOST_ASSERT(is_locked_by_this_thread());
 
     scoped_lock l(mutex, boost::adopt_lock);
-    duration d = ms(timeout);
+    signal = false;
+    duration d   = ms(timeout);
+    time_point t = Clock::now() + d;
     while (!signal) {
         //=================================
-        id_ = boost::thread::id();
-        if (cond.wait_for(l, d) == boost::cv_status::timeout) {
-            id_ = boost::this_thread::get_id();
+        tid_ = boost::thread::id();
+        if (cond.wait_until(l, t) == boost::cv_status::timeout) {
+            tid_ = boost::this_thread::get_id();
             l.release();
             return false;
         }
         //=================================
     }
 
-    signal = false;
     l.release();
     return true;
 }
@@ -196,7 +201,7 @@ bool Synchronized::lock()
 
     mutex.lock();
     isLocked = true;
-    id_      = boost::this_thread::get_id();
+    tid_     = boost::this_thread::get_id();
     return true;
 }
 
@@ -213,7 +218,7 @@ bool Synchronized::lock(unsigned long timeout)
     }
 
     isLocked = true;
-    id_      = boost::this_thread::get_id();
+    tid_     = boost::this_thread::get_id();
     return true; // OK
 }
 #endif
@@ -225,7 +230,7 @@ bool Synchronized::unlock()
 
     if (is_locked_by_this_thread()) {
         isLocked = false;
-        id_      = boost::thread::id();
+        tid_     = boost::thread::id();
         mutex.unlock();
         return true;
     }
@@ -244,7 +249,7 @@ Synchronized::TryLockResult Synchronized::trylock()
     scoped_lock l(mutex, boost::try_to_lock);
     if (l.owns_lock()) {
         isLocked = true;
-        id_      = boost::this_thread::get_id();
+        tid_     = boost::this_thread::get_id();
         l.release();
         return LOCKED; // true
     }
@@ -447,7 +452,10 @@ TaskManager::~TaskManager()
 
 void TaskManager::run()
 {
-    // TODO: Lock l(*this);
+    //=====================================
+    // FIXME: used Lock l(*this);
+    // NOTE: this is not exception save! CK
+    //=====================================
     lock();
     while (go) {
         if (task) {
@@ -499,7 +507,10 @@ bool TaskManager::set_task(Runnable* t)
 
 void ThreadPool::execute(Runnable* t)
 {
-    // TODO: Lock l(*this);
+    //=====================================
+    // FIXME: used Lock l(*this);
+    // NOTE: this is not exception save! CK
+    //=====================================
     lock();
     TaskManager* tm = 0;
     while (!tm) {
@@ -543,16 +554,13 @@ void ThreadPool::idle_notification()
 /// task.
 bool ThreadPool::is_idle()
 {
-    // TODO: use Lock l(*this);
-    lock();
+    Lock l(*this);
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
          cur != taskList.end(); ++cur) {
         if (!(*cur)->is_idle()) {
-            unlock();
             return false;
         }
     }
-    unlock();
     return true; // NOTE: all threads are idle
 }
 
@@ -560,29 +568,24 @@ bool ThreadPool::is_idle()
 /// any task.
 bool ThreadPool::is_busy()
 {
-    // TODO: use Lock l(*this);
-    lock();
+    Lock l(*this);
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
          cur != taskList.end(); ++cur) {
         if ((*cur)->is_idle()) {
-            unlock();
             return false;
         }
     }
-    unlock();
     return true; // NOTE: all threads are busy
 }
 
 void ThreadPool::terminate()
 {
-    // TODO: use Lock l(*this);
-    lock();
+    Lock l(*this);
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
          cur != taskList.end(); ++cur) {
         (*cur)->stop();
     }
-    notify(); // NOTE: for wait() at execute()
-    unlock();
+    notify_all(); // NOTE: for wait() at execute()
 }
 
 ThreadPool::ThreadPool(size_t size)
@@ -734,18 +737,15 @@ void QueuedThreadPool::run()
             if (t) {
                 if (assign(t, false)) { // NOTE: without queuing! CK
                     queue.pop();        // OK, now we pop this entry
-
                 } else {
                     DTRACE("busy! Thread::sleep()");
-                    // NOTE: Wait some ms to prevent notify() loops while busy!
-                    // CK
+                    // NOTE: sleep some ms to prevent notify() loops while busy!
                     Thread::sleep(rand() % 113); // ms
                 }
             }
         }
-
         // NOTE: for idle_notification ... CK
-        Thread::wait(); // ms
+        Thread::wait();
     }
 
     Thread::unlock();

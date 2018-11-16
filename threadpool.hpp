@@ -209,9 +209,9 @@ public:
 private:
     bool is_locked_by_this_thread() const
     {
-        return boost::this_thread::get_id() == id_;
+        return boost::this_thread::get_id() == tid_;
     }
-    bool is_locked() const { return !(boost::thread::id() == id_); }
+    bool is_locked() const { return !(boost::thread::id() == tid_); }
 
     int cond_timed_wait(const timespec*);
 
@@ -230,7 +230,7 @@ private:
 
     volatile bool isLocked;
     volatile bool signal;
-    boost::atomic<boost::thread::id> id_;
+    boost::atomic<boost::thread::id> tid_;
 
 #ifndef _NO_LOGGING
     static unsigned int next_id;
