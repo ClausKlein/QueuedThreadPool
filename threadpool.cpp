@@ -79,8 +79,8 @@ unsigned int Synchronized::next_id  = 0;
 /*--------------------- class Synchronized -------------------------*/
 
 Synchronized::Synchronized()
-    : signal(false)
-    , isLocked(false)
+    : isLocked(false)
+    , signal(false)
     , tid_(boost::thread::id())
 
 #ifndef _NO_LOGGING
@@ -92,8 +92,8 @@ Synchronized::Synchronized()
 Synchronized::~Synchronized()
 {
     if (is_locked()) {
-        notify_all();
         signal = true;
+        notify_all();
         unlock();
         // NOTE: give other waiting threads a time window to unlock the mutex
         boost::this_thread::sleep_for(ms(50));

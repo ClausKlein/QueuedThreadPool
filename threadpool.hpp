@@ -217,15 +217,9 @@ private:
     int cond_timed_wait(const timespec*);
 
     boost::condition_variable cond;
+
     // NOTE: the type of the wrapped lockable
-    // XXX typedef boost::timed_mutex lockable_type;
-
-#if defined BOOST_THREAD_PROVIDES_NESTED_LOCKS
-    typedef boost::testable_mutex<boost::mutex> lockable_type;
-#else
     typedef boost::mutex lockable_type;
-#endif
-
     lockable_type mutex;
     typedef boost::unique_lock<lockable_type> scoped_lock;
 

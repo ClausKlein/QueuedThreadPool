@@ -22,7 +22,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/lockfree/queue.hpp>
 
-#include "boost/testable_mutex.hpp"
+// XXX #include "boost/testable_mutex.hpp"
 #include "simple_stopwatch.hpp"
 
 #include <iostream>
@@ -30,7 +30,7 @@
 #include <vector>
 
 
-#if ! defined BOOST_THREAD_TEST_TIME_MS
+#if !defined BOOST_THREAD_TEST_TIME_MS
 #ifdef BOOST_THREAD_PLATFORM_WIN32
 #define BOOST_THREAD_TEST_TIME_MS 250
 #else
@@ -45,6 +45,9 @@ typedef boost::lockfree::queue<size_t, boost::lockfree::capacity<20> >
     result_queue_t;
 
 class TestTask : public Agentpp::Runnable {
+    typedef boost::mutex lockable_type;
+    typedef boost::unique_lock<lockable_type> scoped_lock;
+
 public:
     explicit TestTask(
         const std::string& msg, result_queue_t& rslt, unsigned ms_delay = 11)
@@ -52,13 +55,13 @@ public:
         , result(rslt)
         , delay(ms_delay)
     {
-        // TODO use boost::mutex! Agentpp::Lock l(lock);
+        scoped_lock l(lock);
         ++counter;
     }
 
     virtual ~TestTask()
     {
-        // TODO use boost::mutex! Agentpp::Lock l(lock);
+        scoped_lock l(lock);
         --counter;
     }
 
@@ -66,9 +69,8 @@ public:
     {
         Agentpp::Thread::sleep(delay); // ms
 
-        // TODO use boost::mutex! Agentpp::Lock l(lock);
-        // TODO BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << " called with: "
-        // << text);
+        scoped_lock l(lock);
+        BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << " called with: " << text);
         size_t hash = boost::hash_value(text);
         result.push(hash);
         ++run_cnt;
@@ -76,17 +78,17 @@ public:
 
     static size_t run_count()
     {
-        // TODO use boost::mutex! Agentpp::Lock l(lock);
+        scoped_lock l(lock);
         return run_cnt;
     }
     static size_t task_count()
     {
-        // TODO use boost::mutex! Agentpp::Lock l(lock);
+        scoped_lock l(lock);
         return counter;
     }
     static void reset_counter()
     {
-        // TODO use boost::mutex! Agentpp::Lock l(lock);
+        scoped_lock l(lock);
         counter = 0;
         run_cnt = 0;
     }
@@ -94,7 +96,7 @@ public:
 protected:
     static test_counter_t run_cnt;
     static test_counter_t counter;
-    // NOTE: not longer used! static Agentpp::Synchronized lock;
+    static lockable_type lock;
 
 private:
     const std::string text;
@@ -102,7 +104,7 @@ private:
     unsigned delay;
 };
 
-// TODO use boost::mutex! Agentpp::Synchronized TestTask::lock;
+TestTask::lockable_type TestTask::lock;
 test_counter_t TestTask::run_cnt(0);
 test_counter_t TestTask::counter(0);
 
@@ -501,20 +503,20 @@ struct wait_data {
 };
 
 
-typedef boost::testable_mutex<Agentpp::Synchronized> mutex_type;
+// XXX typedef boost::testable_mutex<Agentpp::Synchronized> mutex_type;
+typedef Agentpp::Synchronized mutex_type;
 
 void lock_mutexes_slowly(
     mutex_type* m1, mutex_type* m2, wait_data* locked, wait_data* quit)
 {
     boost::lock_guard<mutex_type> l1(*m1);
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(500));
+    boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
     boost::lock_guard<mutex_type> l2(*m2);
     BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
 
     locked->signal();
     quit->wait();
 }
-
 
 void lock_pair(mutex_type* m1, mutex_type* m2)
 {
@@ -537,11 +539,82 @@ BOOST_AUTO_TEST_CASE(test_lock_two_other_thread_locks_in_order)
     boost::thread t(lock_mutexes_slowly, &m1, &m2, &locked, &release);
 
     boost::thread t2(lock_pair, &m1, &m2);
-    BOOST_CHECK(locked.timed_wait(boost::chrono::seconds(1)));
+    BOOST_CHECK(locked.timed_wait(boost::chrono::milliseconds(250)));
 
     release.signal();
 
-    BOOST_CHECK(t2.try_join_for(boost::chrono::seconds(1)));
+    BOOST_CHECK(t2.try_join_for(boost::chrono::milliseconds(250)));
+    t2.join(); // just in case of timeout! CK
+
+    t.join();
+}
+
+BOOST_AUTO_TEST_CASE(test_lock_two_other_thread_locks_in_opposite_order)
+{
+    mutex_type m1, m2;
+    wait_data locked;
+    wait_data release;
+
+    boost::thread t(lock_mutexes_slowly, &m1, &m2, &locked, &release);
+
+    boost::thread t2(lock_pair, &m2, &m1); // NOTE: m2 first!
+    BOOST_CHECK(locked.timed_wait(boost::chrono::milliseconds(250)));
+
+    release.signal();
+
+    BOOST_CHECK(t2.try_join_for(boost::chrono::milliseconds(250)));
+    t2.join(); // just in case of timeout! CK
+
+    t.join();
+}
+
+
+void lock_five_mutexes_slowly(mutex_type* m1, mutex_type* m2, mutex_type* m3,
+    mutex_type* m4, mutex_type* m5, wait_data* locked, wait_data* quit)
+{
+    boost::lock_guard<mutex_type> l1(*m1);
+    boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
+    boost::lock_guard<mutex_type> l2(*m2);
+    boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
+    boost::lock_guard<mutex_type> l3(*m3);
+    boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
+    boost::lock_guard<mutex_type> l4(*m4);
+    boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
+    boost::lock_guard<mutex_type> l5(*m5);
+    BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
+
+    locked->signal();
+    quit->wait();
+}
+
+void lock_n(mutex_type* mutexes, unsigned count)
+{
+    boost::lock(mutexes, mutexes + count);
+    BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
+
+    for (unsigned i = 0; i < count; ++i) {
+        BOOST_CHECK(mutexes[i].unlock());
+    }
+}
+
+
+BOOST_AUTO_TEST_CASE(test_lock_ten_other_thread_locks_in_different_order)
+{
+    unsigned const num_mutexes = 10;
+
+    mutex_type mutexes[num_mutexes];
+    wait_data locked;
+    wait_data release;
+
+    boost::thread t(lock_five_mutexes_slowly, &mutexes[6], &mutexes[3],
+        &mutexes[8], &mutexes[0], &mutexes[2], &locked, &release);
+
+    boost::thread t2(lock_n, mutexes, num_mutexes);
+    BOOST_CHECK(locked.timed_wait(boost::chrono::milliseconds(250)));
+
+    release.signal();
+
+    BOOST_CHECK(t2.try_join_for(boost::chrono::milliseconds(250)));
     t2.join(); // just in case of timeout! CK
 
     t.join();
