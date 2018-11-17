@@ -194,6 +194,7 @@ public:
      *     OWNED if the lock is already owned by the calling thread.
      */
     TryLockResult trylock();
+    bool try_lock() { return trylock(); };
 
     /**
      * Leave a critical section. If this thread called lock or trylock

@@ -30,6 +30,16 @@
 #include <vector>
 
 
+#if ! defined BOOST_THREAD_TEST_TIME_MS
+#ifdef BOOST_THREAD_PLATFORM_WIN32
+#define BOOST_THREAD_TEST_TIME_MS 250
+#else
+#define BOOST_THREAD_TEST_TIME_MS 75
+#endif
+#endif
+
+const ms max_diff(BOOST_THREAD_TEST_TIME_MS);
+
 typedef boost::atomic_size_t test_counter_t;
 typedef boost::lockfree::queue<size_t, boost::lockfree::capacity<20> >
     result_queue_t;
@@ -426,7 +436,12 @@ BOOST_AUTO_TEST_CASE(SyncWait_test)
     Synchronized sync;
     {
         Lock l(sync);
+        Stopwatch sw;
         BOOST_TEST(!sync.wait(42), "no timeout occurred on wait!");
+
+        ns d = sw.elapsed() - ms(42);
+        BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
+        BOOST_TEST(d < ns(max_diff));
     }
 }
 
@@ -437,8 +452,9 @@ BOOST_AUTO_TEST_CASE(ThreadSleep_test)
     Stopwatch sw;
     Thread::sleep(2000); // ms
 
-    BOOST_TEST(sw.elapsed() >= ms(2000));
+    ns d = sw.elapsed() - ms(2000);
     BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
+    BOOST_TEST(d < ns(max_diff));
 }
 
 
@@ -485,7 +501,7 @@ struct wait_data {
 };
 
 
-typedef boost::testable_mutex<boost::mutex> mutex_type;
+typedef boost::testable_mutex<Agentpp::Synchronized> mutex_type;
 
 void lock_mutexes_slowly(
     mutex_type* m1, mutex_type* m2, wait_data* locked, wait_data* quit)
