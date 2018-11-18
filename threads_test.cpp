@@ -447,6 +447,28 @@ BOOST_AUTO_TEST_CASE(SyncWait_test)
     }
 }
 
+BOOST_AUTO_TEST_CASE(SyncTry_lock_for_test)
+{
+    using namespace Agentpp;
+    Synchronized sync;
+    {
+        Lock l(sync);
+        Stopwatch sw;
+        BOOST_TEST(!sync.lock(123), "no timeout occurred on lock!");
+
+        ns d = sw.elapsed() - ms(123);
+        BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
+        BOOST_TEST(d < ns(max_diff));
+    }
+    {
+        Stopwatch sw;
+        BOOST_TEST(sync.lock(7), "timeout occurred on lock!");
+        ns d = sw.elapsed() - ms(7);
+        BOOST_TEST(d < ns(max_diff));
+        BOOST_TEST(sync.unlock());
+    }
+}
+
 BOOST_AUTO_TEST_CASE(ThreadSleep_test)
 {
     using namespace Agentpp;

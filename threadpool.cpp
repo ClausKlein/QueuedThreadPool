@@ -25,21 +25,13 @@ src/threads.cpp > threadpool.cpp
 
 #ifndef _MSC_VER
 #include <unistd.h> // _POSIX_THREADS ...
-
-#ifndef _POSIX_C_SOURCE
-#if defined(__APPLE__) && defined(__DARWIN_C_LEVEL)
-#if __DARWIN_C_LEVEL < 200112L
-#warning "_POSIX_C_SOURCE is undefined!"
-// XXX #define _POSIX_C_SOURCE 200112L
-#endif
-#endif
-#endif
-
-#include <pthread.h>
 #endif
 
 #include "threadpool.hpp"
 
+#include <boost/assert.hpp>
+
+#include <pthread.h>
 #include <iostream>
 
 #if !defined(_NO_LOGGING) && !defined(NDEBUG)
@@ -205,24 +197,25 @@ bool Synchronized::lock()
     return true;
 }
 
-
-#if HAVE_TIMED_MUTEX
+// TODO: should be bool try_lock_for(duration)
 bool Synchronized::lock(unsigned long timeout)
 {
     DTRACE(timeout);
     BOOST_ASSERT(!is_locked_by_this_thread());
 
     duration d = ms(timeout);
-    if (!mutex.try_lock_for(d)) {
-        return false;
+    while (!mutex.try_lock()) {
+        boost::this_thread::sleep_for(ms(10));
+        d = d - ms(10);
+        if (d <= ms(0)) {
+            return false;
+        }
     }
 
     isLocked = true;
     tid_     = boost::this_thread::get_id();
     return true; // OK
 }
-#endif
-
 
 bool Synchronized::unlock()
 {

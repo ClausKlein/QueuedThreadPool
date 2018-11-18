@@ -39,11 +39,6 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #define BOOST_THREAD_VERSION 4
 #define BOOST_CHRONO_VERSION 2
 
-// NOTE: Mutex nested lock types are deprecated! CK
-#if defined BOOST_THREAD_PROVIDES_NESTED_LOCKS
-#include "boost/testable_mutex.hpp"
-#endif
-
 #include <boost/atomic.hpp>
 #include <boost/core/noncopyable.hpp>
 #include <boost/thread/condition_variable.hpp>
