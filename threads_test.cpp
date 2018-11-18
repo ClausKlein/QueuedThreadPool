@@ -5,51 +5,63 @@
 // clang-format -style=file -i thread*.{cpp,hpp}
 //
 
+
 #ifdef USE_AGENTPP
 #include "agent_pp/threads.h" // ThreadPool, QueuedThreadPool
 #else
 #include "threadpool.hpp" // ThreadPool, QueuedThreadPool
 #endif
 
-#if (defined(_MSVC_LANG) && __has_include(<atomic>))                          \
-    || (defined(__cplusplus) && (__cplusplus >= 201103L))
-#define _ENABLE_ATOMIC_ALIGNMENT_FIX
-#include <atomic>
-typedef std::atomic_size_t test_counter_t;
-#else
-typedef volatile std::size_t test_counter_t;
-#endif
+
+#define BOOST_TEST_MODULE Threads
+#define BOOST_TEST_NO_MAIN
+#include <boost/test/included/unit_test.hpp>
+
+#include <boost/atomic.hpp>
+#include <boost/functional/hash.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/lockfree/queue.hpp>
+
+// XXX #include "boost/testable_mutex.hpp"
+#include "simple_stopwatch.hpp"
 
 #include <iostream>
 #include <string>
 #include <vector>
 
-#define BOOST_TEST_MODULE Threads
-#define BOOST_TEST_NO_MAIN
-#include <boost/functional/hash.hpp>
-#include <boost/lexical_cast.hpp>
-#include <boost/lockfree/queue.hpp>
-#include <boost/test/included/unit_test.hpp>
 
+#if !defined BOOST_THREAD_TEST_TIME_MS
+#ifdef BOOST_THREAD_PLATFORM_WIN32
+#define BOOST_THREAD_TEST_TIME_MS 250
+#else
+#define BOOST_THREAD_TEST_TIME_MS 75
+#endif
+#endif
 
+const ms max_diff(BOOST_THREAD_TEST_TIME_MS);
+
+typedef boost::atomic_size_t test_counter_t;
 typedef boost::lockfree::queue<size_t, boost::lockfree::capacity<20> >
     result_queue_t;
 
 class TestTask : public Agentpp::Runnable {
+    typedef boost::mutex lockable_type;
+    typedef boost::unique_lock<lockable_type> scoped_lock;
+
 public:
     explicit TestTask(
-        const std::string& msg, result_queue_t& rslt, size_t ms_delay = 11)
+        const std::string& msg, result_queue_t& rslt, unsigned ms_delay = 11)
         : text(msg)
         , result(rslt)
         , delay(ms_delay)
     {
-        Agentpp::Lock l(lock);
+        scoped_lock l(lock);
         ++counter;
     }
 
     virtual ~TestTask()
     {
-        Agentpp::Lock l(lock);
+        scoped_lock l(lock);
         --counter;
     }
 
@@ -57,9 +69,8 @@ public:
     {
         Agentpp::Thread::sleep(delay); // ms
 
-        Agentpp::Lock l(lock);
-        // TODO BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << " called with: "
-        // << text);
+        scoped_lock l(lock);
+        BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << " called with: " << text);
         size_t hash = boost::hash_value(text);
         result.push(hash);
         ++run_cnt;
@@ -67,17 +78,17 @@ public:
 
     static size_t run_count()
     {
-        Agentpp::Lock l(lock);
+        scoped_lock l(lock);
         return run_cnt;
     }
     static size_t task_count()
     {
-        Agentpp::Lock l(lock);
+        scoped_lock l(lock);
         return counter;
     }
     static void reset_counter()
     {
-        Agentpp::Lock l(lock);
+        scoped_lock l(lock);
         counter = 0;
         run_cnt = 0;
     }
@@ -85,17 +96,18 @@ public:
 protected:
     static test_counter_t run_cnt;
     static test_counter_t counter;
-    static Agentpp::Synchronized lock;
+    static lockable_type lock;
 
 private:
     const std::string text;
     result_queue_t& result;
-    size_t delay;
+    unsigned delay;
 };
 
-Agentpp::Synchronized TestTask::lock;
+TestTask::lockable_type TestTask::lock;
 test_counter_t TestTask::run_cnt(0);
 test_counter_t TestTask::counter(0);
+
 
 BOOST_AUTO_TEST_CASE(ThreadPool_test)
 {
@@ -168,9 +180,9 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
 
         std::srand(static_cast<unsigned>(
             std::time(0))); // use current time as seed for random generator
-        size_t i = 4;
+        unsigned i = 4;
         do {
-            size_t delay = std::rand() % 100;
+            unsigned delay = std::rand() % 100;
             std::string msg(boost::lexical_cast<std::string>(i));
             queuedThreadPool.execute(
                 new TestTask(msg + " Queuing ...", result, delay));
@@ -229,10 +241,10 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolLoad_test)
         defaultThreadPool.execute(new TestTask("Started ...", result));
         BOOST_CHECK(!defaultThreadPool.is_idle());
 
-        size_t i = 20;
+        unsigned i = 20;
         do {
             if (i > 5) {
-                size_t delay = std::rand() % 100;
+                unsigned delay = std::rand() % 100;
                 defaultThreadPool.execute(
                     new TestTask("Running ...", result, delay));
                 Thread::sleep(i / 2); // ms
@@ -385,7 +397,6 @@ BOOST_AUTO_TEST_CASE(Synchronized_test)
     using namespace Agentpp;
     Synchronized sync;
     {
-        Lock l(sync);
         BOOST_TEST(sync.lock());
         BOOST_TEST(sync.unlock());
         BOOST_TEST(!sync.unlock(), "second unlock() returns no error");
@@ -394,7 +405,7 @@ BOOST_AUTO_TEST_CASE(Synchronized_test)
         !sync.unlock(), "unlock() without previous lock() returns no error");
 }
 
-BOOST_AUTO_TEST_CASE(Trylock_test)
+BOOST_AUTO_TEST_CASE(SyncTrylock_test)
 {
     using namespace Agentpp;
     Synchronized sync;
@@ -405,34 +416,233 @@ BOOST_AUTO_TEST_CASE(Trylock_test)
     BOOST_TEST(!sync.unlock(), "second unlock() returns no error");
 }
 
-BOOST_AUTO_TEST_CASE(Wait_test)
+BOOST_AUTO_TEST_CASE(SyncDeadlock_test)
+{
+    using namespace Agentpp;
+    Synchronized sync;
+    try {
+        Lock l(sync);
+        BOOST_TEST(!sync.lock());
+    } catch (std::exception& e) {
+        BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
+        BOOST_TEST_MESSAGE(e.what());
+        BOOST_TEST(false);
+    }
+    BOOST_TEST(sync.lock());
+    BOOST_TEST(sync.unlock());
+}
+
+BOOST_AUTO_TEST_CASE(SyncWait_test)
 {
     using namespace Agentpp;
     Synchronized sync;
     {
         Lock l(sync);
-        BOOST_TEST(sync.wait(42), "no timeout occurred on wait!");
+        Stopwatch sw;
+        BOOST_TEST(!sync.wait(42), "no timeout occurred on wait!");
+
+        ns d = sw.elapsed() - ms(42);
+        BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
+        BOOST_TEST(d < ns(max_diff));
     }
 }
 
-#if defined(_POSIX_TIMERS) && _POSIX_TIMERS > 0
-BOOST_AUTO_TEST_CASE(Thread_test)
+BOOST_AUTO_TEST_CASE(SyncTry_lock_for_test)
+{
+    using namespace Agentpp;
+    Synchronized sync;
+    {
+        Lock l(sync);
+        Stopwatch sw;
+        BOOST_TEST(!sync.lock(123), "no timeout occurred on lock!");
+
+        ns d = sw.elapsed() - ms(123);
+        BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
+        BOOST_TEST(d < ns(max_diff));
+    }
+    {
+        Stopwatch sw;
+        BOOST_TEST(sync.lock(7), "timeout occurred on lock!");
+        ns d = sw.elapsed() - ms(7);
+        BOOST_TEST(d < ns(max_diff));
+        BOOST_TEST(sync.unlock());
+    }
+}
+
+BOOST_AUTO_TEST_CASE(ThreadSleep_test)
 {
     using namespace Agentpp;
 
-    struct timespec startTime;
-    clock_gettime(CLOCK_REALTIME, &startTime);
-    startTime.tv_sec += 2;
-
+    Stopwatch sw;
     Thread::sleep(2000); // ms
 
-    struct timespec endTime;
-    clock_gettime(CLOCK_REALTIME, &endTime);
-    BOOST_TEST(endTime.tv_sec >= startTime.tv_sec);
+    ns d = sw.elapsed() - ms(2000);
+    BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
+    BOOST_TEST(d < ns(max_diff));
 }
-#endif
 
-#ifdef BOOST_TEST_NO_MAIN
+
+struct wait_data {
+    typedef boost::mutex lockable_type;
+    typedef boost::unique_lock<lockable_type> scoped_lock;
+
+    bool flag;
+    lockable_type mtx;
+    boost::condition_variable cond;
+
+    wait_data()
+        : flag(false)
+    {}
+
+    // NOTE: return false if condition waiting for is not true! CK
+    bool predicate() { return flag; }
+
+    void wait()
+    {
+        scoped_lock l(mtx);
+        while (!predicate()) {
+            cond.wait(l);
+        }
+    }
+
+    template <typename Duration> bool timed_wait(Duration d)
+    {
+        scoped_lock l(mtx);
+        while (!predicate()) {
+            if (cond.wait_for(l, d) == boost::cv_status::timeout) {
+                return false;
+            }
+        }
+        return true; // OK
+    }
+
+    void signal()
+    {
+        scoped_lock l(mtx);
+        flag = true;
+        cond.notify_all();
+    }
+};
+
+
+// XXX typedef boost::testable_mutex<Agentpp::Synchronized> mutex_type;
+typedef Agentpp::Synchronized mutex_type;
+
+void lock_mutexes_slowly(
+    mutex_type* m1, mutex_type* m2, wait_data* locked, wait_data* quit)
+{
+    boost::lock_guard<mutex_type> l1(*m1);
+    boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
+    boost::lock_guard<mutex_type> l2(*m2);
+    BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
+
+    locked->signal();
+    quit->wait();
+}
+
+void lock_pair(mutex_type* m1, mutex_type* m2)
+{
+    boost::lock(*m1, *m2);
+    boost::unique_lock<mutex_type> l1(*m1, boost::adopt_lock),
+        l2(*m2, boost::adopt_lock);
+    BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
+
+    BOOST_CHECK(l1.owns_lock());
+    BOOST_CHECK(l2.owns_lock());
+}
+
+
+BOOST_AUTO_TEST_CASE(test_lock_two_other_thread_locks_in_order)
+{
+    mutex_type m1, m2;
+    wait_data locked;
+    wait_data release;
+
+    boost::thread t(lock_mutexes_slowly, &m1, &m2, &locked, &release);
+
+    boost::thread t2(lock_pair, &m1, &m2);
+    BOOST_CHECK(locked.timed_wait(boost::chrono::milliseconds(250)));
+
+    release.signal();
+
+    BOOST_CHECK(t2.try_join_for(boost::chrono::milliseconds(250)));
+    t2.join(); // just in case of timeout! CK
+
+    t.join();
+}
+
+BOOST_AUTO_TEST_CASE(test_lock_two_other_thread_locks_in_opposite_order)
+{
+    mutex_type m1, m2;
+    wait_data locked;
+    wait_data release;
+
+    boost::thread t(lock_mutexes_slowly, &m1, &m2, &locked, &release);
+
+    boost::thread t2(lock_pair, &m2, &m1); // NOTE: m2 first!
+    BOOST_CHECK(locked.timed_wait(boost::chrono::milliseconds(250)));
+
+    release.signal();
+
+    BOOST_CHECK(t2.try_join_for(boost::chrono::milliseconds(250)));
+    t2.join(); // just in case of timeout! CK
+
+    t.join();
+}
+
+
+void lock_five_mutexes_slowly(mutex_type* m1, mutex_type* m2, mutex_type* m3,
+    mutex_type* m4, mutex_type* m5, wait_data* locked, wait_data* quit)
+{
+    boost::lock_guard<mutex_type> l1(*m1);
+    boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
+    boost::lock_guard<mutex_type> l2(*m2);
+    boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
+    boost::lock_guard<mutex_type> l3(*m3);
+    boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
+    boost::lock_guard<mutex_type> l4(*m4);
+    boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
+    boost::lock_guard<mutex_type> l5(*m5);
+    BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
+
+    locked->signal();
+    quit->wait();
+}
+
+void lock_n(mutex_type* mutexes, unsigned count)
+{
+    boost::lock(mutexes, mutexes + count);
+    BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
+
+    for (unsigned i = 0; i < count; ++i) {
+        BOOST_CHECK(mutexes[i].unlock());
+    }
+}
+
+
+BOOST_AUTO_TEST_CASE(test_lock_ten_other_thread_locks_in_different_order)
+{
+    unsigned const num_mutexes = 10;
+
+    mutex_type mutexes[num_mutexes];
+    wait_data locked;
+    wait_data release;
+
+    boost::thread t(lock_five_mutexes_slowly, &mutexes[6], &mutexes[3],
+        &mutexes[8], &mutexes[0], &mutexes[2], &locked, &release);
+
+    boost::thread t2(lock_n, mutexes, num_mutexes);
+    BOOST_CHECK(locked.timed_wait(boost::chrono::milliseconds(250)));
+
+    release.signal();
+
+    BOOST_CHECK(t2.try_join_for(boost::chrono::milliseconds(250)));
+    t2.join(); // just in case of timeout! CK
+
+    t.join();
+}
+
+
 int main(int argc, char* argv[])
 {
     // prototype for user's unit test init function
@@ -457,6 +667,8 @@ int main(int argc, char* argv[])
     }
 
     do {
+        StopwatchReporter sw;
+
         error = ::boost::unit_test::unit_test_main(init_func, argc, argv);
 
         if (--loops <= 0) {
@@ -471,98 +683,4 @@ int main(int argc, char* argv[])
 
     return error;
 }
-#endif
 
-/***
- * OUTPUT:
-
-MINGW64 /e/workspace/cpp/threadpool $ make test
-g++ -g -O -Wextra --std=c++98 -Wno-unused-parameter -DNDEBUG
--I/opt/local/include   -c -o threads_test.o threads_test.cpp g++ -g -O -Wextra
---std=c++98 -Wno-unused-parameter -DNDEBUG -I/opt/local/include
-threads_test.o threadpool.o -o threads_test
-./threads_test -l message ## --random
-
-Running 4 test cases...
-threadPool.size: 4
-virtual void TestTask::run() called with: ThreadPool is running!
-virtual void TestTask::run() called with: Under full load now!
-virtual void TestTask::run() called with: Generate some load.
-virtual void TestTask::run() called with: Hallo world!
-outstanding tasks: 2
-virtual void TestTask::run() called with: Good by!
-outstanding tasks: 0
-
-queuedThreadPool.size: 1
-virtual void TestTask::run() called with: 1 Hi again.
-queuedThreadPool.queue_length: 8
-virtual void TestTask::run() called with: 2 Queuing starts.
-virtual void TestTask::run() called with: 3 Under full load!
-virtual void TestTask::run() called with: 4 Queuing ...
-virtual void TestTask::run() called with: 5 Queuing ...
-virtual void TestTask::run() called with: 6 Queuing ...
-virtual void TestTask::run() called with: 7 Queuing ...
-virtual void TestTask::run() called with: 8 Queuing ...
-virtual void TestTask::run() called with: 9 Queuing ...
-outstanding tasks: 0
-NOTE: checking the order of execution
-
-emptyThreadPool.size: 4
-defaultThreadPool.queue_length: 0
-virtual void TestTask::run() called with: Started ...
-virtual void TestTask::run() called with: Running ...
-defaultThreadPool.queue_length: 0
-defaultThreadPool.queue_length: 0
-virtual void TestTask::run() called with: Running ...
-virtual void TestTask::run() called with: Running ...
-defaultThreadPool.queue_length: 0
-defaultThreadPool.queue_length: 0
-defaultThreadPool.queue_length: 0
-defaultThreadPool.queue_length: 0
-defaultThreadPool.queue_length: 1
-virtual void TestTask::run() called with: Running ...
-virtual void TestTask::run() called with: Running ...
-virtual void TestTask::run() called with: Running ...
-defaultThreadPool.queue_length: 1
-defaultThreadPool.queue_length: 1
-defaultThreadPool.queue_length: 1
-defaultThreadPool.queue_length: 2
-virtual void TestTask::run() called with: Running ...
-virtual void TestTask::run() called with: Running ...
-virtual void TestTask::run() called with: Running ...
-defaultThreadPool.queue_length: 2
-defaultThreadPool.queue_length: 2
-defaultThreadPool.queue_length: 2
-defaultThreadPool.queue_length: 2
-defaultThreadPool.queue_length: 2
-defaultThreadPool.queue_length: 2
-defaultThreadPool.queue_length: 2
-defaultThreadPool.queue_length: 2
-outstanding tasks: 6
-
-virtual void TestTask::run() called with: Running ...
-virtual void TestTask::run() called with: Running ...
-virtual void TestTask::run() called with: Running ...
-virtual void TestTask::run() called with: Running ...
-virtual void TestTask::run() called with: Running ...
-virtual void TestTask::run() called with: Running ...
-outstanding tasks: 0
-
-emptyThreadPool.size: 0
-emptyThreadPool.queue_length: 2
-emptyThreadPool.queue_length: 3
-emptyThreadPool.queue_length: 4
-emptyThreadPool.queue_length: 5
-emptyThreadPool.queue_length: 6
-emptyThreadPool.queue_length: 6
-emptyThreadPool.queue_length: 6
-emptyThreadPool.queue_length: 6
-emptyThreadPool.queue_length: 6
-emptyThreadPool.queue_length: 6
-outstanding tasks: 6
-
-*** No errors detected
-
-MINGW64 /e/workspace/cpp/threadpool $
-
- ***/

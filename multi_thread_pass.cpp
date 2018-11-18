@@ -96,7 +96,6 @@ void test_concurrent_push_and_pull_on_empty_queue()
 }
 
 #if defined(BOOST_THREAD_PROVIDES_VARIADIC_THREAD)
-#warning BOOST_THREAD_PROVIDES_VARIADIC_THREAD
 void test_concurrent_push_and_wait_pull_on_empty_queue()
 {
     boost::sync_queue<ValueType> q;
