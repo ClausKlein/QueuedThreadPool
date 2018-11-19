@@ -1,10 +1,11 @@
+#define BOOST_THREAD_VERSION 4
 #include "simple_stopwatch.hpp"
 
+#include <boost/assert.hpp>
 #include <boost/atomic.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
 #include <boost/thread/thread.hpp>
 
-#include <cassert>
 #include <iostream>
 
 
@@ -88,7 +89,7 @@ int main(int, char**)
     std::cout << "produced " << producer_count << " objects." << std::endl;
     std::cout << "consumed " << consumer_count << " objects." << std::endl;
 
-    assert(producer_count == consumer_count);
+    BOOST_ASSERT(producer_count == consumer_count);
 
     return 0;
 }
