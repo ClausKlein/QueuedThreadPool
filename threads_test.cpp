@@ -22,7 +22,6 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/lockfree/queue.hpp>
 
-// XXX #include "boost/testable_mutex.hpp"
 #include "simple_stopwatch.hpp"
 
 #include <iostream>
@@ -447,28 +446,6 @@ BOOST_AUTO_TEST_CASE(SyncWait_test)
     }
 }
 
-BOOST_AUTO_TEST_CASE(SyncTry_lock_for_test)
-{
-    using namespace Agentpp;
-    Synchronized sync;
-    {
-        Lock l(sync);
-        Stopwatch sw;
-        BOOST_TEST(!sync.lock(123), "no timeout occurred on lock!");
-
-        ns d = sw.elapsed() - ms(123);
-        BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
-        BOOST_TEST(d < ns(max_diff));
-    }
-    {
-        Stopwatch sw;
-        BOOST_TEST(sync.lock(7), "timeout occurred on lock!");
-        ns d = sw.elapsed() - ms(7);
-        BOOST_TEST(d < ns(max_diff));
-        BOOST_TEST(sync.unlock());
-    }
-}
-
 BOOST_AUTO_TEST_CASE(ThreadSleep_test)
 {
     using namespace Agentpp;
@@ -525,15 +502,16 @@ struct wait_data {
 };
 
 
-// XXX typedef boost::testable_mutex<Agentpp::Synchronized> mutex_type;
 typedef Agentpp::Synchronized mutex_type;
 
 void lock_mutexes_slowly(
     mutex_type* m1, mutex_type* m2, wait_data* locked, wait_data* quit)
 {
-    boost::lock_guard<mutex_type> l1(*m1);
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
-    boost::lock_guard<mutex_type> l2(*m2);
+    using namespace boost;
+
+    lock_guard<mutex_type> l1(*m1);
+    this_thread::sleep_for(chrono::milliseconds(50));
+    lock_guard<mutex_type> l2(*m2);
     BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
 
     locked->signal();
@@ -542,9 +520,10 @@ void lock_mutexes_slowly(
 
 void lock_pair(mutex_type* m1, mutex_type* m2)
 {
+    using namespace boost;
+
     boost::lock(*m1, *m2);
-    boost::unique_lock<mutex_type> l1(*m1, boost::adopt_lock),
-        l2(*m2, boost::adopt_lock);
+    unique_lock<mutex_type> l1(*m1, adopt_lock), l2(*m2, adopt_lock);
     BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
 
     BOOST_CHECK(l1.owns_lock());
@@ -554,18 +533,20 @@ void lock_pair(mutex_type* m1, mutex_type* m2)
 
 BOOST_AUTO_TEST_CASE(test_lock_two_other_thread_locks_in_order)
 {
+    using namespace boost;
+
     mutex_type m1, m2;
     wait_data locked;
     wait_data release;
 
-    boost::thread t(lock_mutexes_slowly, &m1, &m2, &locked, &release);
+    thread t(lock_mutexes_slowly, &m1, &m2, &locked, &release);
 
-    boost::thread t2(lock_pair, &m1, &m2);
-    BOOST_CHECK(locked.timed_wait(boost::chrono::milliseconds(250)));
+    thread t2(lock_pair, &m1, &m2);
+    BOOST_CHECK(locked.timed_wait(chrono::milliseconds(250)));
 
     release.signal();
 
-    BOOST_CHECK(t2.try_join_for(boost::chrono::milliseconds(250)));
+    BOOST_CHECK(t2.try_join_for(chrono::milliseconds(250)));
     t2.join(); // just in case of timeout! CK
 
     t.join();
@@ -573,18 +554,20 @@ BOOST_AUTO_TEST_CASE(test_lock_two_other_thread_locks_in_order)
 
 BOOST_AUTO_TEST_CASE(test_lock_two_other_thread_locks_in_opposite_order)
 {
+    using namespace boost;
+
     mutex_type m1, m2;
     wait_data locked;
     wait_data release;
 
-    boost::thread t(lock_mutexes_slowly, &m1, &m2, &locked, &release);
+    thread t(lock_mutexes_slowly, &m1, &m2, &locked, &release);
 
-    boost::thread t2(lock_pair, &m2, &m1); // NOTE: m2 first!
-    BOOST_CHECK(locked.timed_wait(boost::chrono::milliseconds(250)));
+    thread t2(lock_pair, &m2, &m1); // NOTE: m2 first!
+    BOOST_CHECK(locked.timed_wait(chrono::milliseconds(250)));
 
     release.signal();
 
-    BOOST_CHECK(t2.try_join_for(boost::chrono::milliseconds(250)));
+    BOOST_CHECK(t2.try_join_for(chrono::milliseconds(250)));
     t2.join(); // just in case of timeout! CK
 
     t.join();
@@ -594,15 +577,17 @@ BOOST_AUTO_TEST_CASE(test_lock_two_other_thread_locks_in_opposite_order)
 void lock_five_mutexes_slowly(mutex_type* m1, mutex_type* m2, mutex_type* m3,
     mutex_type* m4, mutex_type* m5, wait_data* locked, wait_data* quit)
 {
-    boost::lock_guard<mutex_type> l1(*m1);
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
-    boost::lock_guard<mutex_type> l2(*m2);
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
-    boost::lock_guard<mutex_type> l3(*m3);
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
-    boost::lock_guard<mutex_type> l4(*m4);
-    boost::this_thread::sleep_for(boost::chrono::milliseconds(50));
-    boost::lock_guard<mutex_type> l5(*m5);
+    using namespace boost;
+
+    lock_guard<mutex_type> l1(*m1);
+    this_thread::sleep_for(chrono::milliseconds(50));
+    lock_guard<mutex_type> l2(*m2);
+    this_thread::sleep_for(chrono::milliseconds(50));
+    lock_guard<mutex_type> l3(*m3);
+    this_thread::sleep_for(chrono::milliseconds(50));
+    lock_guard<mutex_type> l4(*m4);
+    this_thread::sleep_for(chrono::milliseconds(50));
+    lock_guard<mutex_type> l5(*m5);
     BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
 
     locked->signal();
@@ -611,10 +596,14 @@ void lock_five_mutexes_slowly(mutex_type* m1, mutex_type* m2, mutex_type* m3,
 
 void lock_n(mutex_type* mutexes, unsigned count)
 {
+    using namespace boost;
+
     boost::lock(mutexes, mutexes + count);
     BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
 
     for (unsigned i = 0; i < count; ++i) {
+        chrono::milliseconds d((rand() % 25) + (250 / count));
+        this_thread::sleep_for(d);
         BOOST_CHECK(mutexes[i].unlock());
     }
 }
@@ -622,24 +611,50 @@ void lock_n(mutex_type* mutexes, unsigned count)
 
 BOOST_AUTO_TEST_CASE(test_lock_ten_other_thread_locks_in_different_order)
 {
+    using namespace boost;
     unsigned const num_mutexes = 10;
 
     mutex_type mutexes[num_mutexes];
     wait_data locked;
     wait_data release;
 
-    boost::thread t(lock_five_mutexes_slowly, &mutexes[6], &mutexes[3],
+    thread t(lock_five_mutexes_slowly, &mutexes[6], &mutexes[3],
         &mutexes[8], &mutexes[0], &mutexes[2], &locked, &release);
 
-    boost::thread t2(lock_n, mutexes, num_mutexes);
-    BOOST_CHECK(locked.timed_wait(boost::chrono::milliseconds(250)));
+    thread t2(lock_n, mutexes, num_mutexes);
+    BOOST_CHECK(locked.timed_wait(chrono::milliseconds(250)));
 
     release.signal();
 
-    BOOST_CHECK(t2.try_join_for(boost::chrono::milliseconds(250)));
+    BOOST_CHECK(t2.try_join_for(chrono::milliseconds(500)));
     t2.join(); // just in case of timeout! CK
 
     t.join();
+}
+
+BOOST_AUTO_TEST_CASE(SyncTry_lock_for_test)
+{
+    using namespace Agentpp;
+    unsigned const num_mutexes = 1;
+
+    Synchronized timed_locks[num_mutexes];
+    {
+        boost::thread t1(lock_n, timed_locks, num_mutexes);
+        boost::this_thread::sleep_for(ms(1));
+        Stopwatch sw;
+        BOOST_TEST(!timed_locks[0].lock(123), "no timeout occurred on lock!");
+        ns d = sw.elapsed() - ms(123);
+        BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
+        BOOST_TEST(d < ns(max_diff));
+        t1.join();
+    }
+    {
+        Stopwatch sw;
+        BOOST_TEST(timed_locks[0].lock(7), "timeout occurred on lock!");
+        ns d = sw.elapsed() - ms(7);
+        BOOST_TEST(d < ns(max_diff));
+        BOOST_TEST(timed_locks[0].unlock());
+    }
 }
 
 
