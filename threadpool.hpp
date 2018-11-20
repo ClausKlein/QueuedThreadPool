@@ -416,12 +416,13 @@ public:
     Thread* clone() { return new Thread(get_runnable()); }
 
 private:
+    static void nsleep(time_t secs, long nanos);
+
     Runnable* runnable;
     ThreadStatus status;
     size_t stackSize;
     pthread_t tid;
     static ThreadList threadList;
-    static void nsleep(time_t secs, long nanos);
 };
 
 

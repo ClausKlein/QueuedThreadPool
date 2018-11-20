@@ -48,7 +48,6 @@ void submit_some(boost::basic_thread_pool& tp)
     tp.submit(&p2);
 }
 
-
 int main()
 {
     BOOST_THREAD_LOG << boost::this_thread::get_id() << " <MAIN"

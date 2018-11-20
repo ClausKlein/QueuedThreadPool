@@ -52,11 +52,13 @@ src/threads.cpp > threadpool.cpp
  * std::cout. When DEBUG is not defined, it expands to nothing.
  */
 #ifdef DEBUG
-#define DTRACE(arg) \
+#define DTRACE(arg)                                                           \
     std::cout << BOOST_CURRENT_FUNCTION << ": " << arg << std::endl
 #else
 #define DTRACE(arg)
 #endif
+
+#define THIS_THREAD_YIELD boost::this_thread::yield();
 
 
 namespace Agentpp
@@ -66,13 +68,13 @@ namespace Agentpp
 static const char* loggerModuleName = "agent++.threads";
 #endif
 
-
 /*--------------------- class Synchronized -------------------------*/
 
 Synchronized::Synchronized()
     : signal(false)
     , tid_(boost::thread::id())
-{}
+{
+}
 
 Synchronized::~Synchronized()
 {
@@ -109,7 +111,7 @@ void Synchronized::wait()
         //=================================
     }
 
-    l.release();    // ownership
+    l.release(); // ownership
 }
 
 // TODO: should be bool wait_for(duration)
@@ -127,14 +129,14 @@ bool Synchronized::wait(unsigned long timeout)
         tid_ = boost::thread::id();
         if (cond.wait_until(l, t) == boost::cv_status::timeout) {
             tid_ = boost::this_thread::get_id();
-            l.release();    // ownership
+            l.release(); // ownership
             return false;
         }
         tid_ = boost::this_thread::get_id();
         //=================================
     }
 
-    l.release();    // ownership
+    l.release(); // ownership
     return true;
 }
 
@@ -146,7 +148,7 @@ void Synchronized::notify()
     scoped_lock l(mutex, boost::adopt_lock);
     signal = true;
     cond.notify_one();
-    l.release();    // ownership
+    l.release(); // ownership
 }
 
 void Synchronized::notify_all()
@@ -157,7 +159,7 @@ void Synchronized::notify_all()
     scoped_lock l(mutex, boost::adopt_lock);
     signal = true;
     cond.notify_all();
-    l.release();    // ownership
+    l.release(); // ownership
 }
 
 bool Synchronized::lock()
@@ -224,13 +226,12 @@ Synchronized::TryLockResult Synchronized::trylock()
     scoped_lock l(mutex, boost::try_to_lock);
     if (l.owns_lock()) {
         tid_ = boost::this_thread::get_id();
-        l.release();    // ownership
+        l.release();   // ownership
         return LOCKED; // true
     }
 
     return BUSY; // false
 }
-
 
 /*------------------------ class Thread ----------------------------*/
 
@@ -372,8 +373,8 @@ void Thread::sleep(long millis)
 
 void Thread::sleep(long millis, long nanos)
 {
-    // XXX nsleep((time_t)(millis / 1000), (millis % 1000) * 1000000 + nanos);
-    boost::this_thread::sleep_for(ms(millis) + ns(nanos));
+    nsleep((time_t)(millis / 1000), (millis % 1000) * 1000000 + nanos);
+    // XXX boost::this_thread::sleep_for(ms(millis) + ns(nanos));
 }
 
 void Thread::nsleep(time_t secs, long nanos)
@@ -382,7 +383,6 @@ void Thread::nsleep(time_t secs, long nanos)
     // XXX long n   = nanos % 1000000000;
     boost::this_thread::sleep_for(sec(secs) + ns(nanos));
 }
-
 
 /*--------------------- class TaskManager --------------------------*/
 
@@ -445,7 +445,6 @@ void TaskManager::run()
     unlock();
 }
 
-
 // TODO: should be assert to be called with lock! CK
 bool TaskManager::set_task(Runnable* t)
 {
@@ -464,7 +463,6 @@ bool TaskManager::set_task(Runnable* t)
         return false;
     }
 }
-
 
 /*--------------------- class ThreadPool --------------------------*/
 
@@ -486,6 +484,7 @@ void ThreadPool::execute(Runnable* t)
                 LOG_END;
 
                 unlock();
+                THIS_THREAD_YIELD;  // FIXME: Only for test! CK
                 //==============================
                 if (tm->set_task(t)) {
                     return; // done
@@ -504,7 +503,6 @@ void ThreadPool::execute(Runnable* t)
     }
     unlock();
 }
-
 
 // TODO: should be assert to be called with lock! CK
 void ThreadPool::idle_notification()
@@ -576,7 +574,6 @@ ThreadPool::~ThreadPool()
     }
 }
 
-
 /*--------------------- class QueuedThreadPool --------------------------*/
 
 QueuedThreadPool::QueuedThreadPool(size_t size)
@@ -633,6 +630,7 @@ bool QueuedThreadPool::assign(Runnable* task, bool withQueuing)
             LOG_END;
 
             Thread::unlock();
+            THIS_THREAD_YIELD;  // FIXME: Only for test! CK
             //==============================
             if (!tm->set_task(task)) {
                 tm = 0;
@@ -647,7 +645,7 @@ bool QueuedThreadPool::assign(Runnable* task, bool withQueuing)
         tm = 0;
     }
 
-#ifndef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
+#ifdef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
     // NOTE: no idle thread found, push to queue if allowed! CK
     if (!tm && withQueuing) {
         LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
