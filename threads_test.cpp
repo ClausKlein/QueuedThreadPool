@@ -58,13 +58,13 @@ public:
         ++counter;
     }
 
-    virtual ~TestTask()
+    ~TestTask() BOOST_OVERRIDE
     {
         scoped_lock l(lock);
         --counter;
     }
 
-    virtual void run()
+    void run() BOOST_OVERRIDE
     {
         Agentpp::Thread::sleep(delay); // ms
 
@@ -118,7 +118,7 @@ BOOST_AUTO_TEST_CASE(ThreadPool_test)
 
         BOOST_TEST_MESSAGE("threadPool.size: " << threadPool.size());
         BOOST_TEST(threadPool.size() == 4UL);
-        BOOST_CHECK(threadPool.stack_size() == AGENTPP_DEFAULT_STACKSIZE);
+        BOOST_CHECK(threadPool.get_stack_size() == AGENTPP_DEFAULT_STACKSIZE);
         BOOST_CHECK(threadPool.is_idle());
 
         BOOST_CHECK(!threadPool.is_busy());
@@ -165,7 +165,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
         BOOST_TEST_MESSAGE(
             "queuedThreadPool.size: " << queuedThreadPool.size());
         BOOST_TEST(queuedThreadPool.size() == 1UL);
-        BOOST_TEST(queuedThreadPool.stack_size() == AGENTPP_DEFAULT_STACKSIZE);
+        BOOST_TEST(queuedThreadPool.get_stack_size() == AGENTPP_DEFAULT_STACKSIZE);
         BOOST_CHECK(queuedThreadPool.is_idle());
         BOOST_CHECK(!queuedThreadPool.is_busy());
 
@@ -287,7 +287,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolInterface_test)
 
         emptyThreadPool.set_stack_size(
             0x20000); // NOTE: this change the queue thread only! CK
-        BOOST_CHECK(emptyThreadPool.stack_size() == 0x20000);
+        BOOST_CHECK(emptyThreadPool.get_stack_size() == 0x20000);
 
         BOOST_TEST_MESSAGE("emptyThreadPool.size: " << emptyThreadPool.size());
         emptyThreadPool.execute(new TestTask("Starting ...", result));
@@ -601,8 +601,14 @@ void lock_n(mutex_type* mutexes, unsigned count)
     boost::lock(mutexes, mutexes + count);
     BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
 
+    if (count == 1)
+    {
+        BOOST_CHECK(mutexes[0].wait(50));
+        return;
+    }
+
     for (unsigned i = 0; i < count; ++i) {
-        chrono::milliseconds d((rand() % 25) + (250 / count));
+        chrono::milliseconds d((rand() % 25) + (50 / count));
         this_thread::sleep_for(d);
         BOOST_CHECK(mutexes[i].unlock());
     }
@@ -635,15 +641,15 @@ BOOST_AUTO_TEST_CASE(test_lock_ten_other_thread_locks_in_different_order)
 BOOST_AUTO_TEST_CASE(SyncTry_lock_for_test)
 {
     using namespace Agentpp;
-    unsigned const num_mutexes = 1;
+    unsigned const num_mutexes = 2;
 
     Synchronized timed_locks[num_mutexes];
     {
         boost::thread t1(lock_n, timed_locks, num_mutexes);
         boost::this_thread::sleep_for(ms(1));
         Stopwatch sw;
-        BOOST_TEST(!timed_locks[0].lock(123), "no timeout occurred on lock!");
-        ns d = sw.elapsed() - ms(123);
+        BOOST_TEST(!timed_locks[0].lock(27), "no timeout occurred on lock!");
+        ns d = sw.elapsed() - ms(27);
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
         BOOST_TEST(d < ns(max_diff));
         t1.join();
@@ -654,6 +660,29 @@ BOOST_AUTO_TEST_CASE(SyncTry_lock_for_test)
         ns d = sw.elapsed() - ms(7);
         BOOST_TEST(d < ns(max_diff));
         BOOST_TEST(timed_locks[0].unlock());
+    }
+}
+
+BOOST_AUTO_TEST_CASE(SyncDelete_while_used_test)
+{
+    using namespace Agentpp;
+    unsigned const num_mutexes = 1;
+
+    Synchronized *lockable = new Synchronized;
+    boost::thread t1(lock_n, lockable, num_mutexes);
+    {
+        Stopwatch sw;
+        boost::this_thread::sleep_for(ms(25));
+        delete lockable;
+        BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
+    }
+    t1.join();
+    {
+        Stopwatch sw;
+        Synchronized *lockable = new Synchronized;
+        lockable->lock();
+        delete lockable;
+        BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
     }
 }
 

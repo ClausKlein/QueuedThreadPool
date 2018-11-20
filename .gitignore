@@ -22,3 +22,7 @@ trylock_test
 volatile
 
 build/
+gcov-summary.txt
+coverage.info
+*.gcda
+*.gcno

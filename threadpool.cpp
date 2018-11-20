@@ -31,8 +31,8 @@ src/threads.cpp > threadpool.cpp
 
 #include <boost/assert.hpp>
 
-#include <pthread.h>
 #include <iostream>
+#include <pthread.h>
 
 #if !defined(_NO_LOGGING) && !defined(NDEBUG)
 #define DEBUG
@@ -64,37 +64,29 @@ namespace Agentpp
 
 #ifndef _NO_LOGGING
 static const char* loggerModuleName = "agent++.threads";
-unsigned int Synchronized::next_id  = 0;
 #endif
 
 
 /*--------------------- class Synchronized -------------------------*/
 
 Synchronized::Synchronized()
-    : isLocked(false)
-    , signal(false)
+    : signal(false)
     , tid_(boost::thread::id())
-
-#ifndef _NO_LOGGING
-    , id(0)
-#endif
-
 {}
 
 Synchronized::~Synchronized()
 {
     // NOTE: give other waiting threads a time window
     // to return from the wait on our condition_variable
-    // TODO: check this! CK
     if (is_locked_by_this_thread()) {
         signal = true;
         notify_all();
         unlock();
         boost::this_thread::sleep_for(ms(10));
     } else {
-        signal = true;      // may be not seen! CK
+        signal = true; // may be not seen! CK
         if (lock(50)) {
-            signal = true;  // again! CK
+            signal = true; // again! CK
             notify_all();
             unlock();
             boost::this_thread::sleep_for(ms(10));
@@ -102,50 +94,32 @@ Synchronized::~Synchronized()
     }
 }
 
-void Synchronized::wait() { cond_timed_wait(0); }
-
-int Synchronized::cond_timed_wait(const struct timespec* ts)
+void Synchronized::wait()
 {
     DTRACE(signal);
     BOOST_ASSERT(is_locked_by_this_thread());
 
     scoped_lock l(mutex, boost::adopt_lock);
     signal = false;
-    if (!ts) {
-        while (!signal) {
-            //=================================
-            tid_ = boost::thread::id();
-            cond.wait(l);
-            tid_ = boost::this_thread::get_id();
-            //=================================
-        }
-    } else {
-        duration d   = sec(ts->tv_sec) + ns(ts->tv_nsec);
-        time_point t = Clock::now() + d;
-        while (!signal) {
-            //=================================
-            tid_ = boost::thread::id();
-            if (cond.wait_until(l, t) == boost::cv_status::timeout) {
-                tid_ = boost::this_thread::get_id();
-                l.release();
-                return -1;
-            }
-            tid_   = boost::this_thread::get_id();
-            //=================================
-        }
+    while (!signal) {
+        //=================================
+        tid_ = boost::thread::id();
+        cond.wait(l);
+        tid_ = boost::this_thread::get_id();
+        //=================================
     }
 
-    l.release();
-    return true;
+    l.release();    // ownership
 }
 
+// TODO: should be bool wait_for(duration)
 bool Synchronized::wait(unsigned long timeout)
 {
     DTRACE(signal);
     BOOST_ASSERT(is_locked_by_this_thread());
 
     scoped_lock l(mutex, boost::adopt_lock);
-    signal = false;
+    signal       = false;
     duration d   = ms(timeout);
     time_point t = Clock::now() + d;
     while (!signal) {
@@ -153,14 +127,14 @@ bool Synchronized::wait(unsigned long timeout)
         tid_ = boost::thread::id();
         if (cond.wait_until(l, t) == boost::cv_status::timeout) {
             tid_ = boost::this_thread::get_id();
-            l.release();
+            l.release();    // ownership
             return false;
         }
         tid_ = boost::this_thread::get_id();
         //=================================
     }
 
-    l.release();
+    l.release();    // ownership
     return true;
 }
 
@@ -172,7 +146,7 @@ void Synchronized::notify()
     scoped_lock l(mutex, boost::adopt_lock);
     signal = true;
     cond.notify_one();
-    l.release();
+    l.release();    // ownership
 }
 
 void Synchronized::notify_all()
@@ -183,7 +157,7 @@ void Synchronized::notify_all()
     scoped_lock l(mutex, boost::adopt_lock);
     signal = true;
     cond.notify_all();
-    l.release();
+    l.release();    // ownership
 }
 
 bool Synchronized::lock()
@@ -198,12 +172,12 @@ bool Synchronized::lock()
 
         // TODO: This thread owns already the lock, but we do not like
         // recursive locking. Thus release it immediately and print a
-        // warning!
+        // warning! Fank Fock
         return false;
     }
 
     mutex.lock();
-    tid_     = boost::this_thread::get_id();
+    tid_ = boost::this_thread::get_id();
     return true;
 }
 
@@ -222,7 +196,7 @@ bool Synchronized::lock(unsigned long timeout)
         }
     }
 
-    tid_     = boost::this_thread::get_id();
+    tid_ = boost::this_thread::get_id();
     return true; // OK
 }
 
@@ -231,7 +205,7 @@ bool Synchronized::unlock()
     DTRACE("");
 
     if (is_locked_by_this_thread()) {
-        tid_     = boost::thread::id();
+        tid_ = boost::thread::id();
         mutex.unlock();
         return true;
     }
@@ -249,8 +223,8 @@ Synchronized::TryLockResult Synchronized::trylock()
 
     scoped_lock l(mutex, boost::try_to_lock);
     if (l.owns_lock()) {
-        tid_     = boost::this_thread::get_id();
-        l.release();
+        tid_ = boost::this_thread::get_id();
+        l.release();    // ownership
         return LOCKED; // true
     }
 
@@ -314,7 +288,6 @@ void Thread::run()
 
 Thread::~Thread()
 {
-    // TODO: check this! CK
     if (status != IDLE) {
         join();
         DTRACE("Thread joined");
@@ -325,7 +298,6 @@ Runnable* Thread::get_runnable() { return runnable; }
 
 void Thread::join()
 {
-    // TODO: check this! CK
     if (status != IDLE) {
         void* retstat;
         int err = pthread_join(tid, &retstat);
@@ -350,7 +322,6 @@ void Thread::join()
 
 void Thread::start()
 {
-    // TODO: check this! CK
     if (status == IDLE) {
         int policy = 0;
         struct sched_param param;
@@ -415,13 +386,13 @@ void Thread::nsleep(time_t secs, long nanos)
 
 /*--------------------- class TaskManager --------------------------*/
 
-TaskManager::TaskManager(ThreadPool* tp, size_t stackSize)
+TaskManager::TaskManager(ThreadPool* tp, size_t stack_size)
     : thread(this)
 {
     threadPool = tp;
     task       = 0;
     go         = true;
-    thread.set_stack_size(stackSize);
+    thread.set_stack_size(stack_size);
     thread.start();
     LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
     LOG("TaskManager: thread started");
@@ -433,7 +404,7 @@ TaskManager::~TaskManager()
     {
         Lock l(*this);
         go = false;
-        notify();
+        l.notify();
     }
 
     thread.join();
@@ -475,13 +446,13 @@ void TaskManager::run()
 }
 
 
-// TODO: assert to be called with lock! CK
+// TODO: should be assert to be called with lock! CK
 bool TaskManager::set_task(Runnable* t)
 {
     Lock l(*this);
     if (!task) {
         task = t;
-        notify();
+        l.notify();
         LOG_BEGIN(loggerModuleName, DEBUG_LOG | 2);
         LOG("TaskManager: after notify");
         LOG_END;
@@ -535,11 +506,11 @@ void ThreadPool::execute(Runnable* t)
 }
 
 
-// TODO: assert to be called with lock! CK
+// TODO: should be assert to be called with lock! CK
 void ThreadPool::idle_notification()
 {
     Lock l(*this);
-    notify();
+    l.notify();
 }
 
 /// return true if NONE of the threads in the pool is currently executing any
@@ -577,7 +548,7 @@ void ThreadPool::terminate()
          cur != taskList.end(); ++cur) {
         (*cur)->stop();
     }
-    notify_all(); // NOTE: for wait() at execute()
+    l.notify_all(); // NOTE: for wait() at execute()
 }
 
 ThreadPool::ThreadPool(size_t size)
@@ -650,7 +621,7 @@ QueuedThreadPool::~QueuedThreadPool()
 }
 
 // NOTE: asserted to be called with lock! CK
-bool QueuedThreadPool::assign(Runnable* t, bool withQueuing)
+bool QueuedThreadPool::assign(Runnable* task, bool withQueuing)
 {
     TaskManager* tm = 0;
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
@@ -663,7 +634,7 @@ bool QueuedThreadPool::assign(Runnable* t, bool withQueuing)
 
             Thread::unlock();
             //==============================
-            if (!tm->set_task(t)) {
+            if (!tm->set_task(task)) {
                 tm = 0;
                 Thread::lock();
             } else {
@@ -682,7 +653,7 @@ bool QueuedThreadPool::assign(Runnable* t, bool withQueuing)
         LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
         LOG("QueuedThreadPool::assign(BUSY): queue.add()");
         LOG_END;
-        queue.push(t);
+        queue.push(task);
 
         DTRACE("busy! task queued; Thread::notify()");
         Thread::notify();
@@ -731,7 +702,8 @@ void QueuedThreadPool::run()
                     queue.pop();        // OK, now we pop this entry
                 } else {
                     DTRACE("busy! Thread::sleep()");
-                    // NOTE: sleep some ms to prevent notify() loops while busy!
+                    // NOTE: sleep some ms to prevent notify() loops while
+                    // busy!
                     Thread::sleep(rand() % 113); // ms
                 }
             }

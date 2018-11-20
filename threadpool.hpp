@@ -129,6 +129,8 @@ public:
      * Causes current thread to wait until another thread
      * invokes the notify() method or the notifyAll()
      * method for this object.
+     *
+     * @note asserted to be called with lock! CK
      */
     void wait();
 
@@ -142,17 +144,24 @@ public:
      *    timeout in milliseconds.
      * @param
      *    return TRUE if timeout occurred, FALSE otherwise.
+     *
+     * @note asserted to be called with lock! CK
      */
     bool wait(unsigned long timeout);
 
     /**
      * Wakes up a single thread that is waiting on this
-     * object's mutex.
+     * object's cond.
+     *
+     * @note asserted to be called with lock! CK
      */
     void notify();
+
     /**
      * Wakes up all threads that are waiting on this object's
-     * mutex.
+     * cond.
+     *
+     * @note asserted to be called with lock! CK
      */
     void notify_all();
 
@@ -209,23 +218,15 @@ private:
     }
     bool is_locked() const { return !(boost::thread::id() == tid_); }
 
-    int cond_timed_wait(const timespec*);
-
-    boost::condition_variable cond;
 
     // NOTE: the type of the wrapped lockable
     typedef boost::mutex lockable_type;
     lockable_type mutex;
     typedef boost::unique_lock<lockable_type> scoped_lock;
 
-    volatile bool isLocked;
+    boost::condition_variable cond;
     volatile bool signal;
     boost::atomic<boost::thread::id> tid_;
-
-#ifndef _NO_LOGGING
-    static unsigned int next_id;
-    unsigned int id;
-#endif
 };
 
 
@@ -281,9 +282,15 @@ public:
 
     /**
      * Wakes up a single thread that is waiting on this
-     * object's mutex.
+     * object's cond.
      */
     void notify() { sync.notify(); }
+
+    /**
+     * Wakes up all threads that are waiting on this object's
+     * cond.
+     */
+    void notify_all() { sync.notify_all(); }
 
 private:
     Synchronized& sync;
@@ -489,10 +496,10 @@ public:
      * @param size
      *    the number of threads started for performing tasks.
      *    The default value is 4 threads.
-     * @param stackSize
+     * @param stack_size
      *    the stack size for each thread.
      */
-    ThreadPool(size_t size, size_t stackSize);
+    ThreadPool(size_t size, size_t stack_size);
 
     /**
      * Destructor will wait for termination of all threads.
@@ -537,7 +544,7 @@ public:
      * @return
      *   the stack size of each thread in this thread pool.
      */
-    size_t stack_size() const { return stackSize; }
+    size_t get_stack_size() const { return stackSize; }
 
     /**
      * Notifies the thread pool about an idle thread (synchronized).
@@ -588,10 +595,10 @@ public:
      * @param size
      *    the number of threads started for performing tasks.
      *    The default value is 4 threads.
-     * @param stackSize
+     * @param stack_size
      *    the stack size for each thread.
      */
-    QueuedThreadPool(size_t size, size_t stackSize);
+    QueuedThreadPool(size_t size, size_t stack_size);
 
     /**
      * Destructor will wait for termination of all threads.
@@ -672,10 +679,10 @@ public:
      *
      * @param threadPool
      *    a pointer to a ThreadPool instance.
-     * @param stackSize
+     * @param stack_size
      *    the stack size for the managed thread.
      */
-    TaskManager(ThreadPool*, size_t stackSize = AGENTPP_DEFAULT_STACKSIZE);
+    TaskManager(ThreadPool*, size_t stack_size = AGENTPP_DEFAULT_STACKSIZE);
 
     /**
      * Destructor will wait for thread to terminate.
@@ -722,14 +729,15 @@ public:
     TaskManager* clone()
     {
         return new TaskManager(
-            new ThreadPool(threadPool->size(), threadPool->stack_size()));
+            new ThreadPool(threadPool->size(), threadPool->get_stack_size()));
     }
 
 protected:
+    void run() BOOST_OVERRIDE;
+
     Thread thread;
     ThreadPool* threadPool;
     Runnable* task;
-    void run();
     volatile bool go;
 };
 } // namespace Agentpp

@@ -46,7 +46,28 @@ DEP:=$(SRC:.cpp=.d)
 MAKEFLAGS += -r # --no-buldin-rules
 .SUFFIXES:      # no default suffix rules!
 #boost unittests links faster without recompile # .INTERMEDIATE: $(OBJ)
-.PHONY: all cmake ctest test clean distclean cppcheck format
+
+ifdef TCOV
+CXXFLAGS+=--coverage
+LDFLAGS+=--coverage
+TCOVFLAGS+=--branch-probabilities # --unconditional-branches --all-blocks
+LCOVFLAGS+=--rc lcov_branch_coverage=1
+#
+#TODO: git clone https://github.com/linux-test-project/lcov.git
+#
+ifdef MSYS
+    TCOVFLAGS+=--relative-only --demangled-names --function-summaries
+endif
+tcov: clean threads_test
+	-./threads_test --log_level=error --random
+	gcov --long-file-names $(TCOVFLAGS) thread*.cpp > /dev/null 2>&1
+	lcov --capture --quiet $(LCOVFLAGS) --no-external --directory . --output-file coverage.info
+	lcov --list coverage.info $(LCOVFLAGS) | tee gcov-summary.txt
+	genhtml coverage.info $(LCOVFLAGS) --demangle-cpp --output-directory html
+endif
+
+
+.PHONY: all cmake ctest tcov test clean distclean cppcheck format
 all: $(PROGRAMS)
 
 cmake: build
@@ -99,7 +120,7 @@ alarm_cond: CXXFLAGS+=--std=c++03
 enable_shared_from_this: CXXFLAGS+=--std=c++03
 
 
-# NOTE: this test using boost unit test framework needs c++14! CK
+# NOTE: this test_suite using boost unit test framework needs c++14! CK
 threads_test.o: CXXFLAGS+=--std=c++14
 threads_test.o: threads_test.cpp simple_stopwatch.hpp
 threads_test.o: threadpool.hpp
@@ -146,10 +167,10 @@ distclean: clean
 	$(RM) -r build *.d *.bak *.orig *~ *.stackdump *.dSYM
 
 test: $(PROGRAMS)
-	-./threads_test --log_level=all --run_test='S*'
-	-./threads_test --log_level=test_suite --random
-	# ./threads_test --run_test=ThreadPool_test -25
-	# ./threads_test --run_test=QueuedThreadPoolLoad_test -25
+	./threads_test --log_level=all --run_test='S*'
+	./threads_test --log_level=success --random
+	./threads_test --run_test=ThreadPool_test -25
+	./threads_test --run_test=QueuedThreadPoolLoad_test -25
 	#TODO ./threads_test --run_test=QueuedThreadPoolLoad_test -1000
 	./chrono_io_ex1
 	./default_executor
@@ -170,7 +191,7 @@ test: $(PROGRAMS)
 #	  echo $$i; i=$$(($$i+1)); done
 
 cppcheck:
-	cppcheck --enable=all --inconclusive --std=posix --force $(CPPFLAGS) -std=c++14 -j 2 thread*.cpp
+	cppcheck --enable=all --inconclusive -DBOOST_OVERRIDE=override --std=posix --force -j 2 thread*.cpp
 
 format:
 	clang-format -i -style=file *.cpp *.hpp *.c
