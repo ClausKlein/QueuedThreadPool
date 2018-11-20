@@ -116,8 +116,88 @@ BOOST_AUTO_TEST_CASE(ThreadPool_busy_test)
     result_queue_t result;
     {
         const size_t stacksize = AGENTPP_DEFAULT_STACKSIZE * 2;
-        Agentpp::ThreadPool threadPool(2UL, stacksize);
-        //###XXX###: missing! threadPool.start();   //NOTE: implicit done! CK
+        ThreadPool threadPool(2UL, stacksize);
+
+        BOOST_TEST_MESSAGE("threadPool.size: " << threadPool.size());
+        BOOST_TEST(threadPool.size() == 2UL);
+        BOOST_CHECK(threadPool.get_stack_size() == stacksize);
+        BOOST_CHECK(threadPool.is_idle());
+        BOOST_CHECK(!threadPool.is_busy());
+
+        // call execute parallel from different task!
+        boost::thread threads[4];
+        for (int i = 0; i < 4; ++i) {
+            threads[i] = boost::thread(push_task, &threadPool);
+            threads[i].detach();
+        }
+
+        do {
+            BOOST_TEST_MESSAGE(
+                "outstanding tasks: " << TestTask::task_count());
+            Thread::sleep(123); // ms
+        } while (!threadPool.is_idle());
+        BOOST_CHECK(threadPool.is_idle());
+
+        threadPool.terminate();
+        BOOST_TEST_MESSAGE("outstanding tasks: " << TestTask::task_count());
+    }
+    BOOST_TEST(TestTask::task_count() == 0UL, "All task has to be deleted!");
+    TestTask::reset_counter();
+}
+
+BOOST_AUTO_TEST_CASE(ThreadPool_test)
+{
+    using namespace Agentpp;
+    result_queue_t result;
+    {
+        ThreadPool threadPool(4UL);
+
+        BOOST_TEST_MESSAGE("threadPool.size: " << threadPool.size());
+        BOOST_TEST(threadPool.size() == 4UL);
+        BOOST_CHECK(threadPool.get_stack_size() == AGENTPP_DEFAULT_STACKSIZE);
+        BOOST_CHECK(threadPool.is_idle());
+
+        BOOST_CHECK(!threadPool.is_busy());
+        threadPool.execute(new TestTask("Hallo world!", result));
+        BOOST_CHECK(!threadPool.is_busy());
+        threadPool.execute(new TestTask("ThreadPool is running!", result));
+        BOOST_CHECK(!threadPool.is_busy());
+        threadPool.execute(new TestTask("Generate some load.", result));
+        BOOST_CHECK(!threadPool.is_busy());
+
+        threadPool.execute(new TestTask("Under full load now!", result));
+        threadPool.execute(new TestTask("Good by!", result));
+
+        do {
+            BOOST_TEST_MESSAGE(
+                "outstanding tasks: " << TestTask::task_count());
+            Thread::sleep(123); // ms
+        } while (!threadPool.is_idle());
+        BOOST_CHECK(threadPool.is_idle());
+
+        threadPool.terminate();
+        BOOST_TEST_MESSAGE("outstanding tasks: " << TestTask::task_count());
+        //############################
+        BOOST_TEST(TestTask::task_count() == 0UL);
+        //############################
+    }
+    BOOST_TEST(TestTask::task_count() == 0UL, "All task has to be deleted!");
+    BOOST_TEST(TestTask::run_count() == 5UL, "All task has to be executed!");
+    TestTask::reset_counter();
+}
+
+BOOST_AUTO_TEST_CASE(QueuedThreadPool_busy_test)
+{
+    using namespace Agentpp;
+    result_queue_t result;
+    {
+        const size_t stacksize = AGENTPP_DEFAULT_STACKSIZE * 2;
+        QueuedThreadPool threadPool(2UL, stacksize);
+
+#if !defined(USE_IMPLIZIT_START)
+        threadPool.start(); // NOTE: different to ThreadPool, but this
+                            // should not really needed!
+#endif
 
         BOOST_TEST_MESSAGE("threadPool.size: " << threadPool.size());
         BOOST_TEST(threadPool.size() == 2UL);
@@ -142,53 +222,8 @@ BOOST_AUTO_TEST_CASE(ThreadPool_busy_test)
 
         threadPool.terminate();
         BOOST_TEST_MESSAGE("outstanding tasks: " << TestTask::task_count());
-        //############################
-        BOOST_TEST(TestTask::task_count() == 0UL);
-        //############################
     }
     BOOST_TEST(TestTask::task_count() == 0UL, "All task has to be deleted!");
-    TestTask::reset_counter();
-}
-
-BOOST_AUTO_TEST_CASE(ThreadPool_test)
-{
-    using namespace Agentpp;
-    result_queue_t result;
-    {
-        Agentpp::ThreadPool threadPool(4UL);
-        //###XXX###: missing! threadPool.start();   //NOTE: implicit done! CK
-
-        BOOST_TEST_MESSAGE("threadPool.size: " << threadPool.size());
-        BOOST_TEST(threadPool.size() == 4UL);
-        BOOST_CHECK(threadPool.get_stack_size() == AGENTPP_DEFAULT_STACKSIZE);
-        BOOST_CHECK(threadPool.is_idle());
-
-        BOOST_CHECK(!threadPool.is_busy());
-        threadPool.execute(new TestTask("Hallo world!", result));
-        BOOST_CHECK(!threadPool.is_busy());
-        threadPool.execute(new TestTask("ThreadPool is running!", result));
-        BOOST_CHECK(!threadPool.is_busy());
-        threadPool.execute(new TestTask("Generate some load.", result));
-        BOOST_CHECK(!threadPool.is_busy());
-        threadPool.execute(new TestTask("Under full load now!", result));
-        BOOST_CHECK(threadPool.is_busy());
-        threadPool.execute(new TestTask("Good by!", result));
-
-        do {
-            BOOST_TEST_MESSAGE(
-                "outstanding tasks: " << TestTask::task_count());
-            Thread::sleep(123); // ms
-        } while (!threadPool.is_idle());
-        BOOST_CHECK(threadPool.is_idle());
-
-        threadPool.terminate();
-        BOOST_TEST_MESSAGE("outstanding tasks: " << TestTask::task_count());
-        //############################
-        BOOST_TEST(TestTask::task_count() == 0UL);
-        //############################
-    }
-    BOOST_TEST(TestTask::task_count() == 0UL, "All task has to be deleted!");
-    BOOST_TEST(TestTask::run_count() == 5UL, "All task has to be executed!");
     TestTask::reset_counter();
 }
 
@@ -197,7 +232,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
     using namespace Agentpp;
     result_queue_t result;
     {
-        QueuedThreadPool queuedThreadPool(1UL);
+        QueuedThreadPool queuedThreadPool(2UL);
 
 #if !defined(USE_IMPLIZIT_START)
         queuedThreadPool.start(); // NOTE: different to ThreadPool, but this
@@ -206,7 +241,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
 
         BOOST_TEST_MESSAGE(
             "queuedThreadPool.size: " << queuedThreadPool.size());
-        BOOST_TEST(queuedThreadPool.size() == 1UL);
+        BOOST_TEST(queuedThreadPool.size() == 2UL);
         BOOST_TEST(
             queuedThreadPool.get_stack_size() == AGENTPP_DEFAULT_STACKSIZE);
         BOOST_CHECK(queuedThreadPool.is_idle());
@@ -519,8 +554,7 @@ struct wait_data {
 
     wait_data()
         : flag(false)
-    {
-    }
+    {}
 
     // NOTE: return false if condition waiting for is not true! CK
     bool predicate() { return flag; }

@@ -3,8 +3,10 @@
 BOOST_ROOT?=/usr/local
 MT?=-mt
 CXX:=ccache /usr/bin/g++
+ifndef TCOV
 CXXFLAGS+=-O2 -DNDEBUG
 ## CXXFLAGS+=-g
+endif
 #=====================
 
 #NO! CK
@@ -48,7 +50,7 @@ MAKEFLAGS += -r # --no-buldin-rules
 #boost unittests links faster without recompile # .INTERMEDIATE: $(OBJ)
 
 ifdef TCOV
-CXXFLAGS+=--coverage
+CXXFLAGS+=--coverage -DNDEBUG
 LDFLAGS+=--coverage
 TCOVFLAGS+=--branch-probabilities # --unconditional-branches --all-blocks
 LCOVFLAGS+=--rc lcov_branch_coverage=1
@@ -58,9 +60,10 @@ LCOVFLAGS+=--rc lcov_branch_coverage=1
 ifdef MSYS
     TCOVFLAGS+=--relative-only --demangled-names --function-summaries
 endif
-tcov: clean threads_test
-	-./threads_test --log_level=error --random
-	gcov --long-file-names $(TCOVFLAGS) thread*.cpp > /dev/null 2>&1
+tcov: clean threads_test thread_pool
+	./thread_pool
+	./threads_test --log_level=error --random
+	gcov --long-file-names $(TCOVFLAGS) thread.cpp > /dev/null 2>&1
 	lcov --capture --quiet $(LCOVFLAGS) --no-external --directory . --output-file coverage.info
 	lcov --list coverage.info $(LCOVFLAGS) | tee gcov-summary.txt
 	genhtml coverage.info $(LCOVFLAGS) --demangle-cpp --output-directory html
@@ -161,7 +164,7 @@ trylock_test: trylock_test.o
 
 
 clean:
-	$(RM) $(PROGRAMS) *.o *.exe
+	$(RM) $(PROGRAMS) *.o *.exe coverage.info *.gcda *.gcno
 
 distclean: clean
 	$(RM) -r build *.d *.bak *.orig *~ *.stackdump *.dSYM
@@ -194,7 +197,7 @@ cppcheck:
 	cppcheck --enable=all --inconclusive -DBOOST_OVERRIDE=override --std=posix --force -j 2 thread*.cpp
 
 format:
-	clang-format -i -style=file *.cpp *.hpp *.c
+	clang-format -i -style=file thread*.cpp thread*.hpp
 
 ifneq ($(MAKECMDGOALS),distclean)
 -include $(DEP)

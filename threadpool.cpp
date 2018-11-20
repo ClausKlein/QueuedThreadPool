@@ -52,13 +52,14 @@ src/threads.cpp > threadpool.cpp
  * std::cout. When DEBUG is not defined, it expands to nothing.
  */
 #ifdef DEBUG
-#define DTRACE(arg)                                                           \
+#define DTRACE(arg) \
     std::cout << BOOST_CURRENT_FUNCTION << ": " << arg << std::endl
 #else
 #define DTRACE(arg)
 #endif
 
-#define THIS_THREAD_YIELD boost::this_thread::yield();
+//XXX #define THIS_THREAD_YIELD boost::this_thread::yield();
+#define THIS_THREAD_YIELD boost::this_thread::sleep_for(ms(10));
 
 
 namespace Agentpp
@@ -73,8 +74,7 @@ static const char* loggerModuleName = "agent++.threads";
 Synchronized::Synchronized()
     : signal(false)
     , tid_(boost::thread::id())
-{
-}
+{}
 
 Synchronized::~Synchronized()
 {
@@ -427,6 +427,7 @@ void TaskManager::run()
             task = 0;
 
             unlock(); // NOTE: prevent deadlock! CK
+            //TODO THIS_THREAD_YIELD; // FIXME: Only for test! CK
             //==============================
             // NOTE: may end in a direct call to set_task()
             // via QueuedThreadPool::run() => QueuedThreadPool::assign()
@@ -484,7 +485,7 @@ void ThreadPool::execute(Runnable* t)
                 LOG_END;
 
                 unlock();
-                THIS_THREAD_YIELD;  // FIXME: Only for test! CK
+                THIS_THREAD_YIELD; // FIXME: Only for test! CK
                 //==============================
                 if (tm->set_task(t)) {
                     return; // done
@@ -630,7 +631,7 @@ bool QueuedThreadPool::assign(Runnable* task, bool withQueuing)
             LOG_END;
 
             Thread::unlock();
-            THIS_THREAD_YIELD;  // FIXME: Only for test! CK
+            THIS_THREAD_YIELD; // FIXME: Only for test! CK
             //==============================
             if (!tm->set_task(task)) {
                 tm = 0;
