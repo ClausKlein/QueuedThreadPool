@@ -1,7 +1,8 @@
 #undef _POSIX_C_SOURCE
 #include <boost/assert.hpp>
 #include <boost/thread.hpp>
-#include <boost/thread/tss.hpp> // tss -> tls: thread local storage
+#include <boost/thread/tss.hpp> // tss(Class thread specific storage) -> tls: thread local storage
+
 #include <iostream>
 
 boost::mutex mutex;

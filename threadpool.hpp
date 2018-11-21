@@ -29,27 +29,22 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 
 #ifdef __INTEGRITY
 #include <integrity.h>
-#endif
-
-#ifdef _WIN32
-#define HAVE_STRUCT_TIMESPEC
-#else
-#ifndef _POSIX_C_SOURCE
-#define _POSIX_C_SOURCE 200112L
-#endif
-#include <unistd.h> // _POSIX_MONOTONIC_CLOCK _POSIX_TIMEOUTS _POSIX_TIMERS _POSIX_THREADS ...
-#endif
-
-#include <pthread.h>
 #include <time.h>
+#endif
 
-#include <iostream>
 #include <list>
 #include <queue>
 #include <vector>
 
+#define BOOST_THREAD_VERSION 4
+#define BOOST_CHRONO_VERSION 2
+
+#include <boost/atomic.hpp>
 #include <boost/core/noncopyable.hpp>
-#include <boost/current_function.hpp>
+#include <boost/thread/condition_variable.hpp>
+#include <boost/thread/locks.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/thread_only.hpp>
 
 #undef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
 
@@ -59,33 +54,21 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #define AGENTX_DEFAULT_THREAD_NAME "ThreadPool::Thread"
 #define AGENTPP_DECL
 
-#if !defined(_NO_LOGGING) && !defined(NDEBUG)
-#define DEBUG
-#define LOG_BEGIN(x, y) std::cerr << BOOST_CURRENT_FUNCTION << ": "
-#define LOG(x) std::cerr << x << ' '
-#define LOG_END std::cerr << std::endl
-#else
-#define LOG_BEGIN(x, y)
-#define LOG(x)
-#define LOG_END
-#define _NO_LOGGING 1
-#endif
-
-/*
- * Define a macro that can be used for diagnostic output from examples. When
- * compiled -DDEBUG, it results in writing with the specified argument to
- * std::cout. When DEBUG is not defined, it expands to nothing.
- */
-#ifdef DEBUG
-#define DTRACE(arg) \
-    std::cout << BOOST_CURRENT_FUNCTION << ": " arg << std::endl
-#else
-#define DTRACE(arg)
+#ifndef BOOST_OVERRIDE
+#define BOOST_OVERRIDE
 #endif
 
 
 namespace Agentpp
 {
+
+typedef boost::chrono::high_resolution_clock Clock;
+typedef Clock::time_point time_point;
+typedef Clock::duration duration;
+typedef boost::chrono::seconds sec;
+typedef boost::chrono::milliseconds ms;
+typedef boost::chrono::microseconds us;
+typedef boost::chrono::nanoseconds ns;
 
 /**
  * The Runnable interface should be implemented by any class whose
@@ -109,7 +92,6 @@ namespace Agentpp
  * @author Frank Fock
  * @version 3.5
  */
-
 class AGENTPP_DECL Runnable {
 
 public:
@@ -122,7 +104,9 @@ public:
      * method to be called in that separately executing thread.
      */
     virtual void run() = 0;
+    void operator()() { run(); };
 };
+
 
 /**
  * The Synchronized class implements services for synchronizing
@@ -130,6 +114,9 @@ public:
  *
  * @author Frank Fock
  * @version 4.0
+ *
+ * @note: copy constructor of 'Synchronized' is implicitly deleted
+ *       because field 'cond' has a deleted copy constructor! CK
  */
 class AGENTPP_DECL Synchronized : private boost::noncopyable {
 public:
@@ -142,6 +129,8 @@ public:
      * Causes current thread to wait until another thread
      * invokes the notify() method or the notifyAll()
      * method for this object.
+     *
+     * @note asserted to be called with lock! CK
      */
     void wait();
 
@@ -155,17 +144,24 @@ public:
      *    timeout in milliseconds.
      * @param
      *    return TRUE if timeout occurred, FALSE otherwise.
+     *
+     * @note asserted to be called with lock! CK
      */
     bool wait(unsigned long timeout);
 
     /**
      * Wakes up a single thread that is waiting on this
-     * object's monitor.
+     * object's cond.
+     *
+     * @note asserted to be called with lock! CK
      */
     void notify();
+
     /**
      * Wakes up all threads that are waiting on this object's
-     * monitor.
+     * cond.
+     *
+     * @note asserted to be called with lock! CK
      */
     void notify_all();
 
@@ -202,6 +198,7 @@ public:
      *     OWNED if the lock is already owned by the calling thread.
      */
     TryLockResult trylock();
+    bool try_lock() { return trylock(); };
 
     /**
      * Leave a critical section. If this thread called lock or trylock
@@ -215,15 +212,23 @@ public:
 
 
 private:
-#ifndef _NO_LOGGING
-    static unsigned int next_id;
-    unsigned int id;
-#endif
-    int cond_timed_wait(const timespec*);
-    pthread_cond_t cond;
-    pthread_mutex_t monitor;
-    bool isLocked;
+    bool is_locked_by_this_thread() const
+    {
+        return boost::this_thread::get_id() == tid_;
+    }
+    bool is_locked() const { return !(boost::thread::id() == tid_); }
+
+
+    // NOTE: the type of the wrapped lockable
+    typedef boost::mutex lockable_type;
+    lockable_type mutex;
+    typedef boost::unique_lock<lockable_type> scoped_lock;
+
+    boost::condition_variable cond;
+    volatile bool signal;
+    boost::atomic<boost::thread::id> tid_;
 };
+
 
 /**
  * The Lock class implements a synchronization object, that
@@ -277,9 +282,15 @@ public:
 
     /**
      * Wakes up a single thread that is waiting on this
-     * object's monitor.
+     * object's cond.
      */
     void notify() { sync.notify(); }
+
+    /**
+     * Wakes up all threads that are waiting on this object's
+     * cond.
+     */
+    void notify_all() { sync.notify_all(); }
 
 private:
     Synchronized& sync;
@@ -358,7 +369,7 @@ public:
      *
      * Subclasses of Thread should override this method.
      */
-    virtual void run() override;
+    virtual void run() BOOST_OVERRIDE;
 
     /**
      * Get the Runnable object used for thread execution.
@@ -405,12 +416,13 @@ public:
     Thread* clone() { return new Thread(get_runnable()); }
 
 private:
+    static void nsleep(time_t secs, long nanos);
+
     Runnable* runnable;
     ThreadStatus status;
     size_t stackSize;
     pthread_t tid;
     static ThreadList threadList;
-    static void nsleep(time_t secs, long nanos);
 };
 
 
@@ -485,10 +497,10 @@ public:
      * @param size
      *    the number of threads started for performing tasks.
      *    The default value is 4 threads.
-     * @param stackSize
+     * @param stack_size
      *    the stack size for each thread.
      */
-    ThreadPool(size_t size, size_t stackSize);
+    ThreadPool(size_t size, size_t stack_size);
 
     /**
      * Destructor will wait for termination of all threads.
@@ -533,7 +545,7 @@ public:
      * @return
      *   the stack size of each thread in this thread pool.
      */
-    size_t stack_size() const { return stackSize; }
+    size_t get_stack_size() const { return stackSize; }
 
     /**
      * Notifies the thread pool about an idle thread (synchronized).
@@ -584,10 +596,10 @@ public:
      * @param size
      *    the number of threads started for performing tasks.
      *    The default value is 4 threads.
-     * @param stackSize
+     * @param stack_size
      *    the stack size for each thread.
      */
-    QueuedThreadPool(size_t size, size_t stackSize);
+    QueuedThreadPool(size_t size, size_t stack_size);
 
     /**
      * Destructor will wait for termination of all threads.
@@ -598,7 +610,7 @@ public:
      * Execute a task. The task will be deleted after call of
      * its run() method.
      */
-    virtual void execute(Runnable*) override;
+    virtual void execute(Runnable*) BOOST_OVERRIDE;
 
     /**
      * Gets the current number of queued tasks.
@@ -613,7 +625,7 @@ public:
     /**
      * Runs the queue processing loop.
      */
-    void run() override;
+    void run() BOOST_OVERRIDE;
 
     /**
      * Stop queue processing.
@@ -623,7 +635,7 @@ public:
     /**
      * Notifies the thread pool about an idle thread.
      */
-    virtual void idle_notification() override;
+    virtual void idle_notification() BOOST_OVERRIDE;
 
     /**
      * Check whether QueuedThreadPool is idle or not.
@@ -632,7 +644,7 @@ public:
      *    TRUE if non of the threads in the pool is currently
      *    executing any task and the queue is emtpy().
      */
-    virtual bool is_idle() override;
+    virtual bool is_idle() BOOST_OVERRIDE;
 
     /**
      * Check whether the ThreadPool is busy (i.e., all threads are
@@ -642,7 +654,7 @@ public:
      *    TRUE if non of the threads in the pool is currently
      *    idle (not executing any task).
      */
-    virtual bool is_busy() override;
+    virtual bool is_busy() BOOST_OVERRIDE;
 
 
 private:
@@ -668,10 +680,10 @@ public:
      *
      * @param threadPool
      *    a pointer to a ThreadPool instance.
-     * @param stackSize
+     * @param stack_size
      *    the stack size for the managed thread.
      */
-    TaskManager(ThreadPool*, size_t stackSize = AGENTPP_DEFAULT_STACKSIZE);
+    TaskManager(ThreadPool*, size_t stack_size = AGENTPP_DEFAULT_STACKSIZE);
 
     /**
      * Destructor will wait for thread to terminate.
@@ -718,16 +730,18 @@ public:
     TaskManager* clone()
     {
         return new TaskManager(
-            new ThreadPool(threadPool->size(), threadPool->stack_size()));
+            new ThreadPool(threadPool->size(), threadPool->get_stack_size()));
     }
 
 protected:
+    void run() BOOST_OVERRIDE;
+
     Thread thread;
     ThreadPool* threadPool;
     Runnable* task;
-    void run();
     volatile bool go;
 };
+
 } // namespace Agentpp
 
-#endif
+#endif // agent_pp_threadpool_hpp_

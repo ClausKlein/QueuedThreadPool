@@ -9,6 +9,7 @@
 #define BOOST_THREAD_PROVIDES_GENERIC_SHARED_MUTEX_ON_WIN
 #define BOOST_CHRONO_VERSION 2
 
+#include <boost/assert.hpp>
 #include <boost/chrono/chrono_io.hpp>
 #include <boost/chrono/stopwatches/reporters/stopwatch_reporter.hpp>
 #include <boost/chrono/stopwatches/strict_stopwatch.hpp>
@@ -61,7 +62,7 @@ void print(const A0& a0, const Args&... args)
 template <class A0, class A1, class A2>
 void print(const A0&, const A1& a1, const A2&)
 {
-    // FIXME assert(a1 > 1000);
+    // FIXME BOOST_ASSERT(a1 > 1000);
 }
 #endif
 
@@ -78,7 +79,7 @@ void reader()
     Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         mut.lock_shared();
-        assert(state == reading);
+        BOOST_ASSERT(state == reading);
         ++count;
         mut.unlock_shared();
     }
@@ -93,7 +94,7 @@ void writer()
     while (Clock::now() < until) {
         mut.lock();
         state = writing;
-        assert(state == writing);
+        BOOST_ASSERT(state == writing);
         state = reading;
         ++count;
         mut.unlock();
@@ -108,7 +109,7 @@ void try_reader()
     Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock_shared()) {
-            assert(state == reading);
+            BOOST_ASSERT(state == reading);
             ++count;
             mut.unlock_shared();
         }
@@ -124,7 +125,7 @@ void try_writer()
     while (Clock::now() < until) {
         if (mut.try_lock()) {
             state = writing;
-            assert(state == writing);
+            BOOST_ASSERT(state == writing);
             state = reading;
             ++count;
             mut.unlock();
@@ -140,7 +141,7 @@ void try_for_reader()
     Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock_shared_for(boost::chrono::microseconds(5))) {
-            assert(state == reading);
+            BOOST_ASSERT(state == reading);
             ++count;
             mut.unlock_shared();
         }
@@ -156,7 +157,7 @@ void try_for_writer()
     while (Clock::now() < until) {
         if (mut.try_lock_for(boost::chrono::microseconds(5))) {
             state = writing;
-            assert(state == writing);
+            BOOST_ASSERT(state == writing);
             state = reading;
             ++count;
             mut.unlock();
@@ -211,7 +212,7 @@ void reader()
     Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         mut.lock_shared();
-        assert(state == reading);
+        BOOST_ASSERT(state == reading);
         ++count;
         mut.unlock_shared();
     }
@@ -226,7 +227,7 @@ void writer()
     while (Clock::now() < until) {
         mut.lock();
         state = writing;
-        assert(state == writing);
+        BOOST_ASSERT(state == writing);
         state = reading;
         ++count;
         mut.unlock();
@@ -241,7 +242,7 @@ void try_reader()
     Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock_shared()) {
-            assert(state == reading);
+            BOOST_ASSERT(state == reading);
             ++count;
             mut.unlock_shared();
         }
@@ -257,7 +258,7 @@ void try_writer()
     while (Clock::now() < until) {
         if (mut.try_lock()) {
             state = writing;
-            assert(state == writing);
+            BOOST_ASSERT(state == writing);
             state = reading;
             ++count;
             mut.unlock();
@@ -273,7 +274,7 @@ void try_for_reader()
     Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock_shared_for(boost::chrono::microseconds(5))) {
-            assert(state == reading);
+            BOOST_ASSERT(state == reading);
             ++count;
             mut.unlock_shared();
         }
@@ -289,7 +290,7 @@ void try_for_writer()
     while (Clock::now() < until) {
         if (mut.try_lock_for(boost::chrono::microseconds(5))) {
             state = writing;
-            assert(state == writing);
+            BOOST_ASSERT(state == writing);
             state = reading;
             ++count;
             mut.unlock();
@@ -305,7 +306,7 @@ void upgradable()
     Clock::time_point until = Clock::now() + boost::chrono::seconds(2);
     while (Clock::now() < until) {
         mut.lock_upgrade();
-        assert(state == reading);
+        BOOST_ASSERT(state == reading);
         ++count;
         mut.unlock_upgrade();
     }
@@ -319,7 +320,7 @@ void try_upgradable()
     Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock_upgrade()) {
-            assert(state == reading);
+            BOOST_ASSERT(state == reading);
             ++count;
             mut.unlock_upgrade();
         }
@@ -334,7 +335,7 @@ void try_for_upgradable()
     Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock_upgrade_for(boost::chrono::microseconds(5))) {
-            assert(state == reading);
+            BOOST_ASSERT(state == reading);
             ++count;
             mut.unlock_upgrade();
         }
@@ -349,23 +350,23 @@ void clockwise()
     Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         mut.lock_shared();
-        assert(state == reading);
+        BOOST_ASSERT(state == reading);
         if (mut.try_unlock_shared_and_lock()) {
             state = writing;
         } else if (mut.try_unlock_shared_and_lock_upgrade()) {
-            assert(state == reading);
+            BOOST_ASSERT(state == reading);
             mut.unlock_upgrade_and_lock();
             state = writing;
         } else {
             mut.unlock_shared();
             continue;
         }
-        assert(state == writing);
+        BOOST_ASSERT(state == writing);
         state = reading;
         mut.unlock_and_lock_upgrade();
-        assert(state == reading);
+        BOOST_ASSERT(state == reading);
         mut.unlock_upgrade_and_lock_shared();
-        assert(state == reading);
+        BOOST_ASSERT(state == reading);
         mut.unlock_shared();
         ++count;
     }
@@ -379,14 +380,14 @@ void counter_clockwise()
     Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         mut.lock_upgrade();
-        assert(state == reading);
+        BOOST_ASSERT(state == reading);
         mut.unlock_upgrade_and_lock();
-        assert(state == reading);
+        BOOST_ASSERT(state == reading);
         state = writing;
-        assert(state == writing);
+        BOOST_ASSERT(state == writing);
         state = reading;
         mut.unlock_and_lock_shared();
-        assert(state == reading);
+        BOOST_ASSERT(state == reading);
         mut.unlock_shared();
         ++count;
     }
@@ -400,23 +401,23 @@ void try_clockwise()
     Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock_shared()) {
-            assert(state == reading);
+            BOOST_ASSERT(state == reading);
             if (mut.try_unlock_shared_and_lock()) {
                 state = writing;
             } else if (mut.try_unlock_shared_and_lock_upgrade()) {
-                assert(state == reading);
+                BOOST_ASSERT(state == reading);
                 mut.unlock_upgrade_and_lock();
                 state = writing;
             } else {
                 mut.unlock_shared();
                 continue;
             }
-            assert(state == writing);
+            BOOST_ASSERT(state == writing);
             state = reading;
             mut.unlock_and_lock_upgrade();
-            assert(state == reading);
+            BOOST_ASSERT(state == reading);
             mut.unlock_upgrade_and_lock_shared();
-            assert(state == reading);
+            BOOST_ASSERT(state == reading);
             mut.unlock_shared();
             ++count;
         }
@@ -431,25 +432,25 @@ void try_for_clockwise()
     Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock_shared_for(boost::chrono::microseconds(5))) {
-            assert(state == reading);
+            BOOST_ASSERT(state == reading);
             if (mut.try_unlock_shared_and_lock_for(
                     boost::chrono::microseconds(5))) {
                 state = writing;
             } else if (mut.try_unlock_shared_and_lock_upgrade_for(
                            boost::chrono::microseconds(5))) {
-                assert(state == reading);
+                BOOST_ASSERT(state == reading);
                 mut.unlock_upgrade_and_lock();
                 state = writing;
             } else {
                 mut.unlock_shared();
                 continue;
             }
-            assert(state == writing);
+            BOOST_ASSERT(state == writing);
             state = reading;
             mut.unlock_and_lock_upgrade();
-            assert(state == reading);
+            BOOST_ASSERT(state == reading);
             mut.unlock_upgrade_and_lock_shared();
-            assert(state == reading);
+            BOOST_ASSERT(state == reading);
             mut.unlock_shared();
             ++count;
         }
@@ -464,14 +465,14 @@ void try_counter_clockwise()
     Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock_upgrade()) {
-            assert(state == reading);
+            BOOST_ASSERT(state == reading);
             if (mut.try_unlock_upgrade_and_lock()) {
-                assert(state == reading);
+                BOOST_ASSERT(state == reading);
                 state = writing;
-                assert(state == writing);
+                BOOST_ASSERT(state == writing);
                 state = reading;
                 mut.unlock_and_lock_shared();
-                assert(state == reading);
+                BOOST_ASSERT(state == reading);
                 mut.unlock_shared();
                 ++count;
             } else {
@@ -489,15 +490,15 @@ void try_for_counter_clockwise()
     Clock::time_point until = Clock::now() + boost::chrono::seconds(1);
     while (Clock::now() < until) {
         if (mut.try_lock_upgrade_for(boost::chrono::microseconds(5))) {
-            assert(state == reading);
+            BOOST_ASSERT(state == reading);
             if (mut.try_unlock_upgrade_and_lock_for(
                     boost::chrono::microseconds(5))) {
-                assert(state == reading);
+                BOOST_ASSERT(state == reading);
                 state = writing;
-                assert(state == writing);
+                BOOST_ASSERT(state == writing);
                 state = reading;
                 mut.unlock_and_lock_shared();
-                assert(state == reading);
+                BOOST_ASSERT(state == reading);
                 mut.unlock_shared();
                 ++count;
             } else {
@@ -637,8 +638,8 @@ public:
 
     void average(A& a)
     {
-        assert(data_.size() == a.data_.size());
-        assert(this != &a);
+        BOOST_ASSERT(data_.size() == a.data_.size());
+        BOOST_ASSERT(this != &a);
 
         Lock this_lock(mut_, boost::defer_lock);
         UpgradeLock share_that_lock(a.mut_, boost::defer_lock);

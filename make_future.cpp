@@ -7,7 +7,6 @@
 #include <boost/config.hpp>
 
 #if !defined BOOST_NO_CXX11_DECLTYPE
-#warning BOOST_RESULT_OF_USE_DECLTYPE used
 #define BOOST_RESULT_OF_USE_DECLTYPE
 #endif
 
@@ -41,7 +40,6 @@ int& f1r()
 void p() {}
 
 #if defined BOOST_THREAD_USES_MOVE
-#warning BOOST_THREAD_USES_MOVE
 boost::future<void> void_compute()
 {
     return BOOST_THREAD_MAKE_RV_REF(boost::make_ready_future());
