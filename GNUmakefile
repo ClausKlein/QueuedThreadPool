@@ -19,7 +19,7 @@ CPPFLAGS+=-I$(BOOST_ROOT)/include
 LDFLAGS+= -L$(BOOST_ROOT)/lib
 LDLIBS:= -lboost_chrono$(MT) -lboost_thread$(MT) -lboost_system$(MT)
 
-CXXFLAGS+=-Wpedantic -Wextra -Wno-unused-parameter -Wno-c++11-long-long -Wno-long-long
+CXXFLAGS+=-Wpedantic -Wextra -Wall -Wno-unused-parameter -Wno-c++11-long-long -Wno-long-long
 
 PROGRAMS:= \
 alarm_cond \

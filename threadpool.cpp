@@ -38,7 +38,7 @@ src/threads.cpp > threadpool.cpp
 #define DEBUG
 #include <boost/current_function.hpp>
 #define LOG_BEGIN(x, y) std::cout << BOOST_CURRENT_FUNCTION << ": "
-#define LOG(x) std::cout << x << ' '
+#define LOG(x) std::cout << (x) << ' '
 #define LOG_END std::cout << std::endl
 #else
 #define LOG_BEGIN(x, y)
@@ -78,6 +78,7 @@ Synchronized::Synchronized()
 
 Synchronized::~Synchronized()
 {
+    DTRACE(signal);
     // NOTE: give other waiting threads a time window
     // to return from the wait on our condition_variable
     if (is_locked_by_this_thread()) {
@@ -86,14 +87,16 @@ Synchronized::~Synchronized()
         unlock();
         boost::this_thread::sleep_for(ms(10));
     } else {
-        signal = true; // may be not seen! CK
-        if (lock(50)) {
-            signal = true; // again! CK
-            notify_all();
-            unlock();
-            boost::this_thread::sleep_for(ms(10));
+        while (!signal) {
+            if (lock(50)) {
+                signal = true; // again! CK
+                notify_all();
+                unlock();
+                boost::this_thread::sleep_for(ms(10));
+            }
         }
     }
+    DTRACE("");
 }
 
 void Synchronized::wait()
@@ -427,7 +430,7 @@ void TaskManager::run()
             task = 0;
 
             unlock(); // NOTE: prevent deadlock! CK
-            //TODO THIS_THREAD_YIELD; // FIXME: Only for test! CK
+            THIS_THREAD_YIELD; // FIXME: Only for test! CK
             //==============================
             // NOTE: may end in a direct call to set_task()
             // via QueuedThreadPool::run() => QueuedThreadPool::assign()

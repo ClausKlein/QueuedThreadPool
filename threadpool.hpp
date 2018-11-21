@@ -741,6 +741,7 @@ protected:
     Runnable* task;
     volatile bool go;
 };
+
 } // namespace Agentpp
 
-#endif
+#endif // agent_pp_threadpool_hpp_

@@ -329,6 +329,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolLoad_test)
             BOOST_TEST_MESSAGE("defaultThreadPool.queue_length: "
                 << defaultThreadPool.queue_length());
         } while (--i > 0);
+        BOOST_CHECK(defaultThreadPool.is_busy());
 
         do {
             BOOST_TEST_MESSAGE(
@@ -368,6 +369,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolInterface_test)
 
         BOOST_TEST_MESSAGE("emptyThreadPool.size: " << emptyThreadPool.size());
         emptyThreadPool.execute(new TestTask("Starting ...", result));
+        BOOST_CHECK(emptyThreadPool.is_busy());
 
 #if !defined(USE_IMPLIZIT_START)
         emptyThreadPool.start();
@@ -385,7 +387,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolInterface_test)
             Thread::sleep(10); // ms
         } while (--i > 0);
 
-        // FIXME: BOOST_CHECK(!emptyThreadPool.is_idle());
+        BOOST_CHECK(!emptyThreadPool.is_idle());
         BOOST_TEST_MESSAGE("outstanding tasks: " << TestTask::task_count());
         BOOST_TEST(TestTask::task_count() == 6UL);
 
@@ -684,7 +686,10 @@ void lock_n(mutex_type* mutexes, unsigned count)
     BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
 
     if (count == 1) {
+        Stopwatch sw;
         BOOST_CHECK(mutexes[0].wait(50));
+        BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
+        BOOST_CHECK(mutexes[0].unlock());
         return;
     }
 
@@ -753,8 +758,8 @@ BOOST_AUTO_TEST_CASE(SyncDelete_while_used_test)
     {
         Stopwatch sw;
         boost::this_thread::sleep_for(ms(25));
-        delete lockable;
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
+        delete lockable;
     }
     t1.join();
     {
