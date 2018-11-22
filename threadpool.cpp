@@ -46,6 +46,7 @@ src/threads.cpp > threadpool.cpp
 #define LOG_END
 #define _NO_LOGGING 1
 #endif
+
 /*
  * Define a macro that can be used for diagnostic output from examples. When
  * compiled -DDEBUG, it results in writing with the specified argument to
@@ -54,12 +55,12 @@ src/threads.cpp > threadpool.cpp
 #ifdef DEBUG
 #define DTRACE(arg) \
     std::cout << BOOST_CURRENT_FUNCTION << ": " << arg << std::endl
+#define THIS_THREAD_YIELD boost::this_thread::sleep_for(ms(10));
 #else
 #define DTRACE(arg)
+#define THIS_THREAD_YIELD boost::this_thread::yield();
 #endif
 
-//XXX #define THIS_THREAD_YIELD boost::this_thread::yield();
-#define THIS_THREAD_YIELD boost::this_thread::sleep_for(ms(10));
 
 
 namespace Agentpp
@@ -172,7 +173,7 @@ bool Synchronized::lock()
     if (is_locked_by_this_thread()) {
 
 #ifdef DEBUG
-        throw std::runtime_error("Synchronized::lock(): recursive used!");
+        //NO! throw std::runtime_error("Synchronized::lock(): recursive used!");
 #endif
 
         // TODO: This thread owns already the lock, but we do not like

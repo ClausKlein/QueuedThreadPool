@@ -9,7 +9,6 @@
 #define BOOST_THREAD_VERSION 4
 #define BOOST_THREAD_USES_LOG
 #define BOOST_THREAD_USES_LOG_THREAD_ID
-#define BOOST_THREAD_QUEUE_DEPRECATE_OLD
 
 #if !defined BOOST_NO_CXX11_DECLTYPE
 #define BOOST_RESULT_OF_USE_DECLTYPE
@@ -24,13 +23,13 @@
 
 void p1()
 {
-    BOOST_THREAD_LOG << boost::this_thread::get_id() << " P1"
+    BOOST_THREAD_LOG << boost::this_thread::get_id() << BOOST_CURRENT_FUNCTION
                      << BOOST_THREAD_END_LOG;
 }
 
 void p2()
 {
-    BOOST_THREAD_LOG << boost::this_thread::get_id() << " P2"
+    BOOST_THREAD_LOG << boost::this_thread::get_id() << BOOST_CURRENT_FUNCTION
                      << BOOST_THREAD_END_LOG;
 }
 
@@ -50,14 +49,16 @@ void submit_some(boost::basic_thread_pool& tp)
 
 int main()
 {
-    BOOST_THREAD_LOG << boost::this_thread::get_id() << " <MAIN"
+    BOOST_THREAD_LOG << boost::this_thread::get_id() << BOOST_CURRENT_FUNCTION
                      << BOOST_THREAD_END_LOG;
     {
         try {
+            //==========================
             boost::basic_thread_pool tp;
             submit_some(tp);
+            //==========================
         } catch (std::exception& ex) {
-            BOOST_THREAD_LOG << "ERRORRRRR " << ex.what() << ""
+            BOOST_THREAD_LOG << "ERRORRRRR " << ex.what()
                              << BOOST_THREAD_END_LOG;
             return 1;
         } catch (...) {
@@ -66,7 +67,7 @@ int main()
             return 2;
         }
     }
-    BOOST_THREAD_LOG << boost::this_thread::get_id() << "MAIN>"
+    BOOST_THREAD_LOG << boost::this_thread::get_id() << BOOST_CURRENT_FUNCTION
                      << BOOST_THREAD_END_LOG;
 
     return 0;
