@@ -25,6 +25,7 @@ user_scheduler
 volatile
 
 build/
+html/
 gcov-summary.txt
 coverage.info
 *.gcda
