@@ -186,10 +186,10 @@ int main()
 #endif
 
         } catch (std::exception& ex) {
-            std::cout << "ERRORRRRR " << ex.what() << "" << std::endl;
+            std::cerr << "ERRORRRRR " << ex.what() << std::endl;
             return 1;
         } catch (...) {
-            std::cout << "ERRORRRRR "
+            std::cerr << "ERRORRRRR "
                       << "non std::exception thrown" << std::endl;
             return 2;
         }

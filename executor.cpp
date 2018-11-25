@@ -8,7 +8,6 @@
 #if !defined BOOST_NO_CXX11_DECLTYPE
 #define BOOST_RESULT_OF_USE_DECLTYPE
 #endif
-#include <iostream>
 
 #define BOOST_THREAD_VERSION 4
 #define BOOST_THREAD_PROVIDES_EXECUTORS
@@ -27,7 +26,7 @@
 #include <boost/thread/executors/serial_executor.hpp>
 #include <boost/thread/executors/thread_executor.hpp>
 #include <boost/thread/future.hpp>
-#include <cassert>
+
 #include <iostream>
 #include <string>
 

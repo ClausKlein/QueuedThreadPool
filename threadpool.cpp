@@ -23,19 +23,22 @@ src/threads.cpp > threadpool.cpp
   _##
   _##########################################################################*/
 
-#ifndef _MSC_VER
-#include <unistd.h> // _POSIX_THREADS ...
-#endif
-
 #include "threadpool.hpp"
 
 #include <boost/assert.hpp>
+#include <boost/bind.hpp>
+
+#ifndef BOOST_MSVC
+#include <unistd.h> // _POSIX_THREADS ...
+#endif
+
+#ifdef POSIX_THREADS
+#include <pthread.h>
+#endif
 
 #include <iostream>
-#include <pthread.h>
 
 #if !defined(_NO_LOGGING) && !defined(NDEBUG)
-#define DEBUG
 #include <boost/current_function.hpp>
 #define LOG_BEGIN(x, y) std::cout << BOOST_CURRENT_FUNCTION << ": "
 #define LOG(x) std::cout << (x) << ' '
@@ -58,9 +61,14 @@ src/threads.cpp > threadpool.cpp
 #define THIS_THREAD_YIELD boost::this_thread::sleep_for(ms(10));
 #else
 #define DTRACE(arg)
+#ifdef NO_YIELD
+#define THIS_THREAD_YIELD \
+    while (false) \
+        ;
+#else
 #define THIS_THREAD_YIELD boost::this_thread::yield();
 #endif
-
+#endif
 
 
 namespace Agentpp
@@ -172,8 +180,8 @@ bool Synchronized::lock()
 
     if (is_locked_by_this_thread()) {
 
-#ifdef DEBUG
-        //NO! throw std::runtime_error("Synchronized::lock(): recursive used!");
+#ifndef NDEBUG
+        throw std::runtime_error("Synchronized::lock(): recursive used!");
 #endif
 
         // TODO: This thread owns already the lock, but we do not like
@@ -271,7 +279,9 @@ void* thread_starter(void* t)
 Thread::Thread()
     : status(IDLE)
     , stackSize(AGENTPP_DEFAULT_STACKSIZE)
+#ifdef POSIX_THREADS
     , tid(0)
+#endif
 {
     runnable = static_cast<Runnable*>(this);
 }
@@ -279,7 +289,9 @@ Thread::Thread()
 Thread::Thread(Runnable* r)
     : status(IDLE)
     , stackSize(AGENTPP_DEFAULT_STACKSIZE)
+#ifdef POSIX_THREADS
     , tid(0)
+#endif
 {
     runnable = r;
 }
@@ -303,6 +315,7 @@ Runnable* Thread::get_runnable() { return runnable; }
 
 void Thread::join()
 {
+#ifdef POSIX_THREADS
     if (status != IDLE) {
         void* retstat;
         int err = pthread_join(tid, &retstat);
@@ -323,10 +336,17 @@ void Thread::join()
         LOG((AGENTPP_OPAQUE_PTHREAD_T)tid);
         LOG_END;
     }
+#else
+    if (status != IDLE) {
+        tid.join();
+        status = IDLE;
+    }
+#endif
 }
 
 void Thread::start()
 {
+#ifdef POSIX_THREADS
     if (status == IDLE) {
         int policy = 0;
         struct sched_param param;
@@ -367,6 +387,12 @@ void Thread::start()
         LOG("Thread: thread already running!");
         LOG_END;
     }
+#else
+    if (status == IDLE) {
+        tid = boost::thread(boost::bind(thread_starter, (void *)this));
+        status = RUNNING;
+    }
+#endif
 }
 
 void Thread::sleep(long millis)
@@ -430,7 +456,7 @@ void TaskManager::run()
             delete task;
             task = 0;
 
-            unlock(); // NOTE: prevent deadlock! CK
+            unlock();          // NOTE: prevent deadlock! CK
             THIS_THREAD_YIELD; // FIXME: Only for test! CK
             //==============================
             // NOTE: may end in a direct call to set_task()
