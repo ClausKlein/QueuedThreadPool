@@ -23,19 +23,22 @@ src/threads.cpp > threadpool.cpp
   _##
   _##########################################################################*/
 
-#ifndef _MSC_VER
-#include <unistd.h> // _POSIX_THREADS ...
-#endif
-
 #include "threadpool.hpp"
 
 #include <boost/assert.hpp>
+#include <boost/bind.hpp>
+
+#ifndef BOOST_MSVC
+#include <unistd.h> // _POSIX_THREADS ...
+#endif
+
+#ifdef POSIX_THREADS
+#include <pthread.h>
+#endif
 
 #include <iostream>
-#include <pthread.h>
 
 #if !defined(_NO_LOGGING) && !defined(NDEBUG)
-#define DEBUG
 #include <boost/current_function.hpp>
 #define LOG_BEGIN(x, y) std::cout << BOOST_CURRENT_FUNCTION << ": "
 #define LOG(x) std::cout << (x) << ' '
@@ -46,6 +49,7 @@ src/threads.cpp > threadpool.cpp
 #define LOG_END
 #define _NO_LOGGING 1
 #endif
+
 /*
  * Define a macro that can be used for diagnostic output from examples. When
  * compiled -DDEBUG, it results in writing with the specified argument to
@@ -54,12 +58,17 @@ src/threads.cpp > threadpool.cpp
 #ifdef DEBUG
 #define DTRACE(arg) \
     std::cout << BOOST_CURRENT_FUNCTION << ": " << arg << std::endl
+#define THIS_THREAD_YIELD boost::this_thread::sleep_for(ms(10));
 #else
 #define DTRACE(arg)
+#ifdef NO_YIELD
+#define THIS_THREAD_YIELD \
+    while (false) \
+        ;
+#else
+#define THIS_THREAD_YIELD boost::this_thread::yield();
 #endif
-
-//XXX #define THIS_THREAD_YIELD boost::this_thread::yield();
-#define THIS_THREAD_YIELD boost::this_thread::sleep_for(ms(10));
+#endif
 
 
 namespace Agentpp
@@ -171,7 +180,7 @@ bool Synchronized::lock()
 
     if (is_locked_by_this_thread()) {
 
-#ifdef DEBUG
+#ifndef NDEBUG
         throw std::runtime_error("Synchronized::lock(): recursive used!");
 #endif
 
@@ -247,7 +256,9 @@ void* thread_starter(void* t)
 
     LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
     LOG("Thread: started (tid)");
+#ifdef POSIX_THREADS
     LOG((AGENTPP_OPAQUE_PTHREAD_T)(thread->tid));
+#endif
     LOG_END;
 
 #if defined(__APPLE__) && defined(_DARWIN_C_SOURCE)
@@ -258,7 +269,9 @@ void* thread_starter(void* t)
 
     LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
     LOG("Thread: ended (tid)");
+#ifdef POSIX_THREADS
     LOG((AGENTPP_OPAQUE_PTHREAD_T)(thread->tid));
+#endif
     LOG_END;
 
     Thread::threadList.remove(thread);
@@ -270,7 +283,9 @@ void* thread_starter(void* t)
 Thread::Thread()
     : status(IDLE)
     , stackSize(AGENTPP_DEFAULT_STACKSIZE)
+#ifdef POSIX_THREADS
     , tid(0)
+#endif
 {
     runnable = static_cast<Runnable*>(this);
 }
@@ -278,7 +293,9 @@ Thread::Thread()
 Thread::Thread(Runnable* r)
     : status(IDLE)
     , stackSize(AGENTPP_DEFAULT_STACKSIZE)
+#ifdef POSIX_THREADS
     , tid(0)
+#endif
 {
     runnable = r;
 }
@@ -302,6 +319,7 @@ Runnable* Thread::get_runnable() { return runnable; }
 
 void Thread::join()
 {
+#ifdef POSIX_THREADS
     if (status != IDLE) {
         void* retstat;
         int err = pthread_join(tid, &retstat);
@@ -322,10 +340,17 @@ void Thread::join()
         LOG((AGENTPP_OPAQUE_PTHREAD_T)tid);
         LOG_END;
     }
+#else
+    if (status != IDLE) {
+        tid.join();
+        status = IDLE;
+    }
+#endif
 }
 
 void Thread::start()
 {
+#ifdef POSIX_THREADS
     if (status == IDLE) {
         int policy = 0;
         struct sched_param param;
@@ -366,6 +391,12 @@ void Thread::start()
         LOG("Thread: thread already running!");
         LOG_END;
     }
+#else
+    if (status == IDLE) {
+        tid = boost::thread(boost::bind(thread_starter, (void *)this));
+        status = RUNNING;
+    }
+#endif
 }
 
 void Thread::sleep(long millis)
@@ -429,7 +460,7 @@ void TaskManager::run()
             delete task;
             task = 0;
 
-            unlock(); // NOTE: prevent deadlock! CK
+            unlock();          // NOTE: prevent deadlock! CK
             THIS_THREAD_YIELD; // FIXME: Only for test! CK
             //==============================
             // NOTE: may end in a direct call to set_task()

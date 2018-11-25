@@ -1,4 +1,4 @@
-// Copyright (C) 2012-2013 Vicente Botet
+// Copyright (C) 2013 Vicente Botet
 //
 //  Distributed under the Boost Software License, Version 1.0. (See
 //  accompanying file LICENSE_1_0.txt or copy at
@@ -15,11 +15,15 @@
 #endif
 
 #include <boost/thread/detail/log.hpp>
-#include <boost/thread/executors/basic_thread_pool.hpp>
+#include <boost/thread/executors/loop_executor.hpp>
+#include <boost/thread/thread_only.hpp>
+
+#include <iostream>
 
 #ifdef BOOST_MSVC
 #pragma warning(disable : 4127) // conditional expression is constant
 #endif
+
 
 void p1()
 {
@@ -33,8 +37,10 @@ void p2()
                      << BOOST_CURRENT_FUNCTION << BOOST_THREAD_END_LOG;
 }
 
-void submit_some(boost::basic_thread_pool& tp)
+void submit_some(boost::loop_executor& tp)
 {
+    BOOST_THREAD_LOG << boost::this_thread::get_id() << " "
+                     << BOOST_CURRENT_FUNCTION << BOOST_THREAD_END_LOG;
     tp.submit(&p1);
     tp.submit(&p2);
     tp.submit(&p1);
@@ -53,17 +59,16 @@ int main()
                      << BOOST_CURRENT_FUNCTION << BOOST_THREAD_END_LOG;
     {
         try {
-            //==========================
-            boost::basic_thread_pool tp;
+            boost::loop_executor tp;
             submit_some(tp);
-            //==========================
+            tp.run_queued_closures();
+            submit_some(tp);
+            tp.run_queued_closures();
         } catch (std::exception& ex) {
-            BOOST_THREAD_LOG << " ERRORRRRR " << ex.what()
-                             << BOOST_THREAD_END_LOG;
+            std::cerr << "ERRORRRRR " << ex.what() << std::endl;
             return 1;
         } catch (...) {
-            BOOST_THREAD_LOG << " ERRORRRRR exception thrown"
-                             << BOOST_THREAD_END_LOG;
+            std::cerr << "ERRORRRRR exception thrown" << std::endl;
             return 2;
         }
     }

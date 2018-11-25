@@ -232,7 +232,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
     using namespace Agentpp;
     result_queue_t result;
     {
-        QueuedThreadPool queuedThreadPool(2UL);
+        QueuedThreadPool queuedThreadPool;
 
 #if !defined(USE_IMPLIZIT_START)
         queuedThreadPool.start(); // NOTE: different to ThreadPool, but this
@@ -241,7 +241,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
 
         BOOST_TEST_MESSAGE(
             "queuedThreadPool.size: " << queuedThreadPool.size());
-        BOOST_TEST(queuedThreadPool.size() == 2UL);
+        BOOST_TEST(queuedThreadPool.size() == 1UL);
         BOOST_TEST(
             queuedThreadPool.get_stack_size() == AGENTPP_DEFAULT_STACKSIZE);
         BOOST_CHECK(queuedThreadPool.is_idle());
@@ -303,7 +303,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolLoad_test)
     using namespace Agentpp;
     result_queue_t result;
     {
-        QueuedThreadPool defaultThreadPool;
+        QueuedThreadPool defaultThreadPool(1UL);
 
 #if !defined(USE_IMPLIZIT_START)
         defaultThreadPool.start(); // NOTE: different to ThreadPool, but this
@@ -329,7 +329,6 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolLoad_test)
             BOOST_TEST_MESSAGE("defaultThreadPool.queue_length: "
                 << defaultThreadPool.queue_length());
         } while (--i > 0);
-        BOOST_CHECK(defaultThreadPool.is_busy());
 
         do {
             BOOST_TEST_MESSAGE(
@@ -525,6 +524,26 @@ BOOST_AUTO_TEST_CASE(SyncWait_test)
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
         BOOST_TEST(d < ns(max_diff));
     }
+}
+
+class Task : public Agentpp::Runnable {
+public:
+    Task(){};
+    void run() { std::cout << "Hello world!" << std::endl; };
+};
+
+BOOST_AUTO_TEST_CASE(ThreadLivetime_test)
+{
+    using namespace Agentpp;
+    Stopwatch sw;
+    {
+        Thread thread;
+        boost::shared_ptr<Thread> ptrThread(thread.clone());
+        thread.start();
+        BOOST_TEST(thread.is_alive());
+        BOOST_TEST(!ptrThread->is_alive());
+    }
+    BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
 }
 
 BOOST_AUTO_TEST_CASE(ThreadSleep_test)

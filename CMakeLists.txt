@@ -27,7 +27,7 @@ if( NOT CMAKE_BUILD_TYPE )
   set(CMAKE_BUILD_TYPE Debug CACHE STRING
       "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
       FORCE )
-  add_definitions(-D_DEBUG)
+  ### add_definitions(-D_DEBUG)
 endif()
 
 # ----------------------------------------------------------------------
@@ -122,12 +122,15 @@ link_directories(${LIBRARY_OUTPUT_PATH})
 
 
 # ----------------------------------------------------------------------
+option(USE_ASIO "use the standalon asio lib too" OFF)
 set(ASIO_ROOT /usr/local CACHE PATH "path to install dir")
-find_package(asio 1.11 CONFIG HINTS ${ASIO_ROOT})
-if(asio_FOUND)
-  # TODO: how to use the imported asio_INCLUDE_DIR? CK
-  # NO! include_directories(BEFORE SYSTEM ${ASIO_ROOT}/include)
-  set(asio_INCLUDE_DIR ${ASIO_ROOT}/include)
+if(USE_ASIO)
+  find_package(asio 1.11 CONFIG HINTS ${ASIO_ROOT})
+  if(asio_FOUND)
+    # TODO: how to use the imported asio_INCLUDE_DIR? CK
+    # NO! include_directories(BEFORE SYSTEM ${ASIO_ROOT}/include)
+    set(asio_INCLUDE_DIR ${ASIO_ROOT}/include)
+  endif()
 endif()
 # ----------------------------------------------------------------------
 
@@ -183,13 +186,13 @@ if(MSYS OR MINGW)
 endif()
 
 
-option(DISABLE_LOGGING "if you do not want any logging output " OFF)
+option(DISABLE_LOGGING "if you do not want any logging output " ON)
 if(DISABLE_LOGGING)
   set(WITH_LOGGING OFF CACHE BOOL "NO logging" FORCE)
-  add_definitions(-D_NO_LOGGING)
+  add_definitions(-D_NO_LOGGING -DNDEBUG)
 else()
   set(WITH_LOGGING ON CACHE BOOL "Use logging" FORCE)
-  add_definitions(-DDEFAULT_LOG_PROFILE)
+  add_definitions(-DDEFAULT_LOG_PROFILE -DDEBUG)
 endif()
 mark_as_advanced(FORCE WITH_LOGGING)
 
@@ -197,7 +200,7 @@ mark_as_advanced(FORCE WITH_LOGGING)
 option(USE_BOOST "build with BOOST support" ON)
 if(USE_BOOST)
   option(Boost_DEBUG "find boost at verbose mode"      ON)
-  option(Boost_USE_STATIC_LIBS "use static libs only" OFF)
+  option(Boost_USE_STATIC_LIBS "use static libs only"  ON)
   option(Boost_USE_MULTITHREADED "use -mt libs only"   ON)
   set(Boost_NO_BOOST_CMAKE        ON)
 
@@ -226,11 +229,14 @@ if(USE_BOOST)
 endif()
 
 
-find_library(PTHREAD_LIBRARY pthread)
-if(PTHREAD_LIBRARY)
-  message(STATUS "pthread library found")
-  list(APPEND EXTRA_LIBS ${PTHREAD_LIBRARY})
-  add_definitions(-DPOSIX_THREADS)
+option(USE_PTHREAD_LIBRARY "" OFF)
+if(USE_PTHREAD_LIBRARY)
+  find_library(PTHREAD_LIBRARY pthread)
+  if(PTHREAD_LIBRARY)
+    message(STATUS "pthread library found")
+    list(APPEND EXTRA_LIBS ${PTHREAD_LIBRARY})
+    add_definitions(-DPOSIX_THREADS)
+  endif()
 endif()
 
 
@@ -243,10 +249,10 @@ if(USE_BOOST OR USE_CTEST)
   if(Boost_FOUND)
     # additional single file examples from boost/thread and boost/asio
     set(noinst_PROGRAMS
-        async_future
+        #C++14 async_future
         async_server
-        ba_externallly_locked
-        bank_account
+        #C++14 ba_externallly_locked
+        #C++14 bank_account
         chrono_io_ex1
         daytime_client
         default_executor
@@ -254,8 +260,8 @@ if(USE_BOOST OR USE_CTEST)
         lockfree_spsc_queue
         make_future
         multi_thread_pass
-        parallel_quick_sort
-        perf_condition_variable
+        #C++14 parallel_quick_sort
+        #C++14 perf_condition_variable
         perf_shared_mutex
         serial_executor
         shared_monitor
@@ -264,15 +270,18 @@ if(USE_BOOST OR USE_CTEST)
         stopwatch_reporter_example
         strict_lock
         synchronized_person
+        test_atomic_counter
+        test_shared_mutex
         thread_pool
         thread_tss_test
         trylock_test
+        user_scheduler
         volatile
     )
 
     foreach(program ${noinst_PROGRAMS})
         add_executable(${program} ${program}.cpp)
-        set_target_properties(${program} PROPERTIES CXX_STANDARD 14)
+        set_target_properties(${program} PROPERTIES CXX_STANDARD 98)
         # target_compile_definitions(${program} PRIVATE
         #NO! -DBOOST_THREAD_VERSION=4
         #### -DBOOST_THREAD_PROVIDES_EXECUTORS
@@ -281,10 +290,10 @@ if(USE_BOOST OR USE_CTEST)
         add_test(NAME ${program} COMMAND ${program})
     endforeach()
 
-    if(asio_FOUND)
+    if(USE_ASIO AND asio_FOUND)
       add_executable(test_priority_scheduler priority_scheduler.cpp)
       target_include_directories(test_priority_scheduler SYSTEM BEFORE PRIVATE ${asio_INCLUDE_DIR})
-      set_target_properties(test_priority_scheduler PROPERTIES CXX_STANDARD 98)
+      set_target_properties(test_priority_scheduler PROPERTIES CXX_STANDARD 14)
       target_link_libraries(test_priority_scheduler ${Boost_LIBRARIES} ${EXTRA_LIBS})
       add_test(NAME test_priority_scheduler COMMAND test_priority_scheduler)
     endif()

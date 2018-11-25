@@ -14,7 +14,6 @@ endif
 
 CPPFLAGS+=-MMD
 CPPFLAGS+=-DBOOST_ALL_NO_LIB
-CPPFLAGS+=-DPOSIX_THREADS
 CPPFLAGS+=-I$(BOOST_ROOT)/include
 LDFLAGS+= -L$(BOOST_ROOT)/lib
 LDLIBS:= -lboost_chrono$(MT) -lboost_thread$(MT) -lboost_system$(MT)
@@ -34,10 +33,13 @@ shared_mutex \
 shared_ptr \
 stopwatch_reporter_example \
 synchronized_person \
+test_atomic_counter \
+test_shared_mutex \
 thread_pool \
 thread_tss_test \
 threads_test \
 trylock_test \
+user_scheduler \
 volatile \
 
 
@@ -60,9 +62,10 @@ LCOVFLAGS+=--rc lcov_branch_coverage=1
 ifdef MSYS
     TCOVFLAGS+=--relative-only --demangled-names --function-summaries
 endif
-tcov: clean threads_test thread_pool
+tcov: clean threads_test thread_pool test_atomic_counter
+	./test_atomic_counter
 	./thread_pool
-	./threads_test --log_level=error --random
+	./threads_test -10
 	gcov --long-file-names $(TCOVFLAGS) thread.cpp > /dev/null 2>&1
 	lcov --capture --quiet $(LCOVFLAGS) --no-external --directory . --output-file coverage.info
 	lcov --list coverage.info $(LCOVFLAGS) | tee gcov-summary.txt
@@ -132,11 +135,12 @@ threads_test.o: threadpool.hpp
 #
 # the Agent++V4.1.2 threads.hpp interfaces implemented with boost libs
 #
-###XXX threadpool.o: CPPFLAGS+=-D_NO_LOGGING
-threadpool.o: CXXFLAGS+=--std=c++03
+threadpool.o: CPPFLAGS+=-D_NO_LOGGING
+threadpool.o: CXXFLAGS+=--std=c++98
 threadpool.o: threadpool.cpp threadpool.hpp
 
 ifdef USE_AGENTPP
+threads_test: CPPFLAGS+=-DPOSIX_THREADS
 threads_test: CPPFLAGS+=-DUSE_AGENTPP
 threads_test: LDLIBS+= -lboost_unit_test_framework$(MT)
 threads_test: LDLIBS:= -lsnmp++ -lagent++ -lcrypto
@@ -175,17 +179,18 @@ test: $(PROGRAMS)
 	./threads_test --run_test=ThreadPool_test -25
 	./threads_test --run_test=QueuedThreadPoolLoad_test -25
 	#TODO ./threads_test --run_test=QueuedThreadPoolLoad_test -1000
-	./chrono_io_ex1
 	./default_executor
 	#FIXME ./lockfree_spsc_queue
 	./perf_shared_mutex
 	./shared_mutex
 	./shared_ptr
 	./stopwatch_reporter_example
+	./test_atomic_counter
 	./thread_tss_test
 	./trylock_test
 	# ./trylock_test +1
 	# ./trylock_test -1
+	./user_scheduler
 	./volatile
 	cat alarm_cond.txt | ./alarm_cond --wait
 

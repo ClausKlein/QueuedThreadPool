@@ -6,7 +6,6 @@
 // https://github.com/chriskohlhoff/asio/
 
 #define ASIO_NO_DEPRECATED
-#define ASIO_HAS_STD_FUTURE
 
 #include <boost/asio/thread_pool.hpp>
 #include <boost/asio/ts/executor.hpp>

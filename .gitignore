@@ -15,13 +15,17 @@ shared_ptr
 stopwatch_reporter_example
 strict_lock
 synchronized_person
+test_atomic_counter
+test_shared_mutex
 thread_pool
 thread_tss_test
 threads_test
 trylock_test
+user_scheduler
 volatile
 
 build/
+html/
 gcov-summary.txt
 coverage.info
 *.gcda

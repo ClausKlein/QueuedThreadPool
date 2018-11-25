@@ -46,13 +46,20 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread_only.hpp>
 
+
 #undef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
 
 #define AGENTPP_DEFAULT_STACKSIZE 0x10000UL
-#define AGENTPP_OPAQUE_PTHREAD_T void*
 #define AGENTX_DEFAULT_PRIORITY 32
 #define AGENTX_DEFAULT_THREAD_NAME "ThreadPool::Thread"
+
+#ifndef AGENTPP_OPAQUE_PTHREAD_T
+#define AGENTPP_OPAQUE_PTHREAD_T void*
+#endif
+
+#ifndef AGENTPP_DECL
 #define AGENTPP_DECL
+#endif
 
 #ifndef BOOST_OVERRIDE
 #define BOOST_OVERRIDE
@@ -413,7 +420,11 @@ public:
      * Clone this thread. This method must not be called on
      * running threads.
      */
-    Thread* clone() { return new Thread(get_runnable()); }
+    Thread* clone()
+    {
+        BOOST_ASSERT(status != RUNNING);
+        return new Thread(get_runnable());
+    }
 
 private:
     static void nsleep(time_t secs, long nanos);
@@ -421,7 +432,13 @@ private:
     Runnable* runnable;
     ThreadStatus status;
     size_t stackSize;
+
+#ifdef POSIX_THREADS
     pthread_t tid;
+#else
+    boost::thread tid;
+#endif
+
     static ThreadList threadList;
 };
 
@@ -584,9 +601,9 @@ public:
      *
      * @param size
      *    the number of threads started for performing tasks.
-     *    The default value is 4 threads.
+     *    The default value is 1 threads.
      */
-    explicit QueuedThreadPool(size_t size = 4);
+    explicit QueuedThreadPool(size_t size = 1);
 
 
     /**
