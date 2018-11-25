@@ -10,6 +10,7 @@
 
 #include "simple_stopwatch.hpp"
 
+#define BOOST_THREAD_VERSION 4
 #define BOOST_THREAD_USES_CHRONO
 #include <boost/thread/lock_types.hpp>
 #include <boost/thread/shared_mutex.hpp>

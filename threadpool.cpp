@@ -256,7 +256,9 @@ void* thread_starter(void* t)
 
     LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
     LOG("Thread: started (tid)");
+#ifdef POSIX_THREADS
     LOG((AGENTPP_OPAQUE_PTHREAD_T)(thread->tid));
+#endif
     LOG_END;
 
 #if defined(__APPLE__) && defined(_DARWIN_C_SOURCE)
@@ -267,7 +269,9 @@ void* thread_starter(void* t)
 
     LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
     LOG("Thread: ended (tid)");
+#ifdef POSIX_THREADS
     LOG((AGENTPP_OPAQUE_PTHREAD_T)(thread->tid));
+#endif
     LOG_END;
 
     Thread::threadList.remove(thread);
