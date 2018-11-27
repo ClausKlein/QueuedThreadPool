@@ -107,36 +107,43 @@ test_counter_t TestTask::counter(0);
 void push_task(Agentpp::ThreadPool* tp)
 {
     static result_queue_t result;
-    tp->execute(new TestTask("Generate to mutch load.", result, 10));
+    tp->execute(new TestTask(
+        "Generate to mutch load.", result, BOOST_THREAD_TEST_TIME_MS));
 }
 
 BOOST_AUTO_TEST_CASE(ThreadPool_busy_test)
 {
     using namespace Agentpp;
-    result_queue_t result;
     {
         const size_t stacksize = AGENTPP_DEFAULT_STACKSIZE * 2;
-        ThreadPool threadPool(2UL, stacksize);
+        const size_t threadCount(2UL);
+        ThreadPool threadPool(threadCount, stacksize);
 
         BOOST_TEST_MESSAGE("threadPool.size: " << threadPool.size());
-        BOOST_TEST(threadPool.size() == 2UL);
-        BOOST_CHECK(threadPool.get_stack_size() == stacksize);
-        BOOST_CHECK(threadPool.is_idle());
-        BOOST_CHECK(!threadPool.is_busy());
+        BOOST_TEST(threadPool.size() == threadCount);
+        BOOST_TEST(threadPool.get_stack_size() == stacksize);
+        BOOST_TEST(threadPool.is_idle());
+        BOOST_TEST(!threadPool.is_busy());
 
         // call execute parallel from different task!
-        boost::thread threads[4];
-        for (int i = 0; i < 4; ++i) {
+        boost::thread threads[threadCount];
+        for (size_t i = 0; i < threadCount; ++i) {
             threads[i] = boost::thread(push_task, &threadPool);
             threads[i].detach();
+            boost::this_thread::yield();
         }
+        boost::this_thread::yield();
+
+#ifdef DEBUG
+        BOOST_TEST(threadPool.is_busy());
+#endif
 
         do {
             BOOST_TEST_MESSAGE(
                 "outstanding tasks: " << TestTask::task_count());
-            Thread::sleep(123); // ms
+            Thread::sleep(BOOST_THREAD_TEST_TIME_MS); // ms
         } while (!threadPool.is_idle());
-        BOOST_CHECK(threadPool.is_idle());
+        BOOST_TEST(threadPool.is_idle());
 
         threadPool.terminate();
         BOOST_TEST_MESSAGE("outstanding tasks: " << TestTask::task_count());
@@ -154,16 +161,16 @@ BOOST_AUTO_TEST_CASE(ThreadPool_test)
 
         BOOST_TEST_MESSAGE("threadPool.size: " << threadPool.size());
         BOOST_TEST(threadPool.size() == 4UL);
-        BOOST_CHECK(threadPool.get_stack_size() == AGENTPP_DEFAULT_STACKSIZE);
-        BOOST_CHECK(threadPool.is_idle());
+        BOOST_TEST(threadPool.get_stack_size() == AGENTPP_DEFAULT_STACKSIZE);
+        BOOST_TEST(threadPool.is_idle());
 
-        BOOST_CHECK(!threadPool.is_busy());
+        BOOST_TEST(!threadPool.is_busy());
         threadPool.execute(new TestTask("Hallo world!", result));
-        BOOST_CHECK(!threadPool.is_busy());
+        BOOST_TEST(!threadPool.is_busy());
         threadPool.execute(new TestTask("ThreadPool is running!", result));
-        BOOST_CHECK(!threadPool.is_busy());
+        BOOST_TEST(!threadPool.is_busy());
         threadPool.execute(new TestTask("Generate some load.", result));
-        BOOST_CHECK(!threadPool.is_busy());
+        BOOST_TEST(!threadPool.is_busy());
 
         threadPool.execute(new TestTask("Under full load now!", result));
         threadPool.execute(new TestTask("Good by!", result));
@@ -171,9 +178,9 @@ BOOST_AUTO_TEST_CASE(ThreadPool_test)
         do {
             BOOST_TEST_MESSAGE(
                 "outstanding tasks: " << TestTask::task_count());
-            Thread::sleep(123); // ms
+            Thread::sleep(BOOST_THREAD_TEST_TIME_MS); // ms
         } while (!threadPool.is_idle());
-        BOOST_CHECK(threadPool.is_idle());
+        BOOST_TEST(threadPool.is_idle());
 
         threadPool.terminate();
         BOOST_TEST_MESSAGE("outstanding tasks: " << TestTask::task_count());
@@ -201,9 +208,9 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_busy_test)
 
         BOOST_TEST_MESSAGE("threadPool.size: " << threadPool.size());
         BOOST_TEST(threadPool.size() == 2UL);
-        BOOST_CHECK(threadPool.get_stack_size() == stacksize);
-        BOOST_CHECK(threadPool.is_idle());
-        BOOST_CHECK(!threadPool.is_busy());
+        BOOST_TEST(threadPool.get_stack_size() == stacksize);
+        BOOST_TEST(threadPool.is_idle());
+        BOOST_TEST(!threadPool.is_busy());
 
         // call execute parallel from different task!
         boost::thread threads[4];
@@ -211,14 +218,14 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_busy_test)
             threads[i] = boost::thread(push_task, &threadPool);
             threads[i].detach();
         }
-        BOOST_CHECK(threadPool.is_busy());
+        BOOST_TEST(threadPool.is_busy());
 
         do {
             BOOST_TEST_MESSAGE(
                 "outstanding tasks: " << TestTask::task_count());
-            Thread::sleep(123); // ms
+            Thread::sleep(BOOST_THREAD_TEST_TIME_MS); // ms
         } while (!threadPool.is_idle());
-        BOOST_CHECK(threadPool.is_idle());
+        BOOST_TEST(threadPool.is_idle());
 
         threadPool.terminate();
         BOOST_TEST_MESSAGE("outstanding tasks: " << TestTask::task_count());
@@ -244,16 +251,16 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
         BOOST_TEST(queuedThreadPool.size() == 1UL);
         BOOST_TEST(
             queuedThreadPool.get_stack_size() == AGENTPP_DEFAULT_STACKSIZE);
-        BOOST_CHECK(queuedThreadPool.is_idle());
-        BOOST_CHECK(!queuedThreadPool.is_busy());
+        BOOST_TEST(queuedThreadPool.is_idle());
+        BOOST_TEST(!queuedThreadPool.is_busy());
 
         queuedThreadPool.execute(new TestTask("1 Hi again.", result, 10));
         queuedThreadPool.execute(
             new TestTask("2 Queuing starts.", result, 20));
         queuedThreadPool.execute(
             new TestTask("3 Under full load!", result, 30));
-        BOOST_CHECK(!queuedThreadPool.is_idle());
-        BOOST_CHECK(queuedThreadPool.is_busy());
+        BOOST_TEST(!queuedThreadPool.is_idle());
+        BOOST_TEST(queuedThreadPool.is_busy());
 
         std::srand(static_cast<unsigned>(
             std::time(0))); // use current time as seed for random generator
@@ -270,8 +277,8 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
                 << queuedThreadPool.queue_length());
             Thread::sleep(500); // NOTE: after more than 1/2 sec! CK
         } while (!queuedThreadPool.is_idle());
-        BOOST_CHECK(queuedThreadPool.is_idle());
-        BOOST_CHECK(!queuedThreadPool.is_busy());
+        BOOST_TEST(queuedThreadPool.is_idle());
+        BOOST_TEST(!queuedThreadPool.is_busy());
 
         queuedThreadPool.terminate();
         BOOST_TEST_MESSAGE("outstanding tasks: " << TestTask::task_count());
@@ -310,13 +317,13 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolLoad_test)
                                    // should not really needed!
 #endif
 
-        BOOST_CHECK(defaultThreadPool.is_idle());
-        BOOST_CHECK(!defaultThreadPool.is_busy());
+        BOOST_TEST(defaultThreadPool.is_idle());
+        BOOST_TEST(!defaultThreadPool.is_busy());
 
         BOOST_TEST_MESSAGE(
             "defaultThreadPool.size: " << defaultThreadPool.size());
         defaultThreadPool.execute(new TestTask("Started ...", result));
-        BOOST_CHECK(!defaultThreadPool.is_idle());
+        BOOST_TEST(!defaultThreadPool.is_idle());
 
         unsigned i = 20;
         do {
@@ -335,8 +342,8 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolLoad_test)
                 "outstanding tasks: " << TestTask::task_count());
             Thread::sleep(100); // ms
         } while (!defaultThreadPool.is_idle());
-        BOOST_CHECK(defaultThreadPool.is_idle());
-        BOOST_CHECK(!defaultThreadPool.is_busy());
+        BOOST_TEST(defaultThreadPool.is_idle());
+        BOOST_TEST(!defaultThreadPool.is_busy());
 
         BOOST_TEST_MESSAGE("outstanding tasks: " << TestTask::task_count());
         BOOST_TEST(TestTask::task_count() == 0UL);
@@ -358,23 +365,23 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolInterface_test)
         BOOST_TEST(emptyThreadPool.size() == 0UL);
 
 #if !defined(USE_AGENTPP) && defined(USE_IMPLIZIT_START)
-        BOOST_CHECK(emptyThreadPool.is_idle());
+        BOOST_TEST(emptyThreadPool.is_idle());
         emptyThreadPool.stop();
 #endif
 
         emptyThreadPool.set_stack_size(
             0x20000); // NOTE: this change the queue thread only! CK
-        BOOST_CHECK(emptyThreadPool.get_stack_size() == 0x20000);
+        BOOST_TEST(emptyThreadPool.get_stack_size() == 0x20000);
 
         BOOST_TEST_MESSAGE("emptyThreadPool.size: " << emptyThreadPool.size());
         emptyThreadPool.execute(new TestTask("Starting ...", result));
-        BOOST_CHECK(emptyThreadPool.is_busy());
+        BOOST_TEST(emptyThreadPool.is_busy());
 
 #if !defined(USE_IMPLIZIT_START)
         emptyThreadPool.start();
 #endif
 
-        BOOST_CHECK(!emptyThreadPool.is_idle());
+        BOOST_TEST(!emptyThreadPool.is_idle());
 
         size_t i = 10;
         do {
@@ -386,7 +393,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolInterface_test)
             Thread::sleep(10); // ms
         } while (--i > 0);
 
-        BOOST_CHECK(!emptyThreadPool.is_idle());
+        BOOST_TEST(!emptyThreadPool.is_idle());
         BOOST_TEST_MESSAGE("outstanding tasks: " << TestTask::task_count());
         BOOST_TEST(TestTask::task_count() == 6UL);
 
@@ -410,11 +417,11 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolIndependency_test)
 
 #if !defined(USE_IMPLIZIT_START)
     firstThreadPool.start();
-    BOOST_CHECK(!firstThreadPool.is_idle());
+    BOOST_TEST(!firstThreadPool.is_idle());
 #endif
 
-    Thread::sleep(50); // ms
-    BOOST_CHECK(firstThreadPool.is_idle());
+    Thread::sleep(BOOST_THREAD_TEST_TIME_MS); // ms
+    BOOST_TEST(firstThreadPool.is_idle());
     size_t n = 1;
 
     {
@@ -426,11 +433,11 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolIndependency_test)
         secondThreadPool.start();
 #endif
 
-        BOOST_CHECK(secondThreadPool.is_idle());
+        BOOST_TEST(secondThreadPool.is_idle());
 
         secondThreadPool.execute(new TestTask("Starting ...", result));
-        Thread::sleep(50); // ms
-        BOOST_CHECK(secondThreadPool.is_idle());
+        Thread::sleep(BOOST_THREAD_TEST_TIME_MS); // ms
+        BOOST_TEST(secondThreadPool.is_idle());
         n++;
 
         secondThreadPool.terminate();
@@ -460,8 +467,8 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolIndependency_test)
     firstThreadPool.execute(new TestTask("Stopping ...", result));
     BOOST_TEST_MESSAGE(
         "firstThreadPool.queue_length: " << firstThreadPool.queue_length());
-    Thread::sleep(50); // ms
-    BOOST_CHECK(firstThreadPool.is_idle());
+    Thread::sleep(BOOST_THREAD_TEST_TIME_MS); // ms
+    BOOST_TEST(firstThreadPool.is_idle());
     firstThreadPool.terminate();
 
     BOOST_TEST(TestTask::task_count() == 0UL, "ALL task has to be deleted!");
@@ -518,19 +525,38 @@ BOOST_AUTO_TEST_CASE(SyncWait_test)
     {
         Lock l(sync);
         Stopwatch sw;
-        BOOST_TEST(!sync.wait(42), "no timeout occurred on wait!");
+        BOOST_TEST(!sync.wait(BOOST_THREAD_TEST_TIME_MS),
+            "no timeout occurred on wait!");
 
-        ns d = sw.elapsed() - ms(42);
+        ns d = sw.elapsed() - ms(BOOST_THREAD_TEST_TIME_MS);
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
         BOOST_TEST(d < ns(max_diff));
     }
 }
 
-class Task : public Agentpp::Runnable {
+#ifdef DEBUG
+class BadTask : public Agentpp::Runnable {
 public:
-    Task(){};
-    void run() { std::cout << "Hello world!" << std::endl; };
+    BadTask(){};
+    void run()
+    {
+        std::cout << "Hello world!" << std::endl;
+        throw std::runtime_error("Fatal Error, can't continue!");
+    };
 };
+
+BOOST_AUTO_TEST_CASE(ThreadTaskThrow_test)
+{
+    using namespace Agentpp;
+    Stopwatch sw;
+    {
+        Thread thread(new BadTask());
+        thread.start();
+        BOOST_TEST(thread.is_alive());
+    }
+    BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
+}
+#endif
 
 BOOST_AUTO_TEST_CASE(ThreadLivetime_test)
 {
@@ -551,15 +577,15 @@ BOOST_AUTO_TEST_CASE(ThreadSleep_test)
     using namespace Agentpp;
     {
         Stopwatch sw;
-        Thread::sleep(200); // ms
-        ns d = sw.elapsed() - ms(200);
+        Thread::sleep(BOOST_THREAD_TEST_TIME_MS); // ms
+        ns d = sw.elapsed() - ms(BOOST_THREAD_TEST_TIME_MS);
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
         BOOST_TEST(d < ns(max_diff));
     }
     {
         Stopwatch sw;
-        Thread::sleep(124, 999999); // ms + ns
-        ns d = sw.elapsed() - (ms(124) + ns(999999));
+        Thread::sleep(BOOST_THREAD_TEST_TIME_MS, 999999); // ms + ns
+        ns d = sw.elapsed() - (ms(BOOST_THREAD_TEST_TIME_MS) + ns(999999));
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
         BOOST_TEST(d < ns(max_diff));
     }
@@ -615,7 +641,7 @@ void lock_mutexes_slowly(
     using namespace boost;
 
     lock_guard<mutex_type> l1(*m1);
-    this_thread::sleep_for(chrono::milliseconds(50));
+    this_thread::sleep_for(ms(BOOST_THREAD_TEST_TIME_MS));
     lock_guard<mutex_type> l2(*m2);
     BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
 
@@ -631,8 +657,8 @@ void lock_pair(mutex_type* m1, mutex_type* m2)
     unique_lock<mutex_type> l1(*m1, adopt_lock), l2(*m2, adopt_lock);
     BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
 
-    BOOST_CHECK(l1.owns_lock());
-    BOOST_CHECK(l2.owns_lock());
+    BOOST_TEST(l1.owns_lock());
+    BOOST_TEST(l2.owns_lock());
 }
 
 BOOST_AUTO_TEST_CASE(test_lock_two_other_thread_locks_in_order)
@@ -646,11 +672,11 @@ BOOST_AUTO_TEST_CASE(test_lock_two_other_thread_locks_in_order)
     thread t(lock_mutexes_slowly, &m1, &m2, &locked, &release);
 
     thread t2(lock_pair, &m1, &m2);
-    BOOST_CHECK(locked.timed_wait(chrono::milliseconds(250)));
+    BOOST_TEST(locked.timed_wait(ms(2 * BOOST_THREAD_TEST_TIME_MS)));
 
     release.signal();
 
-    BOOST_CHECK(t2.try_join_for(chrono::milliseconds(250)));
+    BOOST_TEST(t2.try_join_for(ms(4 * BOOST_THREAD_TEST_TIME_MS)));
     t2.join(); // just in case of timeout! CK
 
     t.join();
@@ -667,11 +693,11 @@ BOOST_AUTO_TEST_CASE(test_lock_two_other_thread_locks_in_opposite_order)
     thread t(lock_mutexes_slowly, &m1, &m2, &locked, &release);
 
     thread t2(lock_pair, &m2, &m1); // NOTE: m2 first!
-    BOOST_CHECK(locked.timed_wait(chrono::milliseconds(250)));
+    BOOST_TEST(locked.timed_wait(ms(2 * BOOST_THREAD_TEST_TIME_MS)));
 
     release.signal();
 
-    BOOST_CHECK(t2.try_join_for(chrono::milliseconds(250)));
+    BOOST_TEST(t2.try_join_for(ms(4 * BOOST_THREAD_TEST_TIME_MS)));
     t2.join(); // just in case of timeout! CK
 
     t.join();
@@ -683,13 +709,13 @@ void lock_five_mutexes_slowly(mutex_type* m1, mutex_type* m2, mutex_type* m3,
     using namespace boost;
 
     lock_guard<mutex_type> l1(*m1);
-    this_thread::sleep_for(chrono::milliseconds(50));
+    this_thread::sleep_for(ms(BOOST_THREAD_TEST_TIME_MS));
     lock_guard<mutex_type> l2(*m2);
-    this_thread::sleep_for(chrono::milliseconds(50));
+    this_thread::sleep_for(ms(BOOST_THREAD_TEST_TIME_MS));
     lock_guard<mutex_type> l3(*m3);
-    this_thread::sleep_for(chrono::milliseconds(50));
+    this_thread::sleep_for(ms(BOOST_THREAD_TEST_TIME_MS));
     lock_guard<mutex_type> l4(*m4);
-    this_thread::sleep_for(chrono::milliseconds(50));
+    this_thread::sleep_for(ms(BOOST_THREAD_TEST_TIME_MS));
     lock_guard<mutex_type> l5(*m5);
     BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
 
@@ -706,16 +732,16 @@ void lock_n(mutex_type* mutexes, unsigned count)
 
     if (count == 1) {
         Stopwatch sw;
-        BOOST_CHECK(mutexes[0].wait(50));
+        BOOST_TEST(mutexes[0].wait(BOOST_THREAD_TEST_TIME_MS));
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
-        BOOST_CHECK(mutexes[0].unlock());
+        BOOST_TEST(mutexes[0].unlock());
         return;
     }
 
     for (unsigned i = 0; i < count; ++i) {
-        chrono::milliseconds d((rand() % 25) + (50 / count));
+        ms d(BOOST_THREAD_TEST_TIME_MS);
         this_thread::sleep_for(d);
-        BOOST_CHECK(mutexes[i].unlock());
+        BOOST_TEST(mutexes[i].unlock());
     }
 }
 
@@ -732,11 +758,12 @@ BOOST_AUTO_TEST_CASE(test_lock_ten_other_thread_locks_in_different_order)
         &mutexes[0], &mutexes[2], &locked, &release);
 
     thread t2(lock_n, mutexes, num_mutexes);
-    BOOST_CHECK(locked.timed_wait(chrono::milliseconds(250)));
+    BOOST_TEST(locked.timed_wait(ms(5 * BOOST_THREAD_TEST_TIME_MS)));
 
     release.signal();
 
-    BOOST_CHECK(t2.try_join_for(chrono::milliseconds(500)));
+    BOOST_TEST(
+        t2.try_join_for(ms(2 * num_mutexes * BOOST_THREAD_TEST_TIME_MS)));
     t2.join(); // just in case of timeout! CK
 
     t.join();
@@ -749,19 +776,22 @@ BOOST_AUTO_TEST_CASE(SyncTry_lock_for_test)
 
     Synchronized timed_locks[num_mutexes];
     {
+        const unsigned timeout = BOOST_THREAD_TEST_TIME_MS / num_mutexes;
         boost::thread t1(lock_n, timed_locks, num_mutexes);
-        boost::this_thread::sleep_for(ms(1));
+        boost::this_thread::sleep_for(ms(timeout));
         Stopwatch sw;
-        BOOST_TEST(!timed_locks[0].lock(27), "no timeout occurred on lock!");
-        ns d = sw.elapsed() - ms(27);
+        BOOST_TEST(
+            !timed_locks[0].lock(timeout), "no timeout occurred on lock!");
+        ns d = sw.elapsed() - ms(timeout);
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
         BOOST_TEST(d < ns(max_diff));
         t1.join();
     }
     {
         Stopwatch sw;
-        BOOST_TEST(timed_locks[0].lock(7), "timeout occurred on lock!");
-        ns d = sw.elapsed() - ms(7);
+        BOOST_TEST(timed_locks[0].lock(BOOST_THREAD_TEST_TIME_MS),
+            "timeout occurred on lock!");
+        ns d = sw.elapsed() - ms(BOOST_THREAD_TEST_TIME_MS);
         BOOST_TEST(d < ns(max_diff));
         BOOST_TEST(timed_locks[0].unlock());
     }
@@ -776,7 +806,7 @@ BOOST_AUTO_TEST_CASE(SyncDelete_while_used_test)
     boost::thread t1(lock_n, lockable, num_mutexes);
     {
         Stopwatch sw;
-        boost::this_thread::sleep_for(ms(25));
+        boost::this_thread::sleep_for(ms(BOOST_THREAD_TEST_TIME_MS / 2));
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
         delete lockable;
     }

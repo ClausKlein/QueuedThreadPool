@@ -65,7 +65,7 @@ endif
 tcov: clean threads_test thread_pool test_atomic_counter
 	./test_atomic_counter
 	./thread_pool
-	./threads_test -10
+	-./threads_test -10
 	gcov --long-file-names $(TCOVFLAGS) thread.cpp > /dev/null 2>&1
 	lcov --capture --quiet $(LCOVFLAGS) --no-external --directory . --output-file coverage.info
 	lcov --list coverage.info $(LCOVFLAGS) | tee gcov-summary.txt
