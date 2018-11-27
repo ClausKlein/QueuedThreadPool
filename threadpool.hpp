@@ -565,7 +565,7 @@ public:
     size_t get_stack_size() const { return stackSize; }
 
     /**
-     * Notifies the thread pool about an idle thread (synchronized).
+     * Notifies the thread pool about an idle thread
      */
     virtual void idle_notification();
 
@@ -575,6 +575,14 @@ public:
      * be destroyed. This call blocks until all threads are stopped.
      */
     void terminate();
+
+protected:
+    /**
+     * Notifies the thread pool about an idle thread
+     *
+     * @note asserted to be called with lock! CK
+     */
+    virtual void idle_notification_impl();
 };
 
 /**
@@ -673,6 +681,13 @@ public:
      */
     virtual bool is_busy() BOOST_OVERRIDE;
 
+protected:
+    /**
+     * Notifies the thread pool about an idle thread.
+     *
+     * @note asserted to be called with lock! CK
+     */
+    virtual void idle_notification_impl() BOOST_OVERRIDE;
 
 private:
     /**

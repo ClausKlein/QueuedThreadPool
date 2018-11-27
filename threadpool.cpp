@@ -449,25 +449,24 @@ TaskManager::~TaskManager()
 
 void TaskManager::run()
 {
+    Lock l(*this);
+    // NOTE: XXX is not exception save! CK
     //=====================================
-    // FIXME: used Lock l(*this);
-    // NOTE: this is not exception save! CK
-    //=====================================
-    lock();
+    //XXX lock();
     while (go) {
         if (task) {
             task->run(); // NOTE: executes the task
             delete task;
             task = 0;
 
-            unlock();          // NOTE: prevent deadlock! CK
-            THIS_THREAD_YIELD; // FIXME: Only for test! CK
+            //XXX unlock();          // NOTE: prevent deadlock! CK
+            //XXX THIS_THREAD_YIELD; // FIXME: Only for test! CK
             //==============================
             // NOTE: may end in a direct call to set_task()
             // via QueuedThreadPool::run() => QueuedThreadPool::assign()
             threadPool->idle_notification();
             //==============================
-            lock(); // NOTE: needed! CK
+            //XXX lock(); // NOTE: needed! CK
         } else {
             wait(); // NOTE: idle, wait until notify signal CK
         }
@@ -477,10 +476,10 @@ void TaskManager::run()
         task = 0;
         DTRACE("task deleted after stop()");
     }
-    unlock();
+    //XXX unlock();
+    //=====================================
 }
 
-// TODO: should be assert to be called with lock! CK
 bool TaskManager::set_task(Runnable* t)
 {
     Lock l(*this);
@@ -503,11 +502,10 @@ bool TaskManager::set_task(Runnable* t)
 
 void ThreadPool::execute(Runnable* t)
 {
-    //=====================================
-    // FIXME: used Lock l(*this);
+    Lock l(*this);
     // NOTE: this is not exception save! CK
     //=====================================
-    lock();
+    //XXX lock();
     TaskManager* tm = 0;
     while (!tm) {
         for (std::vector<TaskManager*>::iterator cur = taskList.begin();
@@ -518,8 +516,8 @@ void ThreadPool::execute(Runnable* t)
                 LOG("TaskManager: task manager found");
                 LOG_END;
 
-                unlock();
-                THIS_THREAD_YIELD; // FIXME: Only for test! CK
+                //XXX unlock();
+                //XXX THIS_THREAD_YIELD; // FIXME: Only for test! CK
                 //==============================
                 if (tm->set_task(t)) {
                     return; // done
@@ -527,7 +525,7 @@ void ThreadPool::execute(Runnable* t)
                     tm = 0; // task could not be assigned
                 }
                 //==============================
-                lock();
+                //XXX lock();
             }
             tm = 0;
         }
@@ -536,14 +534,19 @@ void ThreadPool::execute(Runnable* t)
             wait(); // NOTE: (ms) for idle_notification ... CK
         }
     }
-    unlock();
+    //XXX unlock();
+    //=====================================
 }
 
-// TODO: should be assert to be called with lock! CK
 void ThreadPool::idle_notification()
 {
     Lock l(*this);
     l.notify();
+}
+
+void ThreadPool::idle_notification_impl()
+{
+    notify();
 }
 
 /// return true if NONE of the threads in the pool is currently executing any
@@ -664,14 +667,14 @@ bool QueuedThreadPool::assign(Runnable* task, bool withQueuing)
             LOG("QueuedThreadPool::assign(IDLE):: task manager found");
             LOG_END;
 
-            Thread::unlock();
-            THIS_THREAD_YIELD; // FIXME: Only for test! CK
+            //XXX Thread::unlock();
+            //XXX THIS_THREAD_YIELD; // FIXME: Only for test! CK
             //==============================
             if (!tm->set_task(task)) {
                 tm = 0;
-                Thread::lock();
+                //XXX Thread::lock();
             } else {
-                Thread::lock();
+                //XXX Thread::lock();
                 DTRACE("task manager found");
                 return true; // OK
             }
@@ -764,10 +767,14 @@ void QueuedThreadPool::idle_notification()
     LOG_END;
 
     Thread::lock();
-    Thread::notify();
+    idle_notification_impl();
     Thread::unlock();
+}
 
-    // TODO: why? CK
+void QueuedThreadPool::idle_notification_impl()
+{
+    Thread::notify();
+
     ThreadPool::idle_notification();
 }
 
