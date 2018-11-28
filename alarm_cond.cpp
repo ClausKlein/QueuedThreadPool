@@ -64,7 +64,7 @@ static void TRACE(const std::string& msg)
     lock_guard<mutex> lk(_mut);
     std::cerr << msg << std::endl;
 }
-#define DEBUG
+#define VERBOSE
 #endif
 
 
@@ -135,7 +135,7 @@ static time_point<steady_clock> alarm_insert(Alarm::alarm_t* alarm)
         longest     = alarm; // NOTE: this is the last alarm for now!
     }
 
-#ifdef DEBUG
+#ifdef VERBOSE
     {
         std::ostringstream os;
         Alarm::alarm_t* longestAlarm = alarm_list;
@@ -209,7 +209,7 @@ void alarm_thread(void)
         if (alarm->time > now) {
             duration<double> timeleft = alarm->time - now;
 
-#ifdef DEBUG
+#ifdef VERBOSE
             std::ostringstream os;
             os << "[waiting: " << alarm->seconds << "(" << timeleft.count()
                << ")\"" << alarm->message << "\"]" << std::endl;

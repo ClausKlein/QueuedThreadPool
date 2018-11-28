@@ -47,7 +47,7 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #include <boost/thread/thread_only.hpp>
 
 
-#undef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
+#define AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
 
 #define AGENTPP_DEFAULT_STACKSIZE 0x10000UL
 #define AGENTX_DEFAULT_PRIORITY 32
@@ -211,12 +211,12 @@ public:
      * Leave a critical section. If this thread called lock or trylock
      * more than once successfully, this call will nevertheless release
      * the lock (non-recursive locking).
+     *
      * @return
      *    TRUE if the unlock succeeded, FALSE if there was no lock
      *    to unlock.
      */
     bool unlock();
-
 
 private:
     bool is_locked_by_this_thread() const
@@ -325,8 +325,7 @@ class AGENTPP_DECL Thread : public Synchronized, public Runnable {
 
     enum ThreadStatus { IDLE, RUNNING, FINISHED };
 
-    friend class Synchronized;
-    friend void* thread_starter(void*);
+    friend void* thread_starter(void*); // for access to ThreadList
 
 public:
     /**
@@ -453,27 +452,23 @@ private:
 class AGENTPP_DECL ThreadList : public Synchronized {
 public:
     ThreadList() {}
-    ~ThreadList() { list.clear(); /* do no delete threads */ }
+    ~ThreadList() { list.clear(); /* does not delete threads */ }
 
     void add(Thread* t)
     {
-        lock();
+        Lock(*this);
         list.push_back(t);
-        unlock();
     }
     void remove(Thread* t)
     {
-        lock();
+        Lock(*this);
         list.remove(t);
-        unlock();
     }
     size_t size() const { return list.size(); }
     Thread* last()
     {
-        lock();
-        Thread* t = list.back();
-        unlock();
-        return t;
+        Lock(*this);
+        return list.back();
     }
 
 protected:
@@ -526,12 +521,12 @@ public:
 
     /**
      * Execute a task. The task will be deleted after call of
-     * its run() method.
+     * its run() method (SYNCHRONIZED).
      */
     virtual void execute(Runnable*);
 
     /**
-     * Check whether the ThreadPool is idle or not.
+     * Check whether the ThreadPool is idle or not (SYNCHRONIZED).
      *
      * @return
      *    TRUE if non of the threads in the pool is currently
@@ -541,7 +536,7 @@ public:
 
     /**
      * Check whether the ThreadPool is busy (i.e., all threads are
-     * running a task) or not.
+     * running a task) or not (SYNCHRONIZED).
      *
      * @return
      *    TRUE if non of the threads in the pool is currently
@@ -565,24 +560,17 @@ public:
     size_t get_stack_size() const { return stackSize; }
 
     /**
-     * Notifies the thread pool about an idle thread
+     * Notifies the thread pool about an idle thread (SYNCHRONIZED).
      */
     virtual void idle_notification();
 
     /**
-     * Gracefully stops all running task managers after their current
-     * task execution. The ThreadPool cannot be used thereafter and should
-     * be destroyed. This call blocks until all threads are stopped.
+     * Gracefully stops all running task managers after their current task
+     * execution. The ThreadPool cannot be used thereafter and should be
+     * destroyed. This call blocks until all threads are stopped
+     * (SYNCHRONIZED).
      */
     void terminate();
-
-protected:
-    /**
-     * Notifies the thread pool about an idle thread
-     *
-     * @note asserted to be called with lock! CK
-     */
-    virtual void idle_notification_impl();
 };
 
 /**
@@ -638,8 +626,7 @@ public:
     virtual void execute(Runnable*) BOOST_OVERRIDE;
 
     /**
-     * Gets the current number of queued tasks.
-     * (SYNCHRONIZED)
+     * Gets the current number of queued tasks (SYNCHRONIZED).
      *
      * @return
      *    the number of tasks that are currently queued.
@@ -648,22 +635,22 @@ public:
 
 
     /**
-     * Runs the queue processing loop.
+     * Runs the queue processing loop (SYNCHRONIZED).
      */
     void run() BOOST_OVERRIDE;
 
     /**
-     * Stop queue processing.
+     * Stop queue processing (SYNCHRONIZED).
      */
     void stop();
 
     /**
-     * Notifies the thread pool about an idle thread.
+     * Notifies the thread pool about an idle thread (SYNCHRONIZED).
      */
     virtual void idle_notification() BOOST_OVERRIDE;
 
     /**
-     * Check whether QueuedThreadPool is idle or not.
+     * Check whether QueuedThreadPool is idle or not (SYNCHRONIZED).
      *
      * @return
      *    TRUE if non of the threads in the pool is currently
@@ -673,21 +660,13 @@ public:
 
     /**
      * Check whether the ThreadPool is busy (i.e., all threads are
-     * running a task) or not.
+     * running a task) or not (SYNCHRONIZED).
      *
      * @return
      *    TRUE if non of the threads in the pool is currently
      *    idle (not executing any task).
      */
     virtual bool is_busy() BOOST_OVERRIDE;
-
-protected:
-    /**
-     * Notifies the thread pool about an idle thread.
-     *
-     * @note asserted to be called with lock! CK
-     */
-    virtual void idle_notification_impl() BOOST_OVERRIDE;
 
 private:
     /**

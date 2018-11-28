@@ -65,7 +65,7 @@ endif
 tcov: clean threads_test thread_pool test_atomic_counter
 	./test_atomic_counter
 	./thread_pool
-	-./threads_test -10
+	-./threads_test --log_level=all -2
 	gcov --long-file-names $(TCOVFLAGS) thread.cpp > /dev/null 2>&1
 	lcov --capture --quiet $(LCOVFLAGS) --no-external --directory . --output-file coverage.info
 	lcov --list coverage.info $(LCOVFLAGS) | tee gcov-summary.txt
@@ -174,7 +174,9 @@ distclean: clean
 	$(RM) -r build *.d *.bak *.orig *~ *.stackdump *.dSYM
 
 test: $(PROGRAMS)
-	./threads_test --log_level=all --run_test='S*'
+	./threads_test --log_level=all --run_test='Queue*'
+	./threads_test --log_level=all --run_test='Thread*'
+	./threads_test --log_level=all --run_test='Sync*'
 	./threads_test --log_level=success --random
 	./threads_test --run_test=ThreadPool_test -25
 	./threads_test --run_test=QueuedThreadPoolLoad_test -25
