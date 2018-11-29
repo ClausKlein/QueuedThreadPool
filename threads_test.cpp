@@ -512,7 +512,7 @@ BOOST_AUTO_TEST_CASE(SyncDeadlock_test)
     } catch (std::exception& e) {
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
         BOOST_TEST_MESSAGE(e.what());
-        //XXX BOOST_TEST(false);
+        // XXX BOOST_TEST(false);
     }
     BOOST_TEST(sync.lock());
     BOOST_TEST(sync.unlock());
@@ -599,7 +599,8 @@ struct wait_data {
 
     wait_data()
         : flag(false)
-    {}
+    {
+    }
 
     // NOTE: return false if condition waiting for is not true! CK
     bool predicate() { return flag; }

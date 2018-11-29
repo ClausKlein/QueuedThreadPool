@@ -56,20 +56,19 @@ src/threads.cpp > threadpool.cpp
  * std::cout. When DEBUG is not defined, it expands to nothing.
  */
 #ifdef DEBUG
-#define DTRACE(arg) \
+#define DTRACE(arg)                                                           \
     std::cout << BOOST_CURRENT_FUNCTION << ": " << arg << std::endl
 #define THIS_THREAD_YIELD boost::this_thread::sleep_for(ms(10));
 #else
 #define DTRACE(arg)
 #ifdef NO_YIELD
-#define THIS_THREAD_YIELD \
-    while (false) \
+#define THIS_THREAD_YIELD                                                     \
+    while (false)                                                             \
         ;
 #else
 #define THIS_THREAD_YIELD boost::this_thread::yield();
 #endif
 #endif
-
 
 namespace Agentpp
 {
@@ -83,7 +82,8 @@ static const char* loggerModuleName = "agent++.threads";
 Synchronized::Synchronized()
     : signal(false)
     , tid_(boost::thread::id())
-{}
+{
+}
 
 Synchronized::~Synchronized()
 {
@@ -253,7 +253,7 @@ Synchronized::TryLockResult Synchronized::trylock()
 
 ThreadList Thread::threadList;
 
-void* thread_starter(void* t)
+void* Thread::thread_starter(void* t)
 {
     Thread* thread = static_cast<Thread*>(t);
     Thread::threadList.add(thread);
@@ -406,7 +406,7 @@ void Thread::start()
 #else
     if (status == IDLE) {
         // NOTE: this may throw! CK
-        tid    = boost::thread(boost::bind(thread_starter, (void*)this));
+        tid = boost::thread(boost::bind(thread_starter, this));
         status = RUNNING;
     }
 #endif
@@ -420,8 +420,8 @@ void Thread::sleep(long millis)
 
 void Thread::sleep(long millis, long nanos)
 {
-    nsleep((time_t)(millis / 1000), (millis % 1000) * 1000000 + nanos);
-    // XXX boost::this_thread::sleep_for(ms(millis) + ns(nanos));
+    // nsleep((time_t)(millis / 1000), (millis % 1000) * 1000000 + nanos);
+    boost::this_thread::sleep_for(ms(millis) + ns(nanos));
 }
 
 void Thread::nsleep(time_t secs, long nanos)
@@ -462,12 +462,25 @@ TaskManager::~TaskManager()
 
 void TaskManager::run()
 {
-    Lock l(*this);
+    scoped_lock l(mutex);
+    tid_ = boost::this_thread::get_id();
+
     while (go) {
+        while (!task && go) {
+            //=================================
+            tid_ = boost::thread::id();
+            cond.wait(l); // NOTE: idle, wait for notify signal CK
+            tid_ = boost::this_thread::get_id();
+            //=================================
+        }
+
+        if (!go)
+            break;
+
         if (task) {
             try {
                 //=====================================
-                task->run(); // NOTE: executes the task
+                task->run();
                 //=====================================
             } catch (std::exception& e) {
                 DTRACE(e.what());
@@ -477,15 +490,16 @@ void TaskManager::run()
             delete task;
             task = 0;
             threadPool->idle_notification();
-        } else {
-            wait(); // NOTE: idle, wait for notify signal CK
         }
     }
+
     if (task) {
         delete task;
         task = 0;
         DTRACE("task deleted after stop()");
     }
+
+    tid_ = boost::thread::id();
 }
 
 bool TaskManager::set_task(Runnable* t)
@@ -509,8 +523,9 @@ bool TaskManager::set_task(Runnable* t)
 void ThreadPool::execute(Runnable* t)
 {
     Lock l(*this);
+
     TaskManager* tm = 0;
-    while (!tm) {
+    for (;;) {
         for (std::vector<TaskManager*>::iterator cur = taskList.begin();
              cur != taskList.end(); ++cur) {
             tm = *cur;
@@ -701,9 +716,25 @@ void QueuedThreadPool::execute(Runnable* t)
 
 void QueuedThreadPool::run()
 {
-    Lock l(*static_cast<Thread*>(this));
+    scoped_lock l(Thread::mutex);
+    Thread::tid_ = boost::this_thread::get_id();
+
+#ifndef USE_IMPLIZIT_START
     go = true;
+#endif
+
     while (go) {
+        while (go && queue.empty()) {
+            //=================================
+            Thread::tid_ = boost::thread::id();
+            Thread::cond.wait(l);
+            Thread::tid_ = boost::this_thread::get_id();
+            //=================================
+        }
+
+        if (!go)
+            break;
+
         if (!queue.empty()) {
             LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
             LOG("queue.front");
@@ -720,8 +751,9 @@ void QueuedThreadPool::run()
                 }
             }
         }
-        Thread::wait(); // NOTE: wait for idle_notification CK
     }
+
+    Thread::tid_ = boost::thread::id();
 }
 
 size_t QueuedThreadPool::queue_length()

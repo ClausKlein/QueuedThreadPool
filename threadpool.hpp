@@ -46,7 +46,6 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread_only.hpp>
 
-
 #define AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
 
 #define AGENTPP_DEFAULT_STACKSIZE 0x10000UL
@@ -64,7 +63,6 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #ifndef BOOST_OVERRIDE
 #define BOOST_OVERRIDE
 #endif
-
 
 namespace Agentpp
 {
@@ -113,7 +111,6 @@ public:
     virtual void run() = 0;
     void operator()() { run(); };
 };
-
 
 /**
  * The Synchronized class implements services for synchronizing
@@ -218,13 +215,12 @@ public:
      */
     bool unlock();
 
-private:
+protected:
     bool is_locked_by_this_thread() const
     {
         return boost::this_thread::get_id() == tid_;
     }
     bool is_locked() const { return !(boost::thread::id() == tid_); }
-
 
     // NOTE: the type of the wrapped lockable
     typedef boost::mutex lockable_type;
@@ -235,7 +231,6 @@ private:
     volatile bool signal;
     boost::atomic<boost::thread::id> tid_;
 };
-
 
 /**
  * The Lock class implements a synchronization object, that
@@ -267,7 +262,6 @@ public:
      * object.
      */
     ~Lock() { sync.unlock(); }
-
 
     /**
      * Causes current thread to wait until either another
@@ -325,9 +319,9 @@ class AGENTPP_DECL Thread : public Synchronized, public Runnable {
 
     enum ThreadStatus { IDLE, RUNNING, FINISHED };
 
-    friend void* thread_starter(void*); // for access to ThreadList
-
 public:
+    static void* thread_starter(void*); // for access to ThreadList
+
     /**
      * Create a new thread.
      */
@@ -441,7 +435,6 @@ private:
     static ThreadList threadList;
 };
 
-
 /**
  * The ThreadList class implements a singleton class that holds
  * a list of all currently running Threads.
@@ -475,7 +468,6 @@ protected:
     std::list<Thread*> list;
 };
 
-
 class TaskManager;
 
 /**
@@ -500,7 +492,6 @@ public:
      *    The default value is 4 threads.
      */
     explicit ThreadPool(size_t size = 4);
-
 
     /**
      * Create a ThreadPool with a given number of threads and
@@ -601,7 +592,6 @@ public:
      */
     explicit QueuedThreadPool(size_t size = 1);
 
-
     /**
      * Create a ThreadPool with a given number of threads and
      * stack size.
@@ -632,7 +622,6 @@ public:
      *    the number of tasks that are currently queued.
      */
     size_t queue_length();
-
 
     /**
      * Runs the queue processing loop (SYNCHRONIZED).
@@ -675,7 +664,6 @@ private:
     bool assign(Runnable* task, bool withQueuing = true);
 };
 
-
 /**
  * The TaskManager class controls the execution of tasks on
  * a Thread of a ThreadPool.
@@ -700,7 +688,6 @@ public:
      * Destructor will wait for thread to terminate.
      */
     virtual ~TaskManager();
-
 
     /**
      * Check whether this thread is idle or not.
