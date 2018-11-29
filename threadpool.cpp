@@ -56,14 +56,14 @@ src/threads.cpp > threadpool.cpp
  * std::cout. When DEBUG is not defined, it expands to nothing.
  */
 #ifdef DEBUG
-#define DTRACE(arg)                                                           \
+#define DTRACE(arg) \
     std::cout << BOOST_CURRENT_FUNCTION << ": " << arg << std::endl
 #define THIS_THREAD_YIELD boost::this_thread::sleep_for(ms(10));
 #else
 #define DTRACE(arg)
 #ifdef NO_YIELD
-#define THIS_THREAD_YIELD                                                     \
-    while (false)                                                             \
+#define THIS_THREAD_YIELD \
+    while (false) \
         ;
 #else
 #define THIS_THREAD_YIELD boost::this_thread::yield();
@@ -82,8 +82,7 @@ static const char* loggerModuleName = "agent++.threads";
 Synchronized::Synchronized()
     : signal(false)
     , tid_(boost::thread::id())
-{
-}
+{}
 
 Synchronized::~Synchronized()
 {
@@ -406,7 +405,7 @@ void Thread::start()
 #else
     if (status == IDLE) {
         // NOTE: this may throw! CK
-        tid = boost::thread(boost::bind(thread_starter, this));
+        tid    = boost::thread(boost::bind(thread_starter, this));
         status = RUNNING;
     }
 #endif
@@ -504,14 +503,14 @@ void TaskManager::run()
 
 bool TaskManager::set_task(Runnable* t)
 {
+    DTRACE("");
+
     Lock l(*this);
     if (!task) {
         task = t;
         l.notify();
 
-        LOG_BEGIN(loggerModuleName, DEBUG_LOG | 2);
-        LOG("TaskManager: after notify");
-        LOG_END;
+        DTRACE("after notify");
         return true;
     }
 
@@ -522,6 +521,8 @@ bool TaskManager::set_task(Runnable* t)
 
 void ThreadPool::execute(Runnable* t)
 {
+    DTRACE("");
+
     Lock l(*this);
 
     TaskManager* tm = 0;
@@ -548,6 +549,8 @@ void ThreadPool::execute(Runnable* t)
 
 void ThreadPool::idle_notification()
 {
+    DTRACE("");
+
     Lock l(*this);
     l.notify();
 }
@@ -582,6 +585,8 @@ bool ThreadPool::is_busy()
 
 void ThreadPool::terminate()
 {
+    DTRACE("");
+
     Lock l(*this);
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
          cur != taskList.end(); ++cur) {
@@ -608,6 +613,8 @@ ThreadPool::ThreadPool(size_t size, size_t stack_size)
 
 ThreadPool::~ThreadPool()
 {
+    DTRACE("");
+
     terminate();
 
     for (size_t i = 0; i < taskList.size(); i++) {
@@ -641,6 +648,7 @@ QueuedThreadPool::QueuedThreadPool(size_t size, size_t stack_size)
 
 QueuedThreadPool::~QueuedThreadPool()
 {
+    DTRACE("");
     stop();
 
     join();
@@ -661,14 +669,14 @@ QueuedThreadPool::~QueuedThreadPool()
 // NOTE: asserted to be called with lock! CK
 bool QueuedThreadPool::assign(Runnable* task, bool withQueuing)
 {
+    DTRACE("");
+
     TaskManager* tm = 0;
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
          cur != taskList.end(); ++cur) {
         tm = *cur;
         if (tm->is_idle()) {
-            LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-            LOG("QueuedThreadPool::assign(IDLE):: task manager found");
-            LOG_END;
+            DTRACE("task manager found");
             if (tm->set_task(task)) {
                 DTRACE("task manager found");
                 return true; // OK
@@ -697,6 +705,8 @@ bool QueuedThreadPool::assign(Runnable* task, bool withQueuing)
 
 void QueuedThreadPool::execute(Runnable* t)
 {
+    DTRACE("");
+
     Lock l(*static_cast<Thread*>(this));
 
 #ifdef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
@@ -725,6 +735,7 @@ void QueuedThreadPool::run()
 
     while (go) {
         while (go && queue.empty()) {
+            DTRACE("empty queue");
             //=================================
             Thread::tid_ = boost::thread::id();
             Thread::cond.wait(l);
@@ -736,9 +747,7 @@ void QueuedThreadPool::run()
             break;
 
         if (!queue.empty()) {
-            LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-            LOG("queue.front");
-            LOG_END;
+            DTRACE("queue.front");
             Runnable* t = queue.front();
             if (t) {
                 if (assign(t, false)) { // NOTE: without queuing! CK
@@ -765,9 +774,7 @@ size_t QueuedThreadPool::queue_length()
 
 void QueuedThreadPool::idle_notification()
 {
-    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-    LOG("QueuedThreadPool::idle_notification");
-    LOG_END;
+    DTRACE("");
 
     Lock l(*static_cast<Thread*>(this));
     l.notify();
@@ -789,6 +796,8 @@ bool QueuedThreadPool::is_busy()
 
 void QueuedThreadPool::stop()
 {
+    DTRACE("");
+
     Lock l(*static_cast<Thread*>(this));
     go = false;
     l.notify();

@@ -4,7 +4,7 @@ BOOST_ROOT?=/usr/local
 MT?=-mt
 CXX:=ccache /usr/bin/g++
 ifndef TCOV
-CXXFLAGS+=-O2 -DNDEBUG
+CXXFLAGS+=-O2 -DDEBUG
 ## CXXFLAGS+=-g
 endif
 #=====================

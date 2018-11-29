@@ -27,9 +27,9 @@ BraceWrapping:
   BeforeCatch:     false
   BeforeElse:      false
   IndentBraces:    false
-  ## SplitEmptyFunction: false
-  ## SplitEmptyRecord: true
-  ## SplitEmptyNamespace: true
+  SplitEmptyFunction: false
+  SplitEmptyRecord: true
+  SplitEmptyNamespace: true
 
 #TODO: The preprocessor directive indenting style to use.
 # IndentPPDirectives: AfterHash
@@ -39,7 +39,7 @@ BinPackParameters: true
 BreakBeforeBinaryOperators: NonAssignment
 # DerivePointerAlignment: false
 # PointerAlignment: Right
-## AlignEscapedNewlines: DontAlign
+AlignEscapedNewlines: DontAlign
 AlignAfterOpenBracket: DontAlign
 AlignConsecutiveAssignments: true
 AlignTrailingComments: true

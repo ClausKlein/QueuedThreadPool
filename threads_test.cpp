@@ -599,8 +599,7 @@ struct wait_data {
 
     wait_data()
         : flag(false)
-    {
-    }
+    {}
 
     // NOTE: return false if condition waiting for is not true! CK
     bool predicate() { return flag; }
