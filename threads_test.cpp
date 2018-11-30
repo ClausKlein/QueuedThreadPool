@@ -367,6 +367,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolInterface_test)
 #if !defined(USE_AGENTPP) && defined(USE_IMPLIZIT_START)
         BOOST_TEST(emptyThreadPool.is_idle());
         emptyThreadPool.stop();
+        BOOST_TEST(!emptyThreadPool.is_idle());
 #endif
 
         emptyThreadPool.set_stack_size(
@@ -441,6 +442,8 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolIndependency_test)
         n++;
 
         secondThreadPool.terminate();
+
+#ifdef TEST_USAGE_AFTER_TERMINATE
         secondThreadPool.execute(new TestTask("After terminate ...", result));
         // NO! n++; //XXX
         Thread::sleep(10); // ms
@@ -451,10 +454,11 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolIndependency_test)
                 secondThreadPool.execute(new TestTask("Queuing ...", result));
                 // NO! n++; //XXX
             }
-            BOOST_TEST_MESSAGE("secondThreadPool.queue_length: "
-                << secondThreadPool.queue_length());
+            //BOOST_TEST_MESSAGE("secondThreadPool.queue_length: "
+            //    << secondThreadPool.queue_length());
             Thread::sleep(10); // ms
         } while (--i > 0);
+#endif
 
         if (!secondThreadPool.is_idle()) {
             BOOST_TEST_MESSAGE(

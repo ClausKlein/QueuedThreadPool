@@ -46,7 +46,7 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread_only.hpp>
 
-#undef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
+#define AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
 
 #define AGENTPP_DEFAULT_STACKSIZE 0x10000UL
 #define AGENTX_DEFAULT_PRIORITY 32

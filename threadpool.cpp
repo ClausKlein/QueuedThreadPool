@@ -505,12 +505,19 @@ bool TaskManager::set_task(Runnable* t)
 {
     DTRACE("");
 
-    Lock l(*this);
-    if (!task) {
-        task = t;
-        l.notify();
+    // FIXME: may deadlock Lock l(*this);
 
+    if (!task && trylock()) {
+        task = t;
+        // FIXME: l.notify();
+        notify();
         DTRACE("after notify");
+
+        (void)unlock();
+        return true;
+    } else if (!task) {
+        task = t;           // NOTE: without lock! CK
+        cond.notify_one();  // TODO: check this! CK
         return true;
     }
 
@@ -669,9 +676,15 @@ QueuedThreadPool::~QueuedThreadPool()
 // NOTE: asserted to be called with lock! CK
 bool QueuedThreadPool::assign(Runnable* task, bool withQueuing)
 {
-    DTRACE("");
 
     TaskManager* tm = 0;
+    if (!go || taskList.empty()) {
+        DTRACE("ERROR: can't assign to stopped or empty pool!");
+        delete task;
+        return true;    // OK, but task is discarded! CK
+    }
+
+    DTRACE("");
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
          cur != taskList.end(); ++cur) {
         tm = *cur;

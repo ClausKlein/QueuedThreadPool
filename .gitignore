@@ -28,5 +28,11 @@ build/
 html/
 gcov-summary.txt
 coverage.info
+*.html
 *.gcda
 *.gcno
+*.log
+*.exe
+*.o
+*.d
+
