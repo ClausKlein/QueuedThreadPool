@@ -26,6 +26,7 @@ volatile
 
 build/
 html/
+doc/
 gcov-summary.txt
 coverage.info
 *.html

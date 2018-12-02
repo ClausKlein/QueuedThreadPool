@@ -46,7 +46,12 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread_only.hpp>
 
-#define AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
+// Do NOT change! CK
+#undef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
+#define USE_IMPLIZIT_START
+
+// This may be changed CK
+#undef AGENTPP_DEBUG
 
 #define AGENTPP_DEFAULT_STACKSIZE 0x10000UL
 #define AGENTX_DEFAULT_PRIORITY 32
@@ -126,7 +131,11 @@ class AGENTPP_DECL Synchronized : private boost::noncopyable {
 public:
     enum TryLockResult { LOCKED = 1, BUSY = 0, OWNED = -1 };
 
+    /**
+     * default constructor
+     */
     Synchronized();
+    /// default destructor
     ~Synchronized();
 
     /**
@@ -379,7 +388,7 @@ public:
      *    when created through the default constructor or the
      *    Runnable object given at creation time.
      */
-    virtual Runnable* get_runnable();
+    Runnable* get_runnable();
 
     /**
      * Waits for this thread to die.
@@ -697,7 +706,7 @@ public:
      *   not currently execute any task and the associated thread is running;
      *   FALSE otherwise.
      */
-    bool is_idle() { return (!task && thread.is_alive()); }
+    bool is_idle() const { return (!task && thread.is_alive()); }
 
     /**
      * Start thread execution.

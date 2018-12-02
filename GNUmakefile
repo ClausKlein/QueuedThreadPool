@@ -4,7 +4,7 @@ BOOST_ROOT?=/usr/local
 MT?=-mt
 CXX:=ccache /usr/bin/g++
 ifndef TCOV
-CXXFLAGS+=-O2 -DDEBUG
+CXXFLAGS+=-O2 -DNDEBUG
 ## CXXFLAGS+=-g
 endif
 #=====================
@@ -74,7 +74,11 @@ endif
 
 
 .PHONY: all cmake ctest tcov test clean distclean cppcheck format
-all: $(PROGRAMS)
+all: $(PROGRAMS) doc
+
+Doxyfile::;
+doc: Doxyfile
+	doxygen $<
 
 cmake: build
 	cd build && cmake --build .
@@ -175,9 +179,9 @@ distclean: clean
 
 test: $(PROGRAMS)
 	./threads_test --log_level=all --run_test='Queue*'
-	./threads_test --log_level=all --run_test='Thread*'
 	./threads_test --log_level=all --run_test='Sync*'
-	./threads_test --log_level=success --random
+	./threads_test --log_level=all --run_test='Thread*'
+	timeout 10 ./threads_test --log_level=success --random
 	./threads_test --run_test=ThreadPool_test -25
 	./threads_test --run_test=QueuedThreadPoolLoad_test -25
 	#TODO ./threads_test --run_test=QueuedThreadPoolLoad_test -1000
