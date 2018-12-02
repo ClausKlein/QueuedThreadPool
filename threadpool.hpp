@@ -48,10 +48,13 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 
 // Do NOT change! CK
 #undef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
-#define USE_IMPLIZIT_START
+#define AGENTPP_SET_TASK_USE_TRY_LOCK
+#define AGENTPP_USE_IMPLIZIT_START
 
 // This may be changed CK
 #undef AGENTPP_DEBUG
+#undef AGENTPP_USE_YIELD
+#undef CREATE_RACE_CONDITION
 
 #define AGENTPP_DEFAULT_STACKSIZE 0x10000UL
 #define AGENTX_DEFAULT_PRIORITY 32
@@ -140,7 +143,7 @@ public:
 
     /**
      * Causes current thread to wait until another thread
-     * invokes the notify() method or the notifyAll()
+     * invokes the notify() method or the notify_all()
      * method for this object.
      *
      * @note asserted to be called with lock! CK
@@ -149,7 +152,7 @@ public:
 
     /**
      * Causes current thread to wait until either another
-     * thread invokes the notify() method or the notifyAll()
+     * thread invokes the notify() method or the notify_all()
      * method for this object, or a specified amount of time
      * has elapsed.
      *
@@ -274,7 +277,7 @@ public:
 
     /**
      * Causes current thread to wait until either another
-     * thread invokes the notify() method or the notifyAll()
+     * thread invokes the notify() method or the notify_all()
      * method for this object, or a specified amount of time
      * has elapsed.
      *
@@ -399,7 +402,7 @@ public:
      * Causes this thread to begin execution; the system calls the
      * run method of this thread.
      */
-    void start();
+    virtual void start();
 
     /**
      * Before calling the start method this method can be used
@@ -635,12 +638,12 @@ public:
     /**
      * Runs the queue processing loop (SYNCHRONIZED).
      */
-    void run() BOOST_OVERRIDE;
+    virtual void run() BOOST_OVERRIDE;
 
     /**
      * Stop queue processing (SYNCHRONIZED).
      */
-    void stop();
+    virtual void stop() BOOST_OVERRIDE;
 
     /**
      * Notifies the thread pool about an idle thread (SYNCHRONIZED).
@@ -711,12 +714,12 @@ public:
     /**
      * Start thread execution.
      */
-    void start() { thread.start(); }
+    void start() BOOST_OVERRIDE { thread.start(); }
 
     /**
      * Stop thread execution after having finished current task.
      */
-    void stop() { go = false; }
+    virtual void stop() { go = false; }
 
     /**
      * Set the next task for execution. This will block until
@@ -741,7 +744,7 @@ public:
     }
 
 protected:
-    void run() BOOST_OVERRIDE;
+    virtual void run() BOOST_OVERRIDE;
 
     Thread thread;
     ThreadPool* threadPool;

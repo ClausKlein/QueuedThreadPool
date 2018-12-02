@@ -63,7 +63,7 @@ public:
         --counter;
     }
 
-    void run() BOOST_OVERRIDE
+    virtual void run() BOOST_OVERRIDE
     {
         Agentpp::Thread::sleep((rand() % 3) * delay); // ms
 
@@ -204,7 +204,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_busy_test)
         const size_t stacksize = AGENTPP_DEFAULT_STACKSIZE * 2;
         QueuedThreadPool threadPool(2UL, stacksize);
 
-#if !defined(USE_IMPLIZIT_START)
+#if !defined(AGENTPP_USE_IMPLIZIT_START)
         threadPool.start(); // NOTE: different to ThreadPool, but this
                             // should not really needed!
 #endif
@@ -248,7 +248,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
     {
         QueuedThreadPool queuedThreadPool;
 
-#if !defined(USE_IMPLIZIT_START)
+#if !defined(AGENTPP_USE_IMPLIZIT_START)
         queuedThreadPool.start(); // NOTE: different to ThreadPool, but this
                                   // should not really needed!
 #endif
@@ -323,7 +323,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolLoad_test)
     {
         QueuedThreadPool defaultThreadPool(1UL);
 
-#if !defined(USE_IMPLIZIT_START)
+#if !defined(AGENTPP_USE_IMPLIZIT_START)
         defaultThreadPool.start(); // NOTE: different to ThreadPool, but this
                                    // should not really needed!
 #endif
@@ -376,7 +376,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolInterface_test)
             0UL, 0x20000); // NOTE: without any worker thread! CK
         BOOST_TEST(emptyThreadPool.size() == 0UL);
 
-#if !defined(USE_AGENTPP) && defined(USE_IMPLIZIT_START)
+#if !defined(USE_AGENTPP) && defined(AGENTPP_USE_IMPLIZIT_START)
         BOOST_TEST(emptyThreadPool.is_idle());
         emptyThreadPool.stop();
         // XXX NO! BOOST_TEST(!emptyThreadPool.is_idle());
@@ -390,7 +390,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolInterface_test)
         emptyThreadPool.execute(new TestTask("Starting ...", result));
         BOOST_TEST(emptyThreadPool.is_busy());
 
-#if !defined(USE_IMPLIZIT_START)
+#if !defined(AGENTPP_USE_IMPLIZIT_START)
         emptyThreadPool.start();
 #endif
 
@@ -425,7 +425,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolIndependency_test)
     QueuedThreadPool firstThreadPool(1);
     BOOST_TEST(firstThreadPool.size() == 1UL);
 
-#if !defined(USE_IMPLIZIT_START)
+#if !defined(AGENTPP_USE_IMPLIZIT_START)
     firstThreadPool.start();
 #endif
 
@@ -442,7 +442,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolIndependency_test)
         BOOST_TEST_MESSAGE(
             "secondThreadPool.size: " << secondThreadPool.size());
 
-#if !defined(USE_IMPLIZIT_START)
+#if !defined(AGENTPP_USE_IMPLIZIT_START)
         secondThreadPool.start();
 #endif
 
@@ -558,7 +558,7 @@ BOOST_AUTO_TEST_CASE(SyncWait_test)
 class BadTask : public Agentpp::Runnable {
 public:
     BadTask(){};
-    void run()
+    virtual void run() BOOST_OVERRIDE
     {
         std::cout << "Hello world!" << std::endl;
         throw std::runtime_error("Fatal Error, can't continue!");

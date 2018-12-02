@@ -52,7 +52,7 @@ MAKEFLAGS += -r # --no-buldin-rules
 #boost unittests links faster without recompile # .INTERMEDIATE: $(OBJ)
 
 ifdef TCOV
-CXXFLAGS+=--coverage -DNDEBUG
+CXXFLAGS+=--coverage -DDEBUG
 LDFLAGS+=--coverage
 TCOVFLAGS+=--branch-probabilities # --unconditional-branches --all-blocks
 LCOVFLAGS+=--rc lcov_branch_coverage=1
@@ -205,7 +205,7 @@ test: $(PROGRAMS)
 #	  echo $$i; i=$$(($$i+1)); done
 
 cppcheck:
-	cppcheck --enable=all --inconclusive -DBOOST_OVERRIDE=override --std=posix --force -j 2 thread*.cpp
+	cppcheck --enable=all --inconclusive -DBOOST_OVERRIDE=override -DBOOST_THREAD_TEST_TIME_MS=50 --std=posix --force -j 2 thread*.cpp
 
 format:
 	clang-format -i -style=file thread*.cpp thread*.hpp

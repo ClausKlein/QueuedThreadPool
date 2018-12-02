@@ -121,7 +121,7 @@ void Synchronized::wait()
     while (!signal) {
         //=================================
         tid_ = boost::thread::id();
-        cond.wait(l);
+        cond.wait(l);   // forever
         tid_ = boost::this_thread::get_id();
         //=================================
     }
@@ -482,7 +482,7 @@ void TaskManager::run()
         while (!task && go) {
             //=================================
             tid_ = boost::thread::id();
-            cond.wait(l); // NOTE: idle, wait for notify signal CK
+            cond.wait(l); // NOTE: idle, wait forever for notify() CK
             tid_ = boost::this_thread::get_id();
             //=================================
         }
@@ -518,23 +518,33 @@ void TaskManager::run()
 
 bool TaskManager::set_task(Runnable* t)
 {
-    // FIXME Lock l(*this); may deadlock! CK
-    // FIXME if (!task) {
+#ifndef AGENTPP_SET_TASK_USE_TRY_LOCK
+    // TODO: may deadlock when called from QueuedThreadpool::run()! CK
+    Lock l(*this);
+    if (!task) {
+        task = t;
+        l.notify();
+        DTRACE("after notify");
+        return true;
+    }
+#else
+    //=====================<<<
     if (!task && trylock()) {
         if (task) {
             DTRACE("Busy; too late!");
             (void)unlock();
+            //=============>>>
             return false;
         }
 
         task = t;
-        // FIXME: l.notify();
         notify();
         DTRACE("after notify");
-
         (void)unlock();
+        //==================>>>
         return true;
     }
+#endif
 
     return false;
 }
@@ -561,7 +571,7 @@ void ThreadPool::execute(Runnable* t)
         }
         if (!tm) {
             DTRACE("Busy! Synchronized::wait()");
-            wait(); // NOTE: wait for idle_notification CK
+            wait(); // NOTE: wait forever for idle_notification() CK
         }
     }
 }
@@ -652,7 +662,7 @@ QueuedThreadPool::QueuedThreadPool(size_t size)
 {
     DTRACE("");
 
-#ifdef USE_IMPLIZIT_START
+#ifdef AGENTPP_USE_IMPLIZIT_START
     go = true;
 
     Thread::start();
@@ -667,7 +677,7 @@ QueuedThreadPool::QueuedThreadPool(size_t size, size_t stack_size)
 {
     DTRACE("");
 
-#ifdef USE_IMPLIZIT_START
+#ifdef AGENTPP_USE_IMPLIZIT_START
     go = true;
 
     Thread::start();
@@ -700,27 +710,36 @@ bool QueuedThreadPool::assign(Runnable* task, bool withQueuing)
 {
     DTRACE("");
 
-    TaskManager* tm = 0;
     if (!go || taskList.empty()) {
         DTRACE("Error: can't assign to stopped or empty pool!");
         delete task;
         return true; // OK, but task is discarded! CK
     }
 
+    TaskManager* tm = 0;
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
          cur != taskList.end(); ++cur) {
         tm = *cur;
         if (tm->is_idle()) {
             DTRACE("task manager found");
             //##########################
-            // XXX Thread::unlock(), THIS_THREAD_YIELD;
+#ifdef CREATE_RACE_CONDITION
+            Thread::unlock();
+            THIS_THREAD_YIELD;
+#endif
+
             if (tm->set_task(task)) {
-                // XXX Thread::lock();
+
+#ifdef CREATE_RACE_CONDITION
+                Thread::lock();
+#endif
                 //######################
                 DTRACE("task assigned");
                 return true; // OK
             }
-            // XXX Thread::lock();
+#ifdef CREATE_RACE_CONDITION
+            Thread::lock();
+#endif
             //##########################
         }
         tm = 0;
@@ -729,7 +748,7 @@ bool QueuedThreadPool::assign(Runnable* task, bool withQueuing)
 #ifdef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
     // NOTE: no idle thread found, push to queue if allowed! CK
     if (!tm && withQueuing) {
-        DTRACE("queue.add()");
+        DTRACE("queue.push()");
         queue.push(task);
 
         DTRACE("Busy! task queued; Thread::notify()");
@@ -766,7 +785,7 @@ void QueuedThreadPool::run()
     //=================================
     Thread::tid_ = boost::this_thread::get_id();
 
-#ifndef USE_IMPLIZIT_START
+#ifndef AGENTPP_USE_IMPLIZIT_START
     go = true;
 #endif
 
@@ -792,7 +811,8 @@ void QueuedThreadPool::run()
                     queue.pop();        // OK, now we pop this entry
                 } else {
                     DTRACE("Busy!");
-                    Thread::wait(rand() % 113); // ms
+                    // XXX Thread::wait_for(ms(rand() % 113));
+                    Thread::wait(); // forever
                 }
             }
         }
