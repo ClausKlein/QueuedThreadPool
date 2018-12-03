@@ -378,7 +378,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolInterface_test)
 
 #if !defined(USE_AGENTPP) && defined(AGENTPP_USE_IMPLIZIT_START)
         BOOST_TEST(emptyThreadPool.is_idle());
-        emptyThreadPool.stop();
+        // XXX NO! emptyThreadPool.stop();
         // XXX NO! BOOST_TEST(!emptyThreadPool.is_idle());
 #endif
 
@@ -633,7 +633,7 @@ struct wait_data {
     {}
 
     // NOTE: return false if condition waiting for is not true! CK
-    bool predicate() { return flag; }
+    bool predicate() const { return flag; }
 
     void wait()
     {

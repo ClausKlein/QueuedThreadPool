@@ -1,4 +1,4 @@
-/*_############################################################################
+/*_###########################################################################
   _##
   _##  AGENT++ 4.0 - threads.h
   _##
@@ -22,7 +22,9 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 include/agent_pp/threads.h > threadpool.hpp
 clang-format -i -style=file threadpool.{cpp,hpp}
   _##
-  _##########################################################################*/
+  _##  Note: The start/stop of QueuedThreadPool does not have a clear concept:
+  _##   If not started, the QueuedThreadPool::run() terminates immediately! CK
+  _#########################################################################*/
 
 #ifndef agent_pp_threadpool_hpp_
 #define agent_pp_threadpool_hpp_
@@ -641,11 +643,6 @@ public:
     virtual void run() BOOST_OVERRIDE;
 
     /**
-     * Stop queue processing (SYNCHRONIZED).
-     */
-    virtual void stop() BOOST_OVERRIDE;
-
-    /**
      * Notifies the thread pool about an idle thread (SYNCHRONIZED).
      */
     virtual void idle_notification() BOOST_OVERRIDE;
@@ -668,6 +665,14 @@ public:
      *    idle (not executing any task).
      */
     virtual bool is_busy() BOOST_OVERRIDE;
+
+protected:
+    /**
+     * Stop queue processing (SYNCHRONIZED).
+     *
+     * @note: the run() returns and the thread terminates too!
+     */
+    virtual void stop() BOOST_OVERRIDE;
 
 private:
     /**
@@ -714,12 +719,12 @@ public:
     /**
      * Start thread execution.
      */
-    void start() BOOST_OVERRIDE { thread.start(); }
+    virtual void start() BOOST_OVERRIDE { thread.start(); }
 
     /**
      * Stop thread execution after having finished current task.
      */
-    virtual void stop() { go = false; }
+    virtual void stop() BOOST_OVERRIDE { go = false; }
 
     /**
      * Set the next task for execution. This will block until
