@@ -72,20 +72,13 @@ tcov: clean threads_test thread_pool test_atomic_counter
 	genhtml coverage.info $(LCOVFLAGS) --demangle-cpp --output-directory html
 endif
 
-ifdef MSYS
-DOXYGEN:="/c/Program\ Files/doxygen/bin/doxygen"
-### PATH:="${PATH}:'/c/Program Files (x86)/Graphviz2.38/bin'"
-export PATH
-else
-DOXYGEN:=$(sh which doxygen)
-endif
 
 .PHONY: all cmake ctest tcov test clean distclean cppcheck format
 all: $(PROGRAMS) ### doc
 
 Doxyfile::;
 doc: Doxyfile
-	"${DOXYGEN}" $<
+	doxygen $<
 
 cmake: build
 	cd build && cmake --build .

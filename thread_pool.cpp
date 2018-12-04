@@ -4,32 +4,36 @@
 //  accompanying file LICENSE_1_0.txt or copy at
 //  http://www.boost.org/LICENSE_1_0.txt)
 
+#include "simple_stopwatch.hpp"
+
 #include <boost/config.hpp>
 
 #define BOOST_THREAD_VERSION 4
 #define BOOST_THREAD_USES_LOG
 #define BOOST_THREAD_USES_LOG_THREAD_ID
+#define BOOST_THREAD_PROVIDES_EXECUTORS
 
 #if !defined BOOST_NO_CXX11_DECLTYPE
 #define BOOST_RESULT_OF_USE_DECLTYPE
 #endif
 
-// XXX #include <boost/thread.hpp>
 #include <boost/thread/detail/log.hpp>
-// XXX #include <boost/thread/executor.hpp>
 #include <boost/thread/executors/basic_thread_pool.hpp>
 #include <boost/thread/executors/executor_adaptor.hpp>
 #include <boost/thread/future.hpp>
+
+#include <exception>
+#include <iostream>
 
 #ifdef BOOST_MSVC
 #pragma warning(disable : 4127) // conditional expression is constant
 #endif
 
-#include <exception>
-
 
 int runOutOfMemroy()
 {
+    BOOST_THREAD_LOG << " " << BOOST_CURRENT_FUNCTION << BOOST_THREAD_END_LOG;
+
 #if 0
     while (true) {
         new int[100000000ul]; // throwing overload
@@ -42,14 +46,12 @@ int runOutOfMemroy()
 
 void p1()
 {
-    BOOST_THREAD_LOG << boost::this_thread::get_id() << " "
-                     << BOOST_CURRENT_FUNCTION << BOOST_THREAD_END_LOG;
+    BOOST_THREAD_LOG << " " << BOOST_CURRENT_FUNCTION << BOOST_THREAD_END_LOG;
 }
 
 void p2()
 {
-    BOOST_THREAD_LOG << boost::this_thread::get_id() << " "
-                     << BOOST_CURRENT_FUNCTION << BOOST_THREAD_END_LOG;
+    BOOST_THREAD_LOG << " " << BOOST_CURRENT_FUNCTION << BOOST_THREAD_END_LOG;
 }
 
 void submit_some(boost::basic_thread_pool& tp)
@@ -64,33 +66,43 @@ void submit_some(boost::basic_thread_pool& tp)
     tp.submit(&p2);
     tp.submit(&p1);
     tp.submit(&p2);
+    boost::this_thread::sleep_for(ms(10));
 }
 
 int main()
 {
-    BOOST_THREAD_LOG << boost::this_thread::get_id() << " "
-                     << BOOST_CURRENT_FUNCTION << BOOST_THREAD_END_LOG;
+    BOOST_THREAD_LOG << " " << BOOST_CURRENT_FUNCTION << BOOST_THREAD_END_LOG;
     {
-        boost::basic_thread_pool tp;
-        try {
+        {
+            StopwatchReporter sw;
+            boost::basic_thread_pool tp;
             submit_some(tp);
+        }
+        try {
+            StopwatchReporter sw;
+
+#ifdef BOOST_THREAD_PROVIDES_EXECUTORS
             //==========================
-            // TODO: boost::executor_adaptor<boost::basic_thread_pool> ea;
-            // TODO: boost::future<int> t1 = boost::async(ea, &runOutOfMemroy);
+            boost::executor_adaptor<boost::basic_thread_pool> ea;
+            ea.submit(&p1);
+            ea.submit(&p2);
+            boost::future<int> t1 = boost::async(ea, &runOutOfMemroy);
+            boost::this_thread::sleep_for(ms(10));
+            std::cout << "\n t1 = " << t1.get() << std::endl;
+            //==========================
+#else
             runOutOfMemroy();
-            //==========================
+#endif
+
         } catch (std::exception& ex) {
-            BOOST_THREAD_LOG << " ERRORRRRR " << ex.what()
-                             << BOOST_THREAD_END_LOG;
+            std::cerr << "\n ERRORRRRR " << ex.what() << std::endl;
             // return 1;
         } catch (...) {
-            BOOST_THREAD_LOG << " ERRORRRRR exception thrown"
-                             << BOOST_THREAD_END_LOG;
+            std::cerr << "\n ERRORRRRR exception thrown" << std::endl;
             // return 2;
         }
     }
-    BOOST_THREAD_LOG << boost::this_thread::get_id() << " "
-                     << BOOST_CURRENT_FUNCTION << BOOST_THREAD_END_LOG;
+    BOOST_THREAD_LOG << " " << BOOST_CURRENT_FUNCTION << BOOST_THREAD_END_LOG;
 
     return 0;
 }
