@@ -72,13 +72,20 @@ tcov: clean threads_test thread_pool test_atomic_counter
 	genhtml coverage.info $(LCOVFLAGS) --demangle-cpp --output-directory html
 endif
 
+ifdef MSYS
+DOXYGEN:="/c/Program\ Files/doxygen/bin/doxygen"
+### PATH:="${PATH}:'/c/Program Files (x86)/Graphviz2.38/bin'"
+export PATH
+else
+DOXYGEN:=$(sh which doxygen)
+endif
 
 .PHONY: all cmake ctest tcov test clean distclean cppcheck format
-all: $(PROGRAMS) doc
+all: $(PROGRAMS) ### doc
 
 Doxyfile::;
 doc: Doxyfile
-	doxygen $<
+	"${DOXYGEN}" $<
 
 cmake: build
 	cd build && cmake --build .
@@ -182,8 +189,8 @@ test: $(PROGRAMS)
 	./threads_test --log_level=all --run_test='Sync*'
 	./threads_test --log_level=all --run_test='Thread*'
 	timeout 10 ./threads_test --log_level=success --random
-	./threads_test --run_test=ThreadPool_test -25
-	./threads_test --run_test=QueuedThreadPoolLoad_test -25
+	timeout 10 ./threads_test --run_test=ThreadPool_test -25
+	timeout 50 ./threads_test --run_test=QueuedThreadPoolLoad_test -25
 	#TODO ./threads_test --run_test=QueuedThreadPoolLoad_test -1000
 	./default_executor
 	#FIXME ./lockfree_spsc_queue

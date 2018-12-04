@@ -117,7 +117,9 @@ void Synchronized::wait()
 
     // NOTE: this may throw! CK
     scoped_lock l(mutex, boost::adopt_lock);
+    // Attention: we do not know what we are waiting for! CK
     signal = false;
+    // NOTE: now we wait for a call to notify or notify_all! CK
     while (!signal) {
         //=================================
         tid_ = boost::thread::id();
@@ -137,9 +139,12 @@ bool Synchronized::wait(unsigned long timeout)
 
     // NOTE: this may throw! CK
     scoped_lock l(mutex, boost::adopt_lock);
+    // Attention: we do not know what we are waiting for! CK
     signal       = false;
+
     duration d   = ms(timeout);
     time_point t = Clock::now() + d;
+    // NOTE: now we wait for a call to notify or notify_all! CK
     while (!signal) {
         //=================================
         tid_ = boost::thread::id();
@@ -253,14 +258,14 @@ Synchronized::TryLockResult Synchronized::trylock()
 
 /*------------------------ class Thread ----------------------------*/
 
-ThreadList Thread::threadList;
+//XXX ThreadList Thread::threadList;
 
 void* Thread::thread_starter(void* t)
 {
     Thread* thread = static_cast<Thread*>(t);
     {
         thread->lock();
-        Thread::threadList.add(thread);
+        //XXX Thread::threadList.add(thread);
         DTRACE("add to threadList");
         thread->unlock();
     }
@@ -295,7 +300,7 @@ void* Thread::thread_starter(void* t)
 
     {
         thread->lock();
-        Thread::threadList.remove(thread);
+        //XXX Thread::threadList.remove(thread);
         thread->status = Thread::FINISHED;
         DTRACE("removed from threadList");
         thread->unlock();
@@ -481,6 +486,7 @@ void TaskManager::run()
     while (go) {
         while (!task && go) {
             //=================================
+            signal = false;
             tid_ = boost::thread::id();
             cond.wait(l); // NOTE: idle, wait forever for notify() CK
             tid_ = boost::this_thread::get_id();
@@ -571,7 +577,8 @@ void ThreadPool::execute(Runnable* t)
         }
         if (!tm) {
             DTRACE("Busy! Synchronized::wait()");
-            wait(); // NOTE: wait forever for idle_notification() CK
+            wait(rand() % 113); // wait_for(ms)
+            //TODO wait(); // NOTE: forever until idle_notification() CK
         }
     }
 }
@@ -794,6 +801,7 @@ void QueuedThreadPool::run()
         while (go && queue.empty()) {
             DTRACE("empty queue");
             //=================================
+            Thread::signal = false;
             Thread::tid_ = boost::thread::id();
             Thread::cond.wait(l);
             Thread::tid_ = boost::this_thread::get_id();
@@ -811,8 +819,8 @@ void QueuedThreadPool::run()
                     queue.pop();        // OK, now we pop this entry
                 } else {
                     DTRACE("Busy!");
-                    // XXX Thread::wait_for(ms(rand() % 113));
-                    Thread::wait(); // forever
+                    Thread::wait(rand() % 113); // wait_for(ms)
+                    //TODO Thread::wait(); // forever
                 }
             }
         }
@@ -831,9 +839,17 @@ size_t QueuedThreadPool::queue_length()
 
 void QueuedThreadPool::idle_notification()
 {
+#ifndef BOOST_MSVC
     Lock l(*static_cast<Thread*>(this));
     DTRACE("");
     l.notify();
+#else
+    if (Thread::try_lock()) {
+        DTRACE("");
+        Thread::notify();
+        Thread::unlock();
+    }
+#endif
 }
 
 bool QueuedThreadPool::is_idle()

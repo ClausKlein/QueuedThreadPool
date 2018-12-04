@@ -50,11 +50,17 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 
 // Do NOT change! CK
 #undef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
-#define AGENTPP_SET_TASK_USE_TRY_LOCK
+#undef AGENTPP_SET_TASK_USE_TRY_LOCK
 #define AGENTPP_USE_IMPLIZIT_START
 
 // This may be changed CK
-#undef AGENTPP_DEBUG
+#ifdef _DEBUG
+#define DEBUG 1
+#undef NDEBUG
+#define AGENTPP_DEBUG
+#endif
+
+// ONLY for DEMO: be carefully! CK
 #undef AGENTPP_USE_YIELD
 #undef CREATE_RACE_CONDITION
 
@@ -446,9 +452,10 @@ private:
     boost::thread tid;
 #endif
 
-    static ThreadList threadList;
+    //XXX static ThreadList threadList;
 };
 
+#if 0
 /**
  * The ThreadList class implements a singleton class that holds
  * a list of all currently running Threads.
@@ -481,6 +488,7 @@ public:
 protected:
     std::list<Thread*> list;
 };
+#endif
 
 class TaskManager;
 
