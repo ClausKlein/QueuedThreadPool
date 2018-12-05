@@ -8,19 +8,21 @@
 
 #include <boost/config.hpp>
 
-#define BOOST_THREAD_VERSION 4
-#define BOOST_THREAD_USES_LOG
-#define BOOST_THREAD_USES_LOG_THREAD_ID
-#define BOOST_THREAD_PROVIDES_EXECUTORS
-
 #if !defined BOOST_NO_CXX11_DECLTYPE
 #define BOOST_RESULT_OF_USE_DECLTYPE
 #endif
 
+#define BOOST_THREAD_VERSION 4
+#define BOOST_THREAD_PROVIDES_EXECUTORS
+#define BOOST_THREAD_QUEUE_DEPRECATE_OLD
+
+#define BOOST_THREAD_USES_LOG
+#define BOOST_THREAD_USES_LOG_THREAD_ID
+
 #include <boost/thread/detail/log.hpp>
-#include <boost/thread/executors/basic_thread_pool.hpp>
-#include <boost/thread/executors/executor_adaptor.hpp>
+#include <boost/thread/executor.hpp>
 #include <boost/thread/future.hpp>
+#include <boost/thread/thread_pool.hpp>
 
 #include <exception>
 #include <iostream>
@@ -33,10 +35,9 @@
 int runOutOfMemroy()
 {
     BOOST_THREAD_LOG << " " << BOOST_CURRENT_FUNCTION << BOOST_THREAD_END_LOG;
-
 #if 0
     while (true) {
-        new int[100000000ul]; // throwing overload
+        new int[1000000000ul]; // throwing overload
     }
     return 0;
 #else

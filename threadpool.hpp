@@ -250,6 +250,31 @@ protected:
     boost::condition_variable cond;
     volatile bool signal;
     boost::atomic<boost::thread::id> tid_;
+
+    inline void wait_until_condition(scoped_lock& lk, std::function<bool()> condition)
+    {
+        while (!condition()) {
+            //=================================
+            signal = false;
+            tid_ = boost::thread::id();
+            cond.wait(lk); // forever
+            tid_ = boost::this_thread::get_id();
+            //=================================
+        }
+        // TODO: needed? CK signal = true;
+    }
+
+    inline void wait_for_signal_if_needed(scoped_lock& lk)
+    {
+        while (!signal) {
+            //=================================
+            tid_ = boost::thread::id();
+            cond.wait(lk); // forever
+            tid_ = boost::this_thread::get_id();
+            //=================================
+        }
+    }
+
 };
 
 /**
@@ -682,6 +707,8 @@ protected:
      */
     virtual void stop() BOOST_OVERRIDE;
 
+    inline bool has_task() { return (!go || !queue.empty()); }
+
 private:
     /**
      * @note asserted to be called with lock! CK
@@ -757,7 +784,12 @@ public:
     }
 
 protected:
+    /**
+     * Runs the task (SYNCHRONIZED).
+     */
     virtual void run() BOOST_OVERRIDE;
+
+    inline bool has_task() { return (!go || task); }
 
     Thread thread;
     ThreadPool* threadPool;

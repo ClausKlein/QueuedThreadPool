@@ -27,9 +27,9 @@ src/threads.cpp > threadpool.cpp
 
 #define BOOST_THREAD_USES_LOG
 #define BOOST_THREAD_USES_LOG_THREAD_ID
-#include <boost/thread/detail/log.hpp>
 #include <boost/assert.hpp>
 #include <boost/bind.hpp>
+#include <boost/thread/detail/log.hpp>
 
 #ifndef BOOST_MSVC
 #include <unistd.h> // _POSIX_THREADS ...
@@ -60,7 +60,8 @@ src/threads.cpp > threadpool.cpp
  */
 #ifdef AGENTPP_DEBUG
 #define DTRACE(arg) \
-    BOOST_THREAD_LOG << BOOST_CURRENT_FUNCTION << ": " << arg << BOOST_THREAD_END_LOG
+    BOOST_THREAD_LOG << BOOST_CURRENT_FUNCTION << ": " << arg \
+                     << BOOST_THREAD_END_LOG
 #define THIS_THREAD_YIELD boost::this_thread::sleep_for(ms(10));
 #else
 #define DTRACE(arg)
@@ -117,17 +118,10 @@ void Synchronized::wait()
 
     // NOTE: this may throw! CK
     scoped_lock l(mutex, boost::adopt_lock);
-    // Attention: we do not know what we are waiting for! CK
-    signal = false;
-    // NOTE: now we wait for a call to notify or notify_all! CK
-    while (!signal) {
-        //=================================
-        tid_ = boost::thread::id();
-        cond.wait(l);   // forever
-        tid_ = boost::this_thread::get_id();
-        //=================================
-    }
 
+    // NOTE: now we wait for a call to notify or notify_all! CK
+    signal = false;
+    wait_for_signal_if_needed(l);
     l.release(); // ownership
 }
 
@@ -139,12 +133,12 @@ bool Synchronized::wait(unsigned long timeout)
 
     // NOTE: this may throw! CK
     scoped_lock l(mutex, boost::adopt_lock);
-    // Attention: we do not know what we are waiting for! CK
-    signal       = false;
 
     duration d   = ms(timeout);
     time_point t = Clock::now() + d;
+
     // NOTE: now we wait for a call to notify or notify_all! CK
+    signal = false;
     while (!signal) {
         //=================================
         tid_ = boost::thread::id();
@@ -258,14 +252,14 @@ Synchronized::TryLockResult Synchronized::trylock()
 
 /*------------------------ class Thread ----------------------------*/
 
-//XXX ThreadList Thread::threadList;
+// XXX ThreadList Thread::threadList;
 
 void* Thread::thread_starter(void* t)
 {
     Thread* thread = static_cast<Thread*>(t);
     {
         thread->lock();
-        //XXX Thread::threadList.add(thread);
+        // XXX Thread::threadList.add(thread);
         DTRACE("add to threadList");
         thread->unlock();
     }
@@ -300,7 +294,7 @@ void* Thread::thread_starter(void* t)
 
     {
         thread->lock();
-        //XXX Thread::threadList.remove(thread);
+        // XXX Thread::threadList.remove(thread);
         thread->status = Thread::FINISHED;
         DTRACE("removed from threadList");
         thread->unlock();
@@ -439,7 +433,7 @@ void Thread::sleep(long millis, long nanos)
 {
     // NOTE: only for TCOV CK
     nsleep((time_t)(millis / 1000), (millis % 1000) * 1000000 + nanos);
-    //TODO boost::this_thread::sleep_for(ms(millis) + ns(nanos));
+    // TODO boost::this_thread::sleep_for(ms(millis) + ns(nanos));
 }
 
 void Thread::nsleep(time_t secs, long nanos)
@@ -484,14 +478,7 @@ void TaskManager::run()
 
     DTRACE("");
     while (go) {
-        while (!task && go) {
-            //=================================
-            signal = false;
-            tid_ = boost::thread::id();
-            cond.wait(l); // NOTE: idle, wait forever for notify() CK
-            tid_ = boost::this_thread::get_id();
-            //=================================
-        }
+        wait_until_condition(l, boost::bind(&TaskManager::has_task, this));
 
         if (!go)
             break;
@@ -578,7 +565,7 @@ void ThreadPool::execute(Runnable* t)
         if (!tm) {
             DTRACE("Busy! Synchronized::wait()");
             wait(rand() % 113); // wait_for(ms)
-            //TODO wait(); // NOTE: forever until idle_notification() CK
+            // TODO wait(); // NOTE: forever until idle_notification() CK
         }
     }
 }
@@ -786,6 +773,7 @@ void QueuedThreadPool::execute(Runnable* t)
     }
 }
 
+
 void QueuedThreadPool::run()
 {
     scoped_lock l(Thread::mutex);
@@ -798,15 +786,8 @@ void QueuedThreadPool::run()
 
     DTRACE("");
     while (go) {
-        while (go && queue.empty()) {
-            DTRACE("empty queue");
-            //=================================
-            Thread::signal = false;
-            Thread::tid_ = boost::thread::id();
-            Thread::cond.wait(l);
-            Thread::tid_ = boost::this_thread::get_id();
-            //=================================
-        }
+        Thread::wait_until_condition(
+            l, boost::bind(&QueuedThreadPool::has_task, this));
 
         if (!go)
             break;
@@ -820,7 +801,7 @@ void QueuedThreadPool::run()
                 } else {
                     DTRACE("Busy!");
                     Thread::wait(rand() % 113); // wait_for(ms)
-                    //TODO Thread::wait(); // forever
+                    // TODO Thread::wait(); // forever
                 }
             }
         }
