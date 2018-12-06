@@ -38,7 +38,6 @@
 const ms max_diff(BOOST_THREAD_TEST_TIME_MS);
 
 typedef size_t test_counter_t;
-// XXX typedef boost::atomic_size_t test_counter_t;
 typedef boost::lockfree::queue<size_t, boost::lockfree::capacity<20> >
     result_queue_t;
 
@@ -149,7 +148,6 @@ BOOST_AUTO_TEST_CASE(ThreadPool_busy_test)
         threadPool.terminate();
         BOOST_TEST_MESSAGE("outstanding tasks: " << TestTask::task_count());
 #endif
-
     }
     BOOST_TEST(TestTask::task_count() == 0UL, "All task has to be deleted!");
     TestTask::reset_counter();
@@ -235,7 +233,6 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_busy_test)
         threadPool.terminate();
         BOOST_TEST_MESSAGE("outstanding tasks: " << TestTask::task_count());
 #endif
-
     }
     BOOST_TEST(TestTask::task_count() == 0UL, "All task has to be deleted!");
     TestTask::reset_counter();
@@ -462,13 +459,13 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolIndependency_test)
 
 #ifdef TEST_USAGE_AFTER_TERMINATE
         secondThreadPool.execute(new TestTask("After terminate ...", result));
-        // NO! n++; //XXX
+        // NO! n++; // XXX
 
         size_t i = 10;
         do {
             if (i > 5) {
                 secondThreadPool.execute(new TestTask("Queuing ...", result));
-                // NO! n++; //XXX
+                // NO! n++; // XXX
             }
             Thread::sleep(BOOST_THREAD_TEST_TIME_MS); // ms
         } while (--i > 0);
@@ -621,7 +618,11 @@ BOOST_AUTO_TEST_CASE(ThreadSleep_test)
 }
 
 struct wait_data {
+#ifndef TEST_INDEPENDENTLY
+    typedef Agentpp::Synchronized lockable_type;
+#else
     typedef boost::mutex lockable_type;
+#endif
     typedef boost::unique_lock<lockable_type> scoped_lock;
 
     bool flag;
@@ -638,27 +639,39 @@ struct wait_data {
     void wait()
     {
         scoped_lock l(mtx);
+#ifndef TEST_INDEPENDENTLY
+        mtx.wait();
+#else
         while (!predicate()) {
             cond.wait(l);
         }
+#endif
     }
 
     template <typename Duration> bool timed_wait(Duration d)
     {
         scoped_lock l(mtx);
+#ifndef TEST_INDEPENDENTLY
+        return mtx.wait(ms(d).count());
+#else
         while (!predicate()) {
             if (cond.wait_for(l, d) == boost::cv_status::timeout) {
                 return false;
             }
         }
         return true; // OK
+#endif
     }
 
     void signal()
     {
         scoped_lock l(mtx);
+#ifndef TEST_INDEPENDENTLY
+        mtx.notify_all();
+#else
         flag = true;
         cond.notify_all();
+#endif
     }
 };
 

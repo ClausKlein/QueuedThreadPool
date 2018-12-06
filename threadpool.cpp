@@ -512,7 +512,7 @@ void TaskManager::run()
 bool TaskManager::set_task(Runnable* t)
 {
 #ifndef AGENTPP_SET_TASK_USE_TRY_LOCK
-    // TODO: may deadlock when called from QueuedThreadpool::run()! CK
+    // FIXME: may deadlock when called from ThreadPool::execute()! CK
     Lock l(*this);
     if (!task) {
         task = t;
@@ -522,7 +522,7 @@ bool TaskManager::set_task(Runnable* t)
     }
 #else
     //=====================<<<
-    if (!task && trylock()) {
+    if (!task && try_lock()) {
         if (task) {
             DTRACE("Busy; too late!");
             (void)unlock();
@@ -820,6 +820,7 @@ size_t QueuedThreadPool::queue_length()
 
 void QueuedThreadPool::idle_notification()
 {
+    // TODO: check this! CK
 #ifndef BOOST_MSVC
     Lock l(*static_cast<Thread*>(this));
     DTRACE("");

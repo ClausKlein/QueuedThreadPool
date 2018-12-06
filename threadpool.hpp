@@ -38,11 +38,13 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #include <queue>
 #include <vector>
 
+#define BOOST_THREAD_QUEUE_DEPRECATE_OLD
 #define BOOST_THREAD_VERSION 4
 #define BOOST_CHRONO_VERSION 2
 
 #include <boost/atomic.hpp>
 #include <boost/core/noncopyable.hpp>
+#include <boost/function.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/mutex.hpp>
@@ -50,7 +52,7 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 
 // Do NOT change! CK
 #undef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
-#undef AGENTPP_SET_TASK_USE_TRY_LOCK
+#define AGENTPP_SET_TASK_USE_TRY_LOCK
 #define AGENTPP_USE_IMPLIZIT_START
 
 // This may be changed CK
@@ -142,12 +144,8 @@ class AGENTPP_DECL Synchronized : private boost::noncopyable {
 public:
     enum TryLockResult { LOCKED = 1, BUSY = 0, OWNED = -1 };
 
-    /**
-     * default constructor
-     */
     Synchronized();
-    /// default destructor
-    ~Synchronized();
+    virtual ~Synchronized();
 
     /**
      * Causes current thread to wait until another thread
@@ -222,7 +220,9 @@ public:
      *     OWNED if the lock is already owned by the calling thread.
      */
     TryLockResult trylock();
-    bool try_lock() { return trylock(); };
+
+    /// to be a std::lockable too
+    inline bool try_lock() { return trylock(); };
 
     /**
      * Leave a critical section. If this thread called lock or trylock
@@ -251,11 +251,11 @@ protected:
     volatile bool signal;
     boost::atomic<boost::thread::id> tid_;
 
-    inline void wait_until_condition(scoped_lock& lk, std::function<bool()> condition)
+    inline void wait_until_condition(scoped_lock& lk, boost::function<bool()> condition)
     {
         while (!condition()) {
             //=================================
-            signal = false;
+            // XXX signal = false;
             tid_ = boost::thread::id();
             cond.wait(lk); // forever
             tid_ = boost::this_thread::get_id();
@@ -317,7 +317,7 @@ public:
      * @param timeout
      *    timeout in milliseconds.
      */
-    void wait(long timeout)
+    inline void wait(long timeout)
     {
         if (timeout < 0) {
             sync.wait();
@@ -444,7 +444,7 @@ public:
      * @param stackSize
      *    the thread's stack size in bytes.
      */
-    void set_stack_size(size_t s) { stackSize = s; }
+    inline void set_stack_size(size_t s) { stackSize = s; }
 
     /**
      * Check whether thread is alive.
@@ -452,7 +452,7 @@ public:
      * @return
      *    Returns TRUE if the thread is running; otherwise FALSE.
      */
-    bool is_alive() const { return (status == RUNNING); }
+    inline bool is_alive() const { return (status == RUNNING); }
 
     /**
      * Clone this thread. This method must not be called on
@@ -587,7 +587,7 @@ public:
      * @return
      *    the number of threads in the pool.
      */
-    size_t size() const { return taskList.size(); }
+    inline size_t size() const { return taskList.size(); }
 
     /**
      * Get the stack size.
@@ -595,7 +595,7 @@ public:
      * @return
      *   the stack size of each thread in this thread pool.
      */
-    size_t get_stack_size() const { return stackSize; }
+    inline size_t get_stack_size() const { return stackSize; }
 
     /**
      * Notifies the thread pool about an idle thread (SYNCHRONIZED).
