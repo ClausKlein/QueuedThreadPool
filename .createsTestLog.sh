@@ -7,20 +7,29 @@ make threads_test
 ./threads_test --list_content
 # 0: ./threads_test
 # 1: --list_content
-# ThreadPool_test*
-# QueuedThreadPool_test*
-# QueuedThreadPoolLoad_test*
-# QueuedThreadPoolInterface_test*
 # QueuedThreadPoolIndependency_test*
-# Synchronized_test*
-# SyncTrylock_test*
+# QueuedThreadPoolInterface_test*
+# QueuedThreadPoolLoad_test*
+# QueuedThreadPool_busy_test*
+# QueuedThreadPool_test*
 # SyncDeadlock_test*
+# SyncDelete_while_used_test*
+# SyncTry_lock_for_test*
+# SyncTrylock_test*
 # SyncWait_test*
+# Synchronized_test*
+# ThreadLivetime_test*
+# ThreadPool_busy_test*
+# ThreadPool_test*
 # ThreadSleep_test*
+# ThreadTaskThrow_test*
+# test_lock_ten_other_thread_locks_in_different_order*
+# test_lock_two_other_thread_locks_in_opposite_order*
+# test_lock_two_other_thread_locks_in_order*
 
 ./threads_test --log_level=message --run_test='Sync*' > Synchronized_test.log 2>&1
 
-./threads_test --log_level=message --run_test='QueuedThreadPool*' > QueuedThreadPool_test.log 2>&1
+./threads_test --log_level=message --run_test=QueuedThreadPool_test > QueuedThreadPool_test.log 2>&1
 
 ./threads_test --log_level=message --run_test=ThreadPool_test > ThreadPool_test.log 2>&1
 

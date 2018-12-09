@@ -52,7 +52,7 @@ MAKEFLAGS += -r # --no-buldin-rules
 #boost unittests links faster without recompile # .INTERMEDIATE: $(OBJ)
 
 ifdef TCOV
-CXXFLAGS+=--coverage -DNDEBUG
+CXXFLAGS+=--coverage -DDEBUG
 LDFLAGS+=--coverage
 TCOVFLAGS+=--branch-probabilities # --unconditional-branches --all-blocks
 LCOVFLAGS+=--rc lcov_branch_coverage=1
@@ -65,7 +65,7 @@ endif
 tcov: clean threads_test thread_pool test_atomic_counter
 	./test_atomic_counter
 	./thread_pool
-	-./threads_test -10
+	-./threads_test --log_level=all -2
 	gcov --long-file-names $(TCOVFLAGS) thread.cpp > /dev/null 2>&1
 	lcov --capture --quiet $(LCOVFLAGS) --no-external --directory . --output-file coverage.info
 	lcov --list coverage.info $(LCOVFLAGS) | tee gcov-summary.txt
@@ -74,7 +74,11 @@ endif
 
 
 .PHONY: all cmake ctest tcov test clean distclean cppcheck format
-all: $(PROGRAMS)
+all: $(PROGRAMS) ### doc
+
+Doxyfile::;
+doc: Doxyfile
+	doxygen $<
 
 cmake: build
 	cd build && cmake --build .
@@ -174,10 +178,13 @@ distclean: clean
 	$(RM) -r build *.d *.bak *.orig *~ *.stackdump *.dSYM
 
 test: $(PROGRAMS)
-	./threads_test --log_level=all --run_test='S*'
-	./threads_test --log_level=success --random
-	./threads_test --run_test=ThreadPool_test -25
-	./threads_test --run_test=QueuedThreadPoolLoad_test -25
+	./threads_test --log_level=all --run_test='Queue*'
+	./threads_test --log_level=all --run_test='Sync*'
+	./threads_test --log_level=all --run_test='Thread*'
+	timeout 10 ./threads_test --log_level=success --random
+	timeout 10 ./threads_test --run_test=ThreadPool_test -25
+	timeout 50 ./threads_test --run_test=QueuedThreadPoolLoad_test -25
+	timeout 30 ./threads_test --run_test=test_lock_ten_other_thread_locks_in_different_order -25
 	#TODO ./threads_test --run_test=QueuedThreadPoolLoad_test -1000
 	./default_executor
 	#FIXME ./lockfree_spsc_queue
@@ -199,7 +206,7 @@ test: $(PROGRAMS)
 #	  echo $$i; i=$$(($$i+1)); done
 
 cppcheck:
-	cppcheck --enable=all --inconclusive -DBOOST_OVERRIDE=override --std=posix --force -j 2 thread*.cpp
+	cppcheck --enable=all --inconclusive -DBOOST_OVERRIDE=override -DBOOST_THREAD_TEST_TIME_MS=50 --std=posix --force -j 2 thread*.cpp
 
 format:
 	clang-format -i -style=file thread*.cpp thread*.hpp

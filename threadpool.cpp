@@ -25,8 +25,11 @@ src/threads.cpp > threadpool.cpp
 
 #include "threadpool.hpp"
 
+#define BOOST_THREAD_USES_LOG
+#define BOOST_THREAD_USES_LOG_THREAD_ID
 #include <boost/assert.hpp>
 #include <boost/bind.hpp>
+#include <boost/thread/detail/log.hpp>
 
 #ifndef BOOST_MSVC
 #include <unistd.h> // _POSIX_THREADS ...
@@ -55,13 +58,14 @@ src/threads.cpp > threadpool.cpp
  * compiled -DDEBUG, it results in writing with the specified argument to
  * std::cout. When DEBUG is not defined, it expands to nothing.
  */
-#ifdef DEBUG
+#ifdef AGENTPP_DEBUG
 #define DTRACE(arg) \
-    std::cout << BOOST_CURRENT_FUNCTION << ": " << arg << std::endl
+    BOOST_THREAD_LOG << BOOST_CURRENT_FUNCTION << ": " << arg \
+                     << BOOST_THREAD_END_LOG
 #define THIS_THREAD_YIELD boost::this_thread::sleep_for(ms(10));
 #else
 #define DTRACE(arg)
-#ifdef NO_YIELD
+#ifndef AGENTPP_USE_YIELD
 #define THIS_THREAD_YIELD \
     while (false) \
         ;
@@ -69,7 +73,6 @@ src/threads.cpp > threadpool.cpp
 #define THIS_THREAD_YIELD boost::this_thread::yield();
 #endif
 #endif
-
 
 namespace Agentpp
 {
@@ -113,16 +116,12 @@ void Synchronized::wait()
     DTRACE(signal);
     BOOST_ASSERT(is_locked_by_this_thread());
 
+    // NOTE: this may throw! CK
     scoped_lock l(mutex, boost::adopt_lock);
-    signal = false;
-    while (!signal) {
-        //=================================
-        tid_ = boost::thread::id();
-        cond.wait(l);
-        tid_ = boost::this_thread::get_id();
-        //=================================
-    }
 
+    // NOTE: now we wait for a call to notify or notify_all! CK
+    signal = false;
+    wait_for_signal_if_needed(l, signal);
     l.release(); // ownership
 }
 
@@ -132,10 +131,14 @@ bool Synchronized::wait(unsigned long timeout)
     DTRACE(signal);
     BOOST_ASSERT(is_locked_by_this_thread());
 
+    // NOTE: this may throw! CK
     scoped_lock l(mutex, boost::adopt_lock);
-    signal       = false;
+
     duration d   = ms(timeout);
     time_point t = Clock::now() + d;
+
+    // NOTE: now we wait for a call to notify or notify_all! CK
+    signal = false;
     while (!signal) {
         //=================================
         tid_ = boost::thread::id();
@@ -157,6 +160,7 @@ void Synchronized::notify()
     DTRACE(signal);
     BOOST_ASSERT(is_locked_by_this_thread());
 
+    // NOTE: this may throw! CK
     scoped_lock l(mutex, boost::adopt_lock);
     signal = true;
     cond.notify_one();
@@ -168,6 +172,7 @@ void Synchronized::notify_all()
     DTRACE(signal);
     BOOST_ASSERT(is_locked_by_this_thread());
 
+    // NOTE: this may throw! CK
     scoped_lock l(mutex, boost::adopt_lock);
     signal = true;
     cond.notify_all();
@@ -199,7 +204,6 @@ bool Synchronized::lock()
 bool Synchronized::lock(unsigned long timeout)
 {
     DTRACE(timeout);
-    BOOST_ASSERT(!is_locked_by_this_thread());
 
     duration d = ms(timeout);
     while (!mutex.try_lock()) {
@@ -210,6 +214,7 @@ bool Synchronized::lock(unsigned long timeout)
         }
     }
 
+    BOOST_ASSERT(!is_locked_by_this_thread());
     tid_ = boost::this_thread::get_id();
     return true; // OK
 }
@@ -229,16 +234,16 @@ bool Synchronized::unlock()
 
 Synchronized::TryLockResult Synchronized::trylock()
 {
-    DTRACE("");
-
     if (is_locked_by_this_thread()) {
+        DTRACE("OWNED");
         return OWNED; // true
     }
 
     scoped_lock l(mutex, boost::try_to_lock);
     if (l.owns_lock()) {
         tid_ = boost::this_thread::get_id();
-        l.release();   // ownership
+        l.release(); // ownership
+        DTRACE("LOCKED");
         return LOCKED; // true
     }
 
@@ -247,35 +252,53 @@ Synchronized::TryLockResult Synchronized::trylock()
 
 /*------------------------ class Thread ----------------------------*/
 
-ThreadList Thread::threadList;
+// XXX ThreadList Thread::threadList;
 
-void* thread_starter(void* t)
+void* Thread::thread_starter(void* t)
 {
     Thread* thread = static_cast<Thread*>(t);
-    Thread::threadList.add(thread);
+    {
+        thread->lock();
+        // XXX Thread::threadList.add(thread);
+        DTRACE("add to threadList");
+        thread->unlock();
+    }
 
-    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-    LOG("Thread: started (tid)");
 #ifdef POSIX_THREADS
+    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 4);
+    LOG("Thread: started (tid)");
     LOG((AGENTPP_OPAQUE_PTHREAD_T)(thread->tid));
-#endif
     LOG_END;
+#endif
 
 #if defined(__APPLE__) && defined(_DARWIN_C_SOURCE)
     pthread_setname_np(AGENTX_DEFAULT_THREAD_NAME);
 #endif
 
-    thread->get_runnable()->run();
+    try {
+        //=====================================
+        thread->get_runnable()->run();
+        //=====================================
+    } catch (std::exception& e) {
+        DTRACE(e.what());
+    } catch (...) {
+        // TODO: log ... but ignored! CK
+    }
 
-    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-    LOG("Thread: ended (tid)");
 #ifdef POSIX_THREADS
+    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 4);
+    LOG("Thread: ended (tid)");
     LOG((AGENTPP_OPAQUE_PTHREAD_T)(thread->tid));
-#endif
     LOG_END;
+#endif
 
-    Thread::threadList.remove(thread);
-    thread->status = Thread::FINISHED;
+    {
+        thread->lock();
+        // XXX Thread::threadList.remove(thread);
+        thread->status = Thread::FINISHED;
+        DTRACE("removed from threadList");
+        thread->unlock();
+    }
 
     return t;
 }
@@ -302,9 +325,7 @@ Thread::Thread(Runnable* r)
 
 void Thread::run()
 {
-    LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
-    LOG("Thread: empty run method!");
-    LOG_END;
+    throw std::runtime_error("Error: empty run method called!");
 }
 
 Thread::~Thread()
@@ -344,6 +365,7 @@ void Thread::join()
     if (status != IDLE) {
         tid.join();
         status = IDLE;
+        DTRACE("thread joined");
     }
 #endif
 }
@@ -369,7 +391,7 @@ void Thread::start()
         pthread_attr_setthreadname(&attr, AGENTX_DEFAULT_THREAD_NAME);
 #elif defined(__APPLE__)
 // NOTE: must be set from within the thread (can't specify thread ID)
-// XXX pthread_setname_np(AGENTX_DEFAULT_THREAD_NAME);
+// NO! pthread_setname_np(AGENTX_DEFAULT_THREAD_NAME);
 #endif
 
         pthread_attr_setstacksize(&attr, stackSize);
@@ -393,8 +415,10 @@ void Thread::start()
     }
 #else
     if (status == IDLE) {
-        tid = boost::thread(boost::bind(thread_starter, (void *)this));
+        // NOTE: this may throw! CK
+        tid    = boost::thread(boost::bind(thread_starter, this));
         status = RUNNING;
+        DTRACE("thread created");
     }
 #endif
 }
@@ -407,8 +431,9 @@ void Thread::sleep(long millis)
 
 void Thread::sleep(long millis, long nanos)
 {
+    // NOTE: only for TCOV CK
     nsleep((time_t)(millis / 1000), (millis % 1000) * 1000000 + nanos);
-    // XXX boost::this_thread::sleep_for(ms(millis) + ns(nanos));
+    // TODO boost::this_thread::sleep_for(ms(millis) + ns(nanos));
 }
 
 void Thread::nsleep(time_t secs, long nanos)
@@ -423,126 +448,132 @@ void Thread::nsleep(time_t secs, long nanos)
 TaskManager::TaskManager(ThreadPool* tp, size_t stack_size)
     : thread(this)
 {
+    DTRACE("");
     threadPool = tp;
     task       = 0;
     go         = true;
     thread.set_stack_size(stack_size);
     thread.start();
-    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-    LOG("TaskManager: thread started");
-    LOG_END;
+    DTRACE("thread started");
 }
 
 TaskManager::~TaskManager()
 {
     {
         Lock l(*this);
+        DTRACE("");
         go = false;
         l.notify();
     }
 
     thread.join();
-    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-    LOG("TaskManager: thread joined");
-    LOG_END;
+    DTRACE("thread joined");
 }
 
 void TaskManager::run()
 {
-    //=====================================
-    // FIXME: used Lock l(*this);
-    // NOTE: this is not exception save! CK
-    //=====================================
-    lock();
+    scoped_lock l(mutex);
+    //=================================
+    tid_ = boost::this_thread::get_id();
+
+    DTRACE("");
     while (go) {
+        wait_until_condition(l, boost::bind(&TaskManager::has_task, this));
+
+        if (!go)
+            break;
+
         if (task) {
-            task->run(); // NOTE: executes the task
+            try {
+                //=====================================
+                task->run();
+                //=====================================
+            } catch (std::exception& e) {
+                DTRACE(e.what());
+            } catch (...) {
+                // TODO: log ... but ignored! CK
+            }
             delete task;
             task = 0;
-
-            unlock();          // NOTE: prevent deadlock! CK
-            THIS_THREAD_YIELD; // FIXME: Only for test! CK
-            //==============================
-            // NOTE: may end in a direct call to set_task()
-            // via QueuedThreadPool::run() => QueuedThreadPool::assign()
             threadPool->idle_notification();
-            //==============================
-            lock(); // NOTE: needed! CK
-        } else {
-            wait(); // NOTE: idle, wait until notify signal CK
         }
     }
+
     if (task) {
         delete task;
         task = 0;
         DTRACE("task deleted after stop()");
     }
-    unlock();
+
+    tid_ = boost::thread::id();
+    //=================================
 }
 
-// TODO: should be assert to be called with lock! CK
 bool TaskManager::set_task(Runnable* t)
 {
+#ifndef AGENTPP_SET_TASK_USE_TRY_LOCK
+    // FIXME: may deadlock when called from ThreadPool::execute()! CK
     Lock l(*this);
     if (!task) {
         task = t;
         l.notify();
-        LOG_BEGIN(loggerModuleName, DEBUG_LOG | 2);
-        LOG("TaskManager: after notify");
-        LOG_END;
+        DTRACE("after notify");
         return true;
-    } else {
-        LOG_BEGIN(loggerModuleName, DEBUG_LOG | 2);
-        LOG("TaskManager: got already a task");
-        LOG_END;
-        return false;
     }
+#else
+    //=====================<<<
+    if (!task && try_lock()) {
+        if (task) {
+            DTRACE("Busy; too late!");
+            (void)unlock();
+            //=============>>>
+            return false;
+        }
+
+        task = t;
+        notify();
+        DTRACE("after notify");
+        (void)unlock();
+        //==================>>>
+        return true;
+    }
+#endif
+
+    return false;
 }
 
 /*--------------------- class ThreadPool --------------------------*/
 
 void ThreadPool::execute(Runnable* t)
 {
-    //=====================================
-    // FIXME: used Lock l(*this);
-    // NOTE: this is not exception save! CK
-    //=====================================
-    lock();
+    Lock l(*this);
+    DTRACE("");
+
     TaskManager* tm = 0;
-    while (!tm) {
+    for (;;) {
         for (std::vector<TaskManager*>::iterator cur = taskList.begin();
              cur != taskList.end(); ++cur) {
             tm = *cur;
             if (tm->is_idle()) {
-                LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-                LOG("TaskManager: task manager found");
-                LOG_END;
-
-                unlock();
-                THIS_THREAD_YIELD; // FIXME: Only for test! CK
-                //==============================
+                DTRACE("task manager found");
                 if (tm->set_task(t)) {
                     return; // done
-                } else {
-                    tm = 0; // task could not be assigned
                 }
-                //==============================
-                lock();
             }
             tm = 0;
         }
         if (!tm) {
-            DTRACE("busy! Synchronized::wait()");
-            wait(); // NOTE: (ms) for idle_notification ... CK
+            DTRACE("Busy! Synchronized::wait()");
+            wait(rand() % 113); // wait_for(ms)
+            // TODO wait(); // NOTE: forever until idle_notification() CK
         }
     }
-    unlock();
 }
 
-// TODO: should be assert to be called with lock! CK
 void ThreadPool::idle_notification()
 {
     Lock l(*this);
+    DTRACE("");
     l.notify();
 }
 
@@ -577,6 +608,7 @@ bool ThreadPool::is_busy()
 void ThreadPool::terminate()
 {
     Lock l(*this);
+    DTRACE("");
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
          cur != taskList.end(); ++cur) {
         (*cur)->stop();
@@ -587,6 +619,8 @@ void ThreadPool::terminate()
 ThreadPool::ThreadPool(size_t size)
     : stackSize(AGENTPP_DEFAULT_STACKSIZE)
 {
+    DTRACE("");
+
     for (size_t i = 0; i < size; i++) {
         taskList.push_back(new TaskManager(this));
     }
@@ -595,6 +629,8 @@ ThreadPool::ThreadPool(size_t size)
 ThreadPool::ThreadPool(size_t size, size_t stack_size)
     : stackSize(stack_size)
 {
+    DTRACE("");
+
     for (size_t i = 0; i < size; i++) {
         taskList.push_back(new TaskManager(this, stackSize));
     }
@@ -602,6 +638,8 @@ ThreadPool::ThreadPool(size_t size, size_t stack_size)
 
 ThreadPool::~ThreadPool()
 {
+    DTRACE("");
+
     terminate();
 
     for (size_t i = 0; i < taskList.size(); i++) {
@@ -613,31 +651,40 @@ ThreadPool::~ThreadPool()
 
 QueuedThreadPool::QueuedThreadPool(size_t size)
     : ThreadPool(size)
+    , Thread(this)
     , go(false)
 {
-#ifdef USE_IMPLIZIT_START
+    DTRACE("");
+
+#ifdef AGENTPP_USE_IMPLIZIT_START
     go = true;
 
-    start();
+    Thread::start();
+    DTRACE("thread started");
 #endif
 }
 
 QueuedThreadPool::QueuedThreadPool(size_t size, size_t stack_size)
     : ThreadPool(size, stack_size)
+    , Thread(this)
     , go(false)
 {
-#ifdef USE_IMPLIZIT_START
+    DTRACE("");
+
+#ifdef AGENTPP_USE_IMPLIZIT_START
     go = true;
 
-    start();
+    Thread::start();
+    DTRACE("thread started");
 #endif
 }
 
 QueuedThreadPool::~QueuedThreadPool()
 {
-    stop();
+    DTRACE("");
+    this->stop();
 
-    join();
+    Thread::join();
     DTRACE("thread joined");
 
     while (!queue.empty()) {
@@ -655,27 +702,39 @@ QueuedThreadPool::~QueuedThreadPool()
 // NOTE: asserted to be called with lock! CK
 bool QueuedThreadPool::assign(Runnable* task, bool withQueuing)
 {
+    DTRACE("");
+
+    if (!go || taskList.empty()) {
+        DTRACE("Error: can't assign to stopped or empty pool!");
+        delete task;
+        return true; // OK, but task is discarded! CK
+    }
+
     TaskManager* tm = 0;
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
          cur != taskList.end(); ++cur) {
         tm = *cur;
         if (tm->is_idle()) {
-            LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-            LOG("QueuedThreadPool::assign(IDLE):: task manager found");
-            LOG_END;
-
+            DTRACE("task manager found");
+            //##########################
+#ifdef CREATE_RACE_CONDITION
             Thread::unlock();
-            THIS_THREAD_YIELD; // FIXME: Only for test! CK
-            //==============================
-            if (!tm->set_task(task)) {
-                tm = 0;
+            THIS_THREAD_YIELD;
+#endif
+
+            if (tm->set_task(task)) {
+
+#ifdef CREATE_RACE_CONDITION
                 Thread::lock();
-            } else {
-                Thread::lock();
-                DTRACE("task manager found");
+#endif
+                //######################
+                DTRACE("task assigned");
                 return true; // OK
             }
-            //==============================
+#ifdef CREATE_RACE_CONDITION
+            Thread::lock();
+#endif
+            //##########################
         }
         tm = 0;
     }
@@ -683,12 +742,10 @@ bool QueuedThreadPool::assign(Runnable* task, bool withQueuing)
 #ifdef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
     // NOTE: no idle thread found, push to queue if allowed! CK
     if (!tm && withQueuing) {
-        LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-        LOG("QueuedThreadPool::assign(BUSY): queue.add()");
-        LOG_END;
+        DTRACE("queue.push()");
         queue.push(task);
 
-        DTRACE("busy! task queued; Thread::notify()");
+        DTRACE("Busy! task queued; Thread::notify()");
         Thread::notify();
 
         return true;
@@ -700,101 +757,103 @@ bool QueuedThreadPool::assign(Runnable* task, bool withQueuing)
 
 void QueuedThreadPool::execute(Runnable* t)
 {
-    Thread::lock();
+    Lock l(*static_cast<Thread*>(this));
+    DTRACE("");
 
 #ifdef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
     if (queue.empty()) {
-        assign(t);
+        assign(t, false); // NOTE: push to queue if busy! CK
     } else
 #endif
 
     {
-        LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-        LOG("QueuedThreadPool::execute() queue.push");
-        LOG_END;
+        DTRACE("queue.push");
         queue.push(t);
-        Thread::notify();
+        l.notify();
     }
-
-    Thread::unlock();
 }
+
 
 void QueuedThreadPool::run()
 {
-    Thread::lock();
+    scoped_lock l(Thread::mutex);
+    //=================================
+    Thread::tid_ = boost::this_thread::get_id();
 
+#ifndef AGENTPP_USE_IMPLIZIT_START
     go = true;
+#endif
+
+    DTRACE("");
     while (go) {
+        Thread::wait_until_condition(
+            l, boost::bind(&QueuedThreadPool::has_task, this));
+
+        if (!go)
+            break;
+
         if (!queue.empty()) {
-            LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-            LOG("queue.front");
-            LOG_END;
+            DTRACE("queue.front");
             Runnable* t = queue.front();
             if (t) {
                 if (assign(t, false)) { // NOTE: without queuing! CK
                     queue.pop();        // OK, now we pop this entry
                 } else {
-                    DTRACE("busy! Thread::sleep()");
-                    // NOTE: sleep some ms to prevent notify() loops while
-                    // busy!
-                    Thread::sleep(rand() % 113); // ms
+                    DTRACE("Busy!");
+                    Thread::wait(rand() % 113); // wait_for(ms)
+                    // TODO Thread::wait(); // forever
                 }
             }
         }
-        // NOTE: for idle_notification ... CK
-        Thread::wait();
     }
 
-    Thread::unlock();
+    Thread::tid_ = boost::thread::id();
+    //=================================
 }
 
 size_t QueuedThreadPool::queue_length()
 {
-    Thread::lock();
+    Lock l(*static_cast<Thread*>(this));
     size_t length = queue.size();
-    Thread::unlock();
-
     return length;
 }
 
 void QueuedThreadPool::idle_notification()
 {
-    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-    LOG("QueuedThreadPool::idle_notification");
-    LOG_END;
-
-    Thread::lock();
-    Thread::notify();
-    Thread::unlock();
-
-    // TODO: why? CK
-    ThreadPool::idle_notification();
+    // TODO: check this! CK
+#ifndef BOOST_MSVC
+    Lock l(*static_cast<Thread*>(this));
+    DTRACE("");
+    l.notify();
+#else
+    if (Thread::try_lock()) {
+        DTRACE("");
+        Thread::notify();
+        Thread::unlock();
+    }
+#endif
 }
 
 bool QueuedThreadPool::is_idle()
 {
-    Thread::lock();
+    Lock l(*static_cast<Thread*>(this));
     bool result = is_alive() && queue.empty() && ThreadPool::is_idle();
-    Thread::unlock();
-
     return result;
 }
 
 bool QueuedThreadPool::is_busy()
 {
-    Thread::lock();
+    Lock l(*static_cast<Thread*>(this));
     bool result = !queue.empty() || ThreadPool::is_busy();
-    Thread::unlock();
-
     return result;
 }
 
 void QueuedThreadPool::stop()
 {
-    Thread::lock();
+    Lock l(*static_cast<Thread*>(this));
+    DTRACE("");
     go = false;
-    Thread::notify();
-    Thread::unlock();
+    l.notify();
 }
 
 } // namespace Agentpp
