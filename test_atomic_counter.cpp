@@ -40,7 +40,7 @@ int main()
     Stopwatch sw;
     boost::thread t0(writer);
     boost::thread t1(reader);
-    boost::thread t2(reader);
+    boost::thread t2(writer);
 
     t0.join();
     t1.join();

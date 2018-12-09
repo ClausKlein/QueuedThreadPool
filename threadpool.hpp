@@ -1,4 +1,4 @@
-/*_############################################################################
+/*_###########################################################################
   _##
   _##  AGENT++ 4.0 - threads.h
   _##
@@ -22,7 +22,9 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 include/agent_pp/threads.h > threadpool.hpp
 clang-format -i -style=file threadpool.{cpp,hpp}
   _##
-  _##########################################################################*/
+  _##  Note: The start/stop of QueuedThreadPool does not have a clear concept:
+  _##   If not started, the QueuedThreadPool::run() terminates immediately! CK
+  _#########################################################################*/
 
 #ifndef agent_pp_threadpool_hpp_
 #define agent_pp_threadpool_hpp_
@@ -36,18 +38,33 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #include <queue>
 #include <vector>
 
+#define BOOST_THREAD_QUEUE_DEPRECATE_OLD
 #define BOOST_THREAD_VERSION 4
 #define BOOST_CHRONO_VERSION 2
 
 #include <boost/atomic.hpp>
 #include <boost/core/noncopyable.hpp>
+#include <boost/function.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread_only.hpp>
 
-
+// Do NOT change! CK
 #undef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
+#define AGENTPP_SET_TASK_USE_TRY_LOCK
+#define AGENTPP_USE_IMPLIZIT_START
+
+// This may be changed CK
+#ifdef _DEBUG
+#define DEBUG 1
+#undef NDEBUG
+#define AGENTPP_DEBUG
+#endif
+
+// ONLY for DEMO: be carefully! CK
+#undef AGENTPP_USE_YIELD
+#undef CREATE_RACE_CONDITION
 
 #define AGENTPP_DEFAULT_STACKSIZE 0x10000UL
 #define AGENTX_DEFAULT_PRIORITY 32
@@ -64,7 +81,6 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #ifndef BOOST_OVERRIDE
 #define BOOST_OVERRIDE
 #endif
-
 
 namespace Agentpp
 {
@@ -114,7 +130,6 @@ public:
     void operator()() { run(); };
 };
 
-
 /**
  * The Synchronized class implements services for synchronizing
  * access between different threads.
@@ -130,11 +145,11 @@ public:
     enum TryLockResult { LOCKED = 1, BUSY = 0, OWNED = -1 };
 
     Synchronized();
-    ~Synchronized();
+    virtual ~Synchronized();
 
     /**
      * Causes current thread to wait until another thread
-     * invokes the notify() method or the notifyAll()
+     * invokes the notify() method or the notify_all()
      * method for this object.
      *
      * @note asserted to be called with lock! CK
@@ -143,7 +158,7 @@ public:
 
     /**
      * Causes current thread to wait until either another
-     * thread invokes the notify() method or the notifyAll()
+     * thread invokes the notify() method or the notify_all()
      * method for this object, or a specified amount of time
      * has elapsed.
      *
@@ -205,37 +220,60 @@ public:
      *     OWNED if the lock is already owned by the calling thread.
      */
     TryLockResult trylock();
-    bool try_lock() { return trylock(); };
+
+    /// to be a std::lockable too
+    inline bool try_lock() { return trylock(); };
 
     /**
      * Leave a critical section. If this thread called lock or trylock
      * more than once successfully, this call will nevertheless release
      * the lock (non-recursive locking).
+     *
      * @return
      *    TRUE if the unlock succeeded, FALSE if there was no lock
      *    to unlock.
      */
     bool unlock();
 
-
-private:
-    bool is_locked_by_this_thread() const
-    {
-        return boost::this_thread::get_id() == tid_;
-    }
-    bool is_locked() const { return !(boost::thread::id() == tid_); }
-
-
+protected:
     // NOTE: the type of the wrapped lockable
     typedef boost::mutex lockable_type;
     lockable_type mutex;
     typedef boost::unique_lock<lockable_type> scoped_lock;
-
     boost::condition_variable cond;
     volatile bool signal;
     boost::atomic<boost::thread::id> tid_;
-};
 
+    inline bool is_locked_by_this_thread() const
+    {
+        return boost::this_thread::get_id() == tid_;
+    }
+
+    inline bool is_locked() const { return !(boost::thread::id() == tid_); }
+
+    inline void wait_until_condition(scoped_lock& lk, boost::function<bool()> predicate)
+    {
+        while (!predicate()) {
+            //=================================
+            tid_ = boost::thread::id();
+            cond.wait(lk); // forever
+            tid_ = boost::this_thread::get_id();
+            //=================================
+        }
+    }
+
+    inline void wait_for_signal_if_needed(scoped_lock& lk, volatile bool& signal)
+    {
+        while (!signal) {
+            //=================================
+            tid_ = boost::thread::id();
+            cond.wait(lk); // forever
+            tid_ = boost::this_thread::get_id();
+            //=================================
+        }
+    }
+
+};
 
 /**
  * The Lock class implements a synchronization object, that
@@ -268,17 +306,16 @@ public:
      */
     ~Lock() { sync.unlock(); }
 
-
     /**
      * Causes current thread to wait until either another
-     * thread invokes the notify() method or the notifyAll()
+     * thread invokes the notify() method or the notify_all()
      * method for this object, or a specified amount of time
      * has elapsed.
      *
      * @param timeout
      *    timeout in milliseconds.
      */
-    void wait(long timeout)
+    inline void wait(long timeout)
     {
         if (timeout < 0) {
             sync.wait();
@@ -291,13 +328,13 @@ public:
      * Wakes up a single thread that is waiting on this
      * object's cond.
      */
-    void notify() { sync.notify(); }
+    inline void notify() { sync.notify(); }
 
     /**
      * Wakes up all threads that are waiting on this object's
      * cond.
      */
-    void notify_all() { sync.notify_all(); }
+    inline void notify_all() { sync.notify_all(); }
 
 private:
     Synchronized& sync;
@@ -325,10 +362,9 @@ class AGENTPP_DECL Thread : public Synchronized, public Runnable {
 
     enum ThreadStatus { IDLE, RUNNING, FINISHED };
 
-    friend class Synchronized;
-    friend void* thread_starter(void*);
-
 public:
+    static void* thread_starter(void*); // for access to ThreadList
+
     /**
      * Create a new thread.
      */
@@ -386,7 +422,7 @@ public:
      *    when created through the default constructor or the
      *    Runnable object given at creation time.
      */
-    virtual Runnable* get_runnable();
+    Runnable* get_runnable();
 
     /**
      * Waits for this thread to die.
@@ -397,7 +433,7 @@ public:
      * Causes this thread to begin execution; the system calls the
      * run method of this thread.
      */
-    void start();
+    virtual void start();
 
     /**
      * Before calling the start method this method can be used
@@ -406,7 +442,7 @@ public:
      * @param stackSize
      *    the thread's stack size in bytes.
      */
-    void set_stack_size(size_t s) { stackSize = s; }
+    inline void set_stack_size(size_t s) { stackSize = s; }
 
     /**
      * Check whether thread is alive.
@@ -414,7 +450,7 @@ public:
      * @return
      *    Returns TRUE if the thread is running; otherwise FALSE.
      */
-    bool is_alive() const { return (status == RUNNING); }
+    inline bool is_alive() const { return (status == RUNNING); }
 
     /**
      * Clone this thread. This method must not be called on
@@ -439,10 +475,10 @@ private:
     boost::thread tid;
 #endif
 
-    static ThreadList threadList;
+    //XXX static ThreadList threadList;
 };
 
-
+#if 0
 /**
  * The ThreadList class implements a singleton class that holds
  * a list of all currently running Threads.
@@ -453,33 +489,29 @@ private:
 class AGENTPP_DECL ThreadList : public Synchronized {
 public:
     ThreadList() {}
-    ~ThreadList() { list.clear(); /* do no delete threads */ }
+    ~ThreadList() { list.clear(); /* does not delete threads */ }
 
     void add(Thread* t)
     {
-        lock();
+        Lock(*this);
         list.push_back(t);
-        unlock();
     }
     void remove(Thread* t)
     {
-        lock();
+        Lock(*this);
         list.remove(t);
-        unlock();
     }
-    size_t size() const { return list.size(); }
+    inline size_t size() const { return list.size(); }
     Thread* last()
     {
-        lock();
-        Thread* t = list.back();
-        unlock();
-        return t;
+        Lock(*this);
+        return list.back();
     }
 
 protected:
     std::list<Thread*> list;
 };
-
+#endif
 
 class TaskManager;
 
@@ -506,7 +538,6 @@ public:
      */
     explicit ThreadPool(size_t size = 4);
 
-
     /**
      * Create a ThreadPool with a given number of threads and
      * stack size.
@@ -526,12 +557,12 @@ public:
 
     /**
      * Execute a task. The task will be deleted after call of
-     * its run() method.
+     * its run() method (SYNCHRONIZED).
      */
     virtual void execute(Runnable*);
 
     /**
-     * Check whether the ThreadPool is idle or not.
+     * Check whether the ThreadPool is idle or not (SYNCHRONIZED).
      *
      * @return
      *    TRUE if non of the threads in the pool is currently
@@ -541,7 +572,7 @@ public:
 
     /**
      * Check whether the ThreadPool is busy (i.e., all threads are
-     * running a task) or not.
+     * running a task) or not (SYNCHRONIZED).
      *
      * @return
      *    TRUE if non of the threads in the pool is currently
@@ -554,7 +585,7 @@ public:
      * @return
      *    the number of threads in the pool.
      */
-    size_t size() const { return taskList.size(); }
+    inline size_t size() const { return taskList.size(); }
 
     /**
      * Get the stack size.
@@ -562,17 +593,18 @@ public:
      * @return
      *   the stack size of each thread in this thread pool.
      */
-    size_t get_stack_size() const { return stackSize; }
+    inline size_t get_stack_size() const { return stackSize; }
 
     /**
-     * Notifies the thread pool about an idle thread (synchronized).
+     * Notifies the thread pool about an idle thread (SYNCHRONIZED).
      */
     virtual void idle_notification();
 
     /**
-     * Gracefully stops all running task managers after their current
-     * task execution. The ThreadPool cannot be used thereafter and should
-     * be destroyed. This call blocks until all threads are stopped.
+     * Gracefully stops all running task managers after their current task
+     * execution. The ThreadPool cannot be used thereafter and should be
+     * destroyed. This call blocks until all threads are stopped
+     * (SYNCHRONIZED).
      */
     void terminate();
 };
@@ -605,7 +637,6 @@ public:
      */
     explicit QueuedThreadPool(size_t size = 1);
 
-
     /**
      * Create a ThreadPool with a given number of threads and
      * stack size.
@@ -630,32 +661,25 @@ public:
     virtual void execute(Runnable*) BOOST_OVERRIDE;
 
     /**
-     * Gets the current number of queued tasks.
-     * (SYNCHRONIZED)
+     * Gets the current number of queued tasks (SYNCHRONIZED).
      *
      * @return
      *    the number of tasks that are currently queued.
      */
     size_t queue_length();
 
-
     /**
-     * Runs the queue processing loop.
+     * Runs the queue processing loop (SYNCHRONIZED).
      */
-    void run() BOOST_OVERRIDE;
+    virtual void run() BOOST_OVERRIDE;
 
     /**
-     * Stop queue processing.
-     */
-    void stop();
-
-    /**
-     * Notifies the thread pool about an idle thread.
+     * Notifies the thread pool about an idle thread (SYNCHRONIZED).
      */
     virtual void idle_notification() BOOST_OVERRIDE;
 
     /**
-     * Check whether QueuedThreadPool is idle or not.
+     * Check whether QueuedThreadPool is idle or not (SYNCHRONIZED).
      *
      * @return
      *    TRUE if non of the threads in the pool is currently
@@ -665,7 +689,7 @@ public:
 
     /**
      * Check whether the ThreadPool is busy (i.e., all threads are
-     * running a task) or not.
+     * running a task) or not (SYNCHRONIZED).
      *
      * @return
      *    TRUE if non of the threads in the pool is currently
@@ -673,6 +697,15 @@ public:
      */
     virtual bool is_busy() BOOST_OVERRIDE;
 
+protected:
+    /**
+     * Stop queue processing (SYNCHRONIZED).
+     *
+     * @note: the run() returns and the thread terminates too!
+     */
+    virtual void stop() BOOST_OVERRIDE;
+
+    inline bool has_task() { return (!go || !queue.empty()); }
 
 private:
     /**
@@ -680,7 +713,6 @@ private:
      **/
     bool assign(Runnable* task, bool withQueuing = true);
 };
-
 
 /**
  * The TaskManager class controls the execution of tasks on
@@ -707,7 +739,6 @@ public:
      */
     virtual ~TaskManager();
 
-
     /**
      * Check whether this thread is idle or not.
      *
@@ -716,17 +747,17 @@ public:
      *   not currently execute any task and the associated thread is running;
      *   FALSE otherwise.
      */
-    bool is_idle() { return (!task && thread.is_alive()); }
+    inline bool is_idle() const { return (!task && thread.is_alive()); }
 
     /**
      * Start thread execution.
      */
-    void start() { thread.start(); }
+    virtual void start() BOOST_OVERRIDE { thread.start(); }
 
     /**
      * Stop thread execution after having finished current task.
      */
-    void stop() { go = false; }
+    virtual void stop() BOOST_OVERRIDE { go = false; }
 
     /**
      * Set the next task for execution. This will block until
@@ -751,7 +782,12 @@ public:
     }
 
 protected:
-    void run() BOOST_OVERRIDE;
+    /**
+     * Runs the task (SYNCHRONIZED).
+     */
+    virtual void run() BOOST_OVERRIDE;
+
+    inline bool has_task() { return (!go || task); }
 
     Thread thread;
     ThreadPool* threadPool;

@@ -11,6 +11,8 @@
 
 #define BOOST_THREAD_VERSION 4
 #define BOOST_THREAD_PROVIDES_EXECUTORS
+#define BOOST_THREAD_QUEUE_DEPRECATE_OLD
+
 #define BOOST_THREAD_USES_LOG
 #define BOOST_THREAD_USES_LOG_THREAD_ID
 
@@ -28,14 +30,13 @@
 #include <boost/thread/future.hpp>
 
 #include <iostream>
-#include <string>
-
-static boost::mutex mtx;
 
 
-#if defined BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION
+#if defined BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION \
+    && !defined BOOST_NO_CXX11_RVALUE_REFERENCES
 static boost::future<void> p(boost::future<void> f)
 {
+    static boost::mutex mtx;
     boost::unique_lock<boost::mutex> l(mtx);
 
     std::cout << BOOST_CURRENT_FUNCTION << std::endl;
@@ -87,6 +88,7 @@ void submit_some(boost::executor& tp)
 
 void at_th_entry(boost::basic_thread_pool&)
 {
+    static boost::mutex mtx;
     boost::unique_lock<boost::mutex> l(mtx);
     BOOST_THREAD_LOG << BOOST_CURRENT_FUNCTION << BOOST_THREAD_END_LOG;
 }
@@ -106,9 +108,9 @@ int test_executor_adaptor()
                 {
                     boost::future<int> t1 = boost::async(ea, &f1);
                     boost::future<int> t2 = boost::async(ea, &f1);
-                    std::cout << BOOST_CONTEXTOF << " t1= " << t1.get()
+                    std::cout << BOOST_CONTEXTOF << " t1 = " << t1.get()
                               << std::endl;
-                    std::cout << BOOST_CONTEXTOF << " t2= " << t2.get()
+                    std::cout << BOOST_CONTEXTOF << " t2 = " << t2.get()
                               << std::endl;
                 }
 
@@ -122,14 +124,19 @@ int test_executor_adaptor()
                     std::cout << BOOST_CONTEXTOF << std::endl;
                     boost::future<int> t2 = boost::async(ea3, &f1);
                     std::cout << BOOST_CONTEXTOF << std::endl;
-                    // boost::future<int> t2 = boost::async(ea3, f2, 1); //
-                    // todo this doesn't compiles yet on C++11
-                    // boost::future<int> t2 = boost::async(ea3,
-                    // boost::bind(f2, 1)); // todo this doesn't compiles yet
-                    // on C++98
-                    std::cout << BOOST_CONTEXTOF << " t1= " << t1.get()
+#if !defined(BOOST_NO_CXX11_RVALUE_REFERENCES)
+                    boost::future<int> t3 = boost::async(
+                        ea3, f2, 1); // TODO This doesn't compiles yet on C++11
+#else
+
+                    boost::future<int> t3 =
+                        boost::async(ea3, boost::bind(f2, 1));
+#endif
+                    std::cout << BOOST_CONTEXTOF << " t1 = " << t1.get()
                               << std::endl;
-                    std::cout << BOOST_CONTEXTOF << " t2= " << t2.get()
+                    std::cout << BOOST_CONTEXTOF << " t2 = " << t2.get()
+                              << std::endl;
+                    std::cout << BOOST_CONTEXTOF << " t3 = " << t3.get()
                               << std::endl;
                 }
 
@@ -197,7 +204,7 @@ int test_executor_adaptor()
             {
                 boost::basic_thread_pool ea(4, at_th_entry);
                 boost::future<int> t1 = boost::async(ea, &f1);
-                std::cout << BOOST_CONTEXTOF << " t1= " << t1.get()
+                std::cout << BOOST_CONTEXTOF << " t1 = " << t1.get()
                           << std::endl;
 
 #if 0
@@ -232,10 +239,10 @@ int test_executor_adaptor()
             boost::this_thread::sleep_for(boost::chrono::milliseconds(200));
             std::cout << BOOST_CONTEXTOF << std::endl;
         } catch (std::exception& ex) {
-            std::cout << "ERROR= " << ex.what() << "" << std::endl;
+            std::cout << "ERROR = " << ex.what() << "" << std::endl;
             return 1;
         } catch (...) {
-            std::cout << " ERROR= exception thrown" << std::endl;
+            std::cout << " ERROR = exception thrown" << std::endl;
             return 2;
         }
     }
