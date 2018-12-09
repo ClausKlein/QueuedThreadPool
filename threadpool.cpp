@@ -121,7 +121,7 @@ void Synchronized::wait()
 
     // NOTE: now we wait for a call to notify or notify_all! CK
     signal = false;
-    wait_for_signal_if_needed(l);
+    wait_for_signal_if_needed(l, signal);
     l.release(); // ownership
 }
 

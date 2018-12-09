@@ -236,35 +236,33 @@ public:
     bool unlock();
 
 protected:
-    bool is_locked_by_this_thread() const
-    {
-        return boost::this_thread::get_id() == tid_;
-    }
-    bool is_locked() const { return !(boost::thread::id() == tid_); }
-
     // NOTE: the type of the wrapped lockable
     typedef boost::mutex lockable_type;
     lockable_type mutex;
     typedef boost::unique_lock<lockable_type> scoped_lock;
-
     boost::condition_variable cond;
     volatile bool signal;
     boost::atomic<boost::thread::id> tid_;
 
-    inline void wait_until_condition(scoped_lock& lk, boost::function<bool()> condition)
+    inline bool is_locked_by_this_thread() const
     {
-        while (!condition()) {
+        return boost::this_thread::get_id() == tid_;
+    }
+
+    inline bool is_locked() const { return !(boost::thread::id() == tid_); }
+
+    inline void wait_until_condition(scoped_lock& lk, boost::function<bool()> predicate)
+    {
+        while (!predicate()) {
             //=================================
-            // XXX signal = false;
             tid_ = boost::thread::id();
             cond.wait(lk); // forever
             tid_ = boost::this_thread::get_id();
             //=================================
         }
-        // TODO: needed? CK signal = true;
     }
 
-    inline void wait_for_signal_if_needed(scoped_lock& lk)
+    inline void wait_for_signal_if_needed(scoped_lock& lk, volatile bool& signal)
     {
         while (!signal) {
             //=================================
@@ -330,13 +328,13 @@ public:
      * Wakes up a single thread that is waiting on this
      * object's cond.
      */
-    void notify() { sync.notify(); }
+    inline void notify() { sync.notify(); }
 
     /**
      * Wakes up all threads that are waiting on this object's
      * cond.
      */
-    void notify_all() { sync.notify_all(); }
+    inline void notify_all() { sync.notify_all(); }
 
 private:
     Synchronized& sync;
@@ -503,7 +501,7 @@ public:
         Lock(*this);
         list.remove(t);
     }
-    size_t size() const { return list.size(); }
+    inline size_t size() const { return list.size(); }
     Thread* last()
     {
         Lock(*this);
@@ -749,7 +747,7 @@ public:
      *   not currently execute any task and the associated thread is running;
      *   FALSE otherwise.
      */
-    bool is_idle() const { return (!task && thread.is_alive()); }
+    inline bool is_idle() const { return (!task && thread.is_alive()); }
 
     /**
      * Start thread execution.

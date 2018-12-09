@@ -184,6 +184,7 @@ test: $(PROGRAMS)
 	timeout 10 ./threads_test --log_level=success --random
 	timeout 10 ./threads_test --run_test=ThreadPool_test -25
 	timeout 50 ./threads_test --run_test=QueuedThreadPoolLoad_test -25
+	timeout 30 ./threads_test --run_test=test_lock_ten_other_thread_locks_in_different_order -25
 	#TODO ./threads_test --run_test=QueuedThreadPoolLoad_test -1000
 	./default_executor
 	#FIXME ./lockfree_spsc_queue
