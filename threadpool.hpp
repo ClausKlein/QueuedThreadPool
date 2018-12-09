@@ -39,6 +39,7 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #include <vector>
 
 #define BOOST_THREAD_QUEUE_DEPRECATE_OLD
+#define BOOST_THREAD_PROVIDES_EXECUTORS
 #define BOOST_THREAD_VERSION 4
 #define BOOST_CHRONO_VERSION 2
 
@@ -46,6 +47,7 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #include <boost/core/noncopyable.hpp>
 #include <boost/function.hpp>
 #include <boost/thread/condition_variable.hpp>
+#include <boost/thread/executors/basic_thread_pool.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread_only.hpp>
@@ -251,7 +253,8 @@ protected:
 
     inline bool is_locked() const { return !(boost::thread::id() == tid_); }
 
-    inline void wait_until_condition(scoped_lock& lk, boost::function<bool()> predicate)
+    inline void wait_until_condition(
+        scoped_lock& lk, boost::function<bool()> predicate)
     {
         while (!predicate()) {
             //=================================
@@ -262,7 +265,8 @@ protected:
         }
     }
 
-    inline void wait_for_signal_if_needed(scoped_lock& lk, volatile bool& signal)
+    inline void wait_for_signal_if_needed(
+        scoped_lock& lk, volatile bool& signal)
     {
         while (!signal) {
             //=================================
@@ -272,7 +276,6 @@ protected:
             //=================================
         }
     }
-
 };
 
 /**
@@ -475,7 +478,7 @@ private:
     boost::thread tid;
 #endif
 
-    //XXX static ThreadList threadList;
+    // XXX static ThreadList threadList;
 };
 
 #if 0
@@ -585,7 +588,7 @@ public:
      * @return
      *    the number of threads in the pool.
      */
-    inline size_t size() const { return taskList.size(); }
+    virtual size_t size() const { return taskList.size(); }
 
     /**
      * Get the stack size.
@@ -606,7 +609,7 @@ public:
      * destroyed. This call blocks until all threads are stopped
      * (SYNCHRONIZED).
      */
-    void terminate();
+    virtual void terminate();
 };
 
 /**
@@ -624,7 +627,8 @@ public:
  */
 class AGENTPP_DECL QueuedThreadPool : public ThreadPool, public Thread {
 
-    std::queue<Runnable*> queue;
+    // XXX std::queue<Runnable*> queue;
+    size_t _size;
     volatile bool go;
 
 public:
@@ -697,6 +701,10 @@ public:
      */
     virtual bool is_busy() BOOST_OVERRIDE;
 
+    virtual size_t size() const BOOST_OVERRIDE { return _size; }
+
+    virtual void terminate() BOOST_OVERRIDE;
+
 protected:
     /**
      * Stop queue processing (SYNCHRONIZED).
@@ -705,13 +713,15 @@ protected:
      */
     virtual void stop() BOOST_OVERRIDE;
 
-    inline bool has_task() { return (!go || !queue.empty()); }
+    // XXX inline bool has_task() { return (!go || !queue.empty()); }
 
 private:
     /**
      * @note asserted to be called with lock! CK
      **/
-    bool assign(Runnable* task, bool withQueuing = true);
+    // XXX bool assign(Runnable* task, bool withQueuing = true);
+
+    boost::basic_thread_pool* ea;
 };
 
 /**

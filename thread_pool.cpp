@@ -76,7 +76,7 @@ int main()
     {
         {
             StopwatchReporter sw;
-            boost::basic_thread_pool tp;
+            boost::basic_thread_pool tp(2);
             submit_some(tp);
         }
         try {
@@ -84,7 +84,7 @@ int main()
 
 #ifdef BOOST_THREAD_PROVIDES_EXECUTORS
             //==========================
-            boost::executor_adaptor<boost::basic_thread_pool> ea;
+            boost::executor_adaptor<boost::basic_thread_pool> ea(1);
             ea.submit(&p1);
             ea.submit(&p2);
             boost::future<int> t1 = boost::async(ea, &runOutOfMemroy);
