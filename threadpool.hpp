@@ -38,6 +38,10 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #include <queue>
 #include <vector>
 
+#if !defined BOOST_NO_CXX11_DECLTYPE
+#define BOOST_RESULT_OF_USE_DECLTYPE
+#endif
+
 #define BOOST_THREAD_QUEUE_DEPRECATE_OLD
 #define BOOST_THREAD_PROVIDES_EXECUTORS
 #define BOOST_THREAD_VERSION 4
@@ -675,7 +679,7 @@ public:
     /**
      * Runs the queue processing loop (SYNCHRONIZED).
      */
-    virtual void run() BOOST_OVERRIDE;
+    //XXX virtual void run() BOOST_OVERRIDE;
 
     /**
      * Notifies the thread pool about an idle thread (SYNCHRONIZED).

@@ -30,6 +30,7 @@ src/threads.cpp > threadpool.cpp
 #include <boost/assert.hpp>
 #include <boost/bind.hpp>
 #include <boost/thread/detail/log.hpp>
+#include <boost/thread/future.hpp>
 
 #ifndef BOOST_MSVC
 #include <unistd.h> // _POSIX_THREADS ...
@@ -698,10 +699,12 @@ void QueuedThreadPool::execute(Runnable* t)
     DTRACE("");
     boost::shared_ptr<Runnable> ptr_t(t);
     if (ea && !ea->closed()) {
-        ea->submit(boost::bind(&Runnable::run, ptr_t));
+        boost::future<void> t1 =
+            boost::async(*ea, (boost::bind(&Runnable::run, ptr_t)));
     }
 }
 
+#if 0
 void QueuedThreadPool::run()
 {
     DTRACE("");
@@ -712,6 +715,7 @@ void QueuedThreadPool::run()
             break;
     }
 }
+#endif
 
 size_t QueuedThreadPool::queue_length() { return (is_busy() ? 1 : 0); }
 
