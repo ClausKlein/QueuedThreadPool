@@ -1,16 +1,10 @@
-cmake_minimum_required(VERSION 3.9.1)
+cmake_minimum_required(VERSION 3.12.1)
 
 ## use ccache if found
 find_program(CCACHE_EXECUTABLE "ccache" HINTS /usr/local/bin /opt/local/bin)
 if(CCACHE_EXECUTABLE AND NOT CMAKE_TOOLCHAIN_FILE)
     message(STATUS "use ccache")
-    find_program(GXX_EXECUTABLE "g++" HINTS /usr/local/bin /opt/local/bin)
-    if(GXX_EXECUTABLE)
-      message(STATUS "GXX_EXECUTABLE FOUND")
-      set(CMAKE_COMPILER_IS_GNUCXX ON)
-      set(CMAKE_CXX_COMPILER "${CCACHE_EXECUTABLE}" CACHE PATH "ccache" FORCE)
-      set(CMAKE_CXX_COMPILER_ARG1 ${GXX_EXECUTABLE} CACHE PATH "the real g++" FORCE)
-    endif()
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_EXECUTABLE}" CACHE PATH "ccache" FORCE)
 endif()
 
 # The name of our project is "ThreadPoolTests". CMakeLists files in this project can
@@ -19,6 +13,23 @@ endif()
 #====================
 project(ThreadPoolTests CXX)
 #====================
+
+message(STATUS "Configuring on/for ${CMAKE_SYSTEM_NAME}")
+
+
+## require a C++ standard
+set(CMAKE_CXX_STANDARD 17)
+option(CMAKE_CXX_EXTENSIONS "" OFF)
+option(CMAKE_CXX_STANDARD_REQUIRED "" ON)
+
+
+message(STATUS "Is the C++ compiler loaded? ${CMAKE_CXX_COMPILER_LOADED}")
+if(CMAKE_CXX_COMPILER_LOADED)
+  message(STATUS "The C++ compiler ID is: ${CMAKE_CXX_COMPILER_ID}")
+  message(STATUS "Is the C++ from GNU? ${CMAKE_COMPILER_IS_GNUCXX}")
+  message(STATUS "The C++ compiler version is: ${CMAKE_CXX_COMPILER_VERSION}")
+endif()
+
 
 # ----------------------------------------------------------------------
 # default cmake setup the build configuration for this project
@@ -29,6 +40,8 @@ if( NOT CMAKE_BUILD_TYPE )
       FORCE )
   ### add_definitions(-D_DEBUG)
 endif()
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+
 
 # ----------------------------------------------------------------------
 #
@@ -43,7 +56,7 @@ option(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE "name object files as main.o instead o
 
 option(CMAKE_DEPENDS_IN_PROJECT_ONLY "do not use system header files" ON)
 if(CMAKE_DEPENDS_IN_PROJECT_ONLY)
-  if(GXX_EXECUTABLE)
+  if(CMAKE_COMPILER_IS_GNUCXX)
     set(CMAKE_DEPFILE_FLAGS_C "-MMD" CACHE STRING "dependency flag" FORCE)
     set(CMAKE_DEPFILE_FLAGS_CXX "-MMD" CACHE STRING "dependency flag" FORCE)
   elseif(GHSMULTI)
@@ -53,7 +66,7 @@ if(CMAKE_DEPENDS_IN_PROJECT_ONLY)
 endif()
 
 
-option(USE_CXX_CPPCHECK "run clang-tidy along with the compiler and report any problems" ON)
+option(USE_CXX_CPPCHECK "run cppcheck along with the compiler and report any problems" ON)
 if(USE_CXX_CPPCHECK)
   find_program(CMAKE_CXX_CPPCHECK cppcheck HINTS /usr/local/bin /opt/local/bin "C:/Program Files/Cppcheck" REQUIRED)
 endif()
@@ -159,7 +172,7 @@ if(MSVC)
   ## set(CMAKE_STATIC_LIBRARY_PREFIX "lib" CACHE STRING "" FORCE)
 
 else()
-  if(GXX_EXECUTABLE)
+  if(CMAKE_COMPILER_IS_GNUCXX)
     # each error message will appear on a single line.
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmessage-length=0")
 
@@ -200,7 +213,7 @@ mark_as_advanced(FORCE WITH_LOGGING)
 option(USE_BOOST "build with BOOST support" ON)
 if(USE_BOOST)
   option(Boost_DEBUG "find boost at verbose mode"      ON)
-  option(Boost_USE_STATIC_LIBS "use static libs only"  ON)
+  option(Boost_USE_STATIC_LIBS "use static libs only" OFF)
   option(Boost_USE_MULTITHREADED "use -mt libs only"   ON)
   set(Boost_NO_BOOST_CMAKE        ON)
 
@@ -216,16 +229,20 @@ if(USE_BOOST)
   endif()
 
   find_package(Boost 1.67 COMPONENTS chrono atomic thread system
-          regex unit_test_framework ## log ### HINTS /usr/local /opt/local
+          unit_test_framework ## regex log filesystem
+          ### HINTS /usr/local /opt/local
   )   # NOTE: Not REQUIRED! CK
   if(Boost_FOUND)
     include_directories(BEFORE SYSTEM ${Boost_INCLUDE_DIR})
   elseif(IS_DIRECTORY ${BOOST_ROOT}/include)
     message(WARNING "BOOST header only usable!")
-    add_definitions(-DBOOST_ALL_NO_LIB)
     set(Boost_INCLUDE_DIR ${BOOST_ROOT}/include CACHE PATH "path to boost include dir")
     include_directories(BEFORE SYSTEM ${Boost_INCLUDE_DIR})
   endif()
+  add_definitions(-DBOOST_ALL_NO_LIB)
+  # starting with boost V1.69.0, there is no chrono/stopwatches!
+  # It not longer part of boost/chrono; NOTE: use zip file! CK
+  include_directories(include)
 endif()
 
 
@@ -240,19 +257,20 @@ if(USE_PTHREAD_LIBRARY)
 endif()
 
 
-option(USE_CTEST "build with unittests added by CK" ON)
-if(USE_BOOST OR USE_CTEST)
+include(CTest)
+if(USE_BOOST OR BUILD_TESTING)
 
-  # enable ctest
-  enable_testing()
 
   if(Boost_FOUND)
     # additional single file examples from boost/thread and boost/asio
     set(noinst_PROGRAMS
-        #C++14 async_future
+        #C++14
+        async_future
         async_server
-        #C++14 ba_externallly_locked
-        #C++14 bank_account
+        #C++14
+        ba_externallly_locked
+        #C++14
+        bank_account
         chrono_io_ex1
         daytime_client
         default_executor
@@ -260,8 +278,10 @@ if(USE_BOOST OR USE_CTEST)
         lockfree_spsc_queue
         make_future
         multi_thread_pass
-        #C++14 parallel_quick_sort
-        #C++14 perf_condition_variable
+        #C++14
+        parallel_quick_sort
+        #C++14
+        perf_condition_variable
         perf_shared_mutex
         serial_executor
         shared_monitor
@@ -281,7 +301,7 @@ if(USE_BOOST OR USE_CTEST)
 
     foreach(program ${noinst_PROGRAMS})
         add_executable(${program} ${program}.cpp)
-        set_target_properties(${program} PROPERTIES CXX_STANDARD 98)
+        set_target_properties(${program} PROPERTIES CXX_STANDARD 17)
         # target_compile_definitions(${program} PRIVATE
         #NO! -DBOOST_THREAD_VERSION=4
         #### -DBOOST_THREAD_PROVIDES_EXECUTORS
@@ -293,7 +313,7 @@ if(USE_BOOST OR USE_CTEST)
     if(USE_ASIO AND asio_FOUND)
       add_executable(test_priority_scheduler priority_scheduler.cpp)
       target_include_directories(test_priority_scheduler SYSTEM BEFORE PRIVATE ${asio_INCLUDE_DIR})
-      set_target_properties(test_priority_scheduler PROPERTIES CXX_STANDARD 14)
+      set_target_properties(test_priority_scheduler PROPERTIES CXX_STANDARD 17)
       target_link_libraries(test_priority_scheduler ${Boost_LIBRARIES} ${EXTRA_LIBS})
       add_test(NAME test_priority_scheduler COMMAND test_priority_scheduler)
     endif()
@@ -303,7 +323,7 @@ if(USE_BOOST OR USE_CTEST)
   add_executable(test_threads threads_test.cpp
     threadpool.cpp threadpool.hpp
   )
-  set_target_properties(test_threads PROPERTIES CXX_STANDARD 14)
+  set_target_properties(test_threads PROPERTIES CXX_STANDARD 17)
   target_link_libraries(test_threads ${Boost_LIBRARIES} ${EXTRA_LIBS})
   add_test(NAME test_threads COMMAND test_threads)
 

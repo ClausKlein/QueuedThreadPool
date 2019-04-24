@@ -5,7 +5,8 @@
 // https://think-async.com/Asio/Documentation
 // https://github.com/chriskohlhoff/asio/
 
-#define ASIO_NO_DEPRECATED
+#define BOOST_ASIO_NO_DEPRECATED
+#include <boost/config.hpp>
 
 #include <boost/asio/thread_pool.hpp>
 #include <boost/asio/ts/executor.hpp>
@@ -16,7 +17,7 @@
 #include <exception>
 #include <iostream>
 
-#if defined(ASIO_HAS_STD_FUTURE)
+#if defined(BOOST_ASIO_HAS_STD_FUTURE)
 #include <future>
 #endif
 
@@ -32,12 +33,12 @@ int main()
     try {
         thread_pool pool;
 
-#if defined(ASIO_HAS_STD_FUTURE)
+#if defined(BOOST_ASIO_HAS_STD_FUTURE)
         std::future<int> f = post(pool, use_future([] {
             boost::this_thread::sleep_for(boost::chrono::milliseconds(500));
             // ...
             if (std::time(NULL) % 2) {
-                throw std::runtime_error("Sorry, no answer at this time!");
+                throw std::runtime_error("Sorry, no answer at this odd time!");
             }
             return 42;
         }));
@@ -45,7 +46,7 @@ int main()
         std::cout << "Wait something ..., result = " << std::flush << f.get()
                   << std::endl;
 #else
-        throw std::runtime_error("Sorry, no future => no answer!");
+        throw std::runtime_error("Sorry, no future => no answer!")
 #endif
 
     } catch (std::exception& e) {

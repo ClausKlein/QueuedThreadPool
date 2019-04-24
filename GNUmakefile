@@ -1,7 +1,7 @@
 #=====================
 #   configure part
 BOOST_ROOT?=/usr/local
-MT?=-mt
+## MT?=-mt
 CXX:=ccache /usr/bin/g++
 ifndef TCOV
 CXXFLAGS+=-O2 -DNDEBUG
@@ -14,7 +14,7 @@ endif
 
 CPPFLAGS+=-MMD
 CPPFLAGS+=-DBOOST_ALL_NO_LIB
-CPPFLAGS+=-I$(BOOST_ROOT)/include
+CPPFLAGS+=-I$(BOOST_ROOT)/include -I$(CURDIR)/include
 LDFLAGS+= -L$(BOOST_ROOT)/lib
 LDLIBS:= -lboost_chrono$(MT) -lboost_thread$(MT) -lboost_system$(MT)
 
