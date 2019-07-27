@@ -64,7 +64,7 @@ public:
 
     virtual void run() BOOST_OVERRIDE
     {
-        Agentpp::Thread::sleep((rand() % 3) * delay); // ms
+        Agentpp::Thread::sleep((arc4random() % 3) * delay); // ms
 
         scoped_lock l(lock);
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << " called with: " << text);
@@ -101,7 +101,11 @@ private:
     unsigned delay;
 };
 
-TestTask::lockable_type TestTask::lock;
+TestTask::lockable_type
+    TestTask::lock; //  warning: initialization of 'lock' with static storage
+                    //  duration may throw an exception that cannot be caught
+                    //  [cert-err58-cpp]
+
 test_counter_t TestTask::run_cnt(0);
 test_counter_t TestTask::counter(0);
 
@@ -127,10 +131,10 @@ BOOST_AUTO_TEST_CASE(ThreadPool_busy_test)
         BOOST_TEST(!threadPool.is_busy());
 
         // call execute parallel from different task!
-        boost::thread threads[threadCount];
+        std::array<boost::thread, threadCount> threads;
         for (size_t i = 0; i < threadCount; ++i) {
-            threads[i] = boost::thread(push_task, &threadPool);
-            threads[i].detach();
+            threads.at(i) = boost::thread(push_task, &threadPool);
+            threads.at(i).detach();
             boost::this_thread::yield();
         }
         boost::this_thread::yield();
@@ -214,10 +218,10 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_busy_test)
         BOOST_TEST(!threadPool.is_busy());
 
         // call execute parallel from different task!
-        boost::thread threads[4];
+        std::array<boost::thread, 4> threads;
         for (int i = 0; i < 4; ++i) {
-            threads[i] = boost::thread(push_task, &threadPool);
-            threads[i].detach();
+            threads.at(i) = boost::thread(push_task, &threadPool);
+            threads.at(i).detach();
         }
 
 #ifdef USE_BUSY_TEST
@@ -273,8 +277,8 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
             std::time(0))); // use current time as seed for random generator
         unsigned i = 4;
         do {
-            unsigned delay = std::rand() % 100;
-            std::string msg(boost::lexical_cast<std::string>(i));
+            unsigned delay = arc4random() % 100;
+            std::string msg(std::to_string(i));
             queuedThreadPool.execute(
                 new TestTask(msg + " Queuing ...", result, delay));
         } while (++i < (4 + 6));
@@ -335,7 +339,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolLoad_test)
         unsigned i = 20;
         do {
             if (i > 5) {
-                unsigned delay = std::rand() % 100;
+                unsigned delay = arc4random() % 100;
                 defaultThreadPool.execute(
                     new TestTask("Running ...", result, delay));
                 // TODO BOOST_TEST(!defaultThreadPool.is_idle());
@@ -554,7 +558,7 @@ BOOST_AUTO_TEST_CASE(SyncWait_test)
 
 class BadTask : public Agentpp::Runnable {
 public:
-    BadTask(){};
+    BadTask() {};
     virtual void run() BOOST_OVERRIDE
     {
         std::cout << "Hello world!" << std::endl;
@@ -894,7 +898,7 @@ int main(int argc, char* argv[])
             break;
         }
         for (int i = 0; i < argc; ++i) {
-            strcpy(argv[i], args[i].c_str());
+            strncpy(argv[i], args[i].c_str(), args[i].length());
             std::cout << i << ": " << argv[i] << std::endl;
         }
         std::cout << "loops left: " << loops << std::endl;

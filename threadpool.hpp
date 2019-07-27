@@ -99,6 +99,20 @@ typedef boost::chrono::milliseconds ms;
 typedef boost::chrono::microseconds us;
 typedef boost::chrono::nanoseconds ns;
 
+
+// NOTE: this prevents prevent slicing too! CK
+class ClonableBase {
+public:
+    ClonableBase()          = default;
+    virtual ~ClonableBase() = default;
+    // FIXME virtual std::unique_ptr<ClonableBase> clone() const = 0;
+
+    ClonableBase(const ClonableBase&) = delete;
+    ClonableBase& operator=(const ClonableBase&) = delete;
+    ClonableBase(ClonableBase&&)                 = delete;
+    ClonableBase& operator=(ClonableBase&&) = delete;
+};
+
 /**
  * The Runnable interface should be implemented by any class whose
  * instances are intended to be executed by a thread. The class must
@@ -121,10 +135,12 @@ typedef boost::chrono::nanoseconds ns;
  * @author Frank Fock
  * @version 3.5
  */
-class AGENTPP_DECL Runnable {
+class AGENTPP_DECL Runnable : public ClonableBase {
 
 public:
-    Runnable() {}
+    Runnable()
+        : ClonableBase()
+    {}
     virtual ~Runnable() {}
 
     /**
@@ -462,11 +478,13 @@ public:
     /**
      * Clone this thread. This method must not be called on
      * running threads.
+     * see too:
+     * http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#c21-if-you-define-or-delete-any-default-operation-define-or-delete-them-all
      */
-    Thread* clone()
+    std::unique_ptr<Thread> clone()
     {
         BOOST_ASSERT(status != RUNNING);
-        return new Thread(get_runnable());
+        return std::make_unique<Thread>(get_runnable());
     }
 
 private:
@@ -529,10 +547,12 @@ class TaskManager;
  * @author Frank Fock
  * @version 3.5.19
  */
-class AGENTPP_DECL ThreadPool : public Synchronized {
+class AGENTPP_DECL ThreadPool
+    : public Synchronized,
+      public virtual std::enable_shared_from_this<ThreadPool> {
 
 protected:
-    std::vector<TaskManager*> taskList;
+    std::vector<std::unique_ptr<TaskManager> > taskList;
     size_t stackSize;
 
 public:
@@ -679,7 +699,7 @@ public:
     /**
      * Runs the queue processing loop (SYNCHRONIZED).
      */
-    //XXX virtual void run() BOOST_OVERRIDE;
+    // XXX virtual void run() BOOST_OVERRIDE;
 
     /**
      * Notifies the thread pool about an idle thread (SYNCHRONIZED).
@@ -725,7 +745,7 @@ private:
      **/
     // XXX bool assign(Runnable* task, bool withQueuing = true);
 
-    boost::basic_thread_pool* ea;
+    std::unique_ptr<boost::basic_thread_pool> ea;
 };
 
 /**
@@ -746,7 +766,8 @@ public:
      * @param stack_size
      *    the stack size for the managed thread.
      */
-    TaskManager(ThreadPool*, size_t stack_size = AGENTPP_DEFAULT_STACKSIZE);
+    TaskManager(std::shared_ptr<ThreadPool>,
+        size_t stack_size = AGENTPP_DEFAULT_STACKSIZE);
 
     /**
      * Destructor will wait for thread to terminate.
@@ -788,11 +809,13 @@ public:
 
     /**
      * Clone this TaskManager.
+     * see too:
+     * http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#c21-if-you-define-or-delete-any-default-operation-define-or-delete-them-all
      */
-    TaskManager* clone()
+    std::unique_ptr<TaskManager> clone()
     {
-        return new TaskManager(
-            new ThreadPool(threadPool->size(), threadPool->get_stack_size()));
+        return std::make_unique<TaskManager>(std::make_shared<ThreadPool>(
+            threadPool->size(), threadPool->get_stack_size()));
     }
 
 protected:
@@ -804,8 +827,8 @@ protected:
     inline bool has_task() { return (!go || task); }
 
     Thread thread;
-    ThreadPool* threadPool;
-    Runnable* task;
+    std::shared_ptr<ThreadPool> threadPool;
+    Runnable* task; //TODO: should be a std::unique_ptr<Runnable>
     volatile bool go;
 };
 

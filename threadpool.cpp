@@ -446,7 +446,7 @@ void Thread::nsleep(time_t secs, long nanos)
 
 /*--------------------- class TaskManager --------------------------*/
 
-TaskManager::TaskManager(ThreadPool* tp, size_t stack_size)
+TaskManager::TaskManager(std::shared_ptr<ThreadPool> tp, size_t stack_size)
     : thread(this)
 {
     DTRACE("");
@@ -550,24 +550,20 @@ void ThreadPool::execute(Runnable* t)
     Lock l(*this);
     DTRACE("");
 
-    TaskManager* tm = 0;
     for (;;) {
-        for (std::vector<TaskManager*>::iterator cur = taskList.begin();
+        for (std::vector<std::unique_ptr<TaskManager> >::iterator cur =
+                 taskList.begin();
              cur != taskList.end(); ++cur) {
-            tm = *cur;
-            if (tm->is_idle()) {
+            if ((*cur)->is_idle()) {
                 DTRACE("task manager found");
-                if (tm->set_task(t)) {
+                if ((*cur)->set_task(t)) {
                     return; // done
                 }
             }
-            tm = 0;
         }
-        if (!tm) {
-            DTRACE("Busy! Synchronized::wait()");
-            wait(rand() % 113); // wait_for(ms)
-            // TODO wait(); // NOTE: forever until idle_notification() CK
-        }
+        DTRACE("Busy! Synchronized::wait()");
+        wait(arc4random() % 113); // wait_for(ms)
+        // TODO wait(); // NOTE: forever until idle_notification() CK
     }
 }
 
@@ -583,7 +579,8 @@ void ThreadPool::idle_notification()
 bool ThreadPool::is_idle()
 {
     Lock l(*this);
-    for (std::vector<TaskManager*>::iterator cur = taskList.begin();
+    for (std::vector<std::unique_ptr<TaskManager> >::iterator cur =
+             taskList.begin();
          cur != taskList.end(); ++cur) {
         if (!(*cur)->is_idle()) {
             return false;
@@ -597,7 +594,8 @@ bool ThreadPool::is_idle()
 bool ThreadPool::is_busy()
 {
     Lock l(*this);
-    for (std::vector<TaskManager*>::iterator cur = taskList.begin();
+    for (std::vector<std::unique_ptr<TaskManager> >::iterator cur =
+             taskList.begin();
          cur != taskList.end(); ++cur) {
         if ((*cur)->is_idle()) {
             return false;
@@ -610,7 +608,8 @@ void ThreadPool::terminate()
 {
     Lock l(*this);
     DTRACE("");
-    for (std::vector<TaskManager*>::iterator cur = taskList.begin();
+    for (std::vector<std::unique_ptr<TaskManager> >::iterator cur =
+             taskList.begin();
          cur != taskList.end(); ++cur) {
         (*cur)->stop();
     }
@@ -623,7 +622,7 @@ ThreadPool::ThreadPool(size_t size)
     DTRACE("");
 
     for (size_t i = 0; i < size; i++) {
-        taskList.push_back(new TaskManager(this));
+        taskList.push_back(std::make_unique<TaskManager>(shared_from_this()));
     }
 }
 
@@ -633,7 +632,8 @@ ThreadPool::ThreadPool(size_t size, size_t stack_size)
     DTRACE("");
 
     for (size_t i = 0; i < size; i++) {
-        taskList.push_back(new TaskManager(this, stackSize));
+        taskList.push_back(
+            std::make_unique<TaskManager>(shared_from_this(), stackSize));
     }
 }
 
@@ -641,10 +641,10 @@ ThreadPool::~ThreadPool()
 {
     DTRACE("");
 
-    terminate();
+    terminate(); // FIXME: Call to virtual function during destruction
 
     for (size_t i = 0; i < taskList.size(); i++) {
-        delete taskList[i];
+        taskList[i].reset();
     }
 }
 
@@ -655,13 +655,12 @@ QueuedThreadPool::QueuedThreadPool(size_t size)
     , Thread(this)
     , _size(size)
     , go(true)
-    , ea(0)
 {
     DTRACE("");
     if (!_size)
-        this->stop();
+        this->stop(); // warning: Call to virtual function during construction
     else
-        ea = new boost::basic_thread_pool(_size);
+        ea = std::make_unique<boost::basic_thread_pool>(_size);
 }
 
 QueuedThreadPool::QueuedThreadPool(size_t size, size_t stack_size)
@@ -669,21 +668,20 @@ QueuedThreadPool::QueuedThreadPool(size_t size, size_t stack_size)
     , Thread(this)
     , _size(size)
     , go(true)
-    , ea(0)
 {
     DTRACE("");
     if (!_size)
-        this->stop();
+        this->stop(); // warning: Call to virtual function during construction
     else
-        ea = new boost::basic_thread_pool(_size);
+        ea = std::make_unique<boost::basic_thread_pool>(_size);
 }
 
 QueuedThreadPool::~QueuedThreadPool()
 {
     DTRACE("");
     this->stop();
-    ThreadPool::terminate();
-    delete ea;
+    ThreadPool::terminate(); // FIXME: Call to virtual function during
+                             // destruction
 }
 
 #if 0

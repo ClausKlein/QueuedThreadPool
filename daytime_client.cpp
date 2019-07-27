@@ -37,7 +37,7 @@ int main(int argc, char* argv[])
         boost::asio::connect(socket, endpoints);
 
         for (;;) {
-            boost::array<char, 128> buf;
+            boost::array<char, 128> buf = {0};
             boost::system::error_code error;
 
             size_t len = socket.read_some(boost::asio::buffer(buf), error);
