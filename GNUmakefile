@@ -1,0 +1,1 @@
+../GNUmakefile.4ninja
