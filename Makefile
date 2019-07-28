@@ -1,10 +1,10 @@
 #=====================
 #   configure part
 BOOST_ROOT?=/usr/local
-## MT?=-mt
+MT?=-mt
 CXX:=ccache /usr/bin/g++
-ifndef TCOV
-CXXFLAGS+=-O2 -DNDEBUG
+ifndef LCOV
+   CXXFLAGS+=-O2 -DNDEBUG
 ## CXXFLAGS+=-g
 endif
 #=====================
@@ -18,7 +18,7 @@ CPPFLAGS+=-I$(BOOST_ROOT)/include -I$(CURDIR)/include
 LDFLAGS+= -L$(BOOST_ROOT)/lib
 LDLIBS:= -lboost_chrono$(MT) -lboost_thread$(MT) -lboost_system$(MT)
 
-CXXFLAGS+=-Wpedantic -Wextra -Wall -Wno-unused-parameter -Wno-c++11-long-long -Wno-long-long
+CXXFLAGS+=-Wpedantic -Wextra -Wall -Wno-unused-parameter ## -Wno-c++11-long-long -Wno-long-long
 
 PROGRAMS:= \
 alarm_cond \
@@ -39,8 +39,9 @@ thread_pool \
 thread_tss_test \
 threads_test \
 trylock_test \
-user_scheduler \
 volatile \
+
+## user_scheduler \
 
 
 SRC:=$(PROGRAMS:=.cpp)
@@ -51,33 +52,34 @@ MAKEFLAGS += -r # --no-buldin-rules
 .SUFFIXES:      # no default suffix rules!
 #boost unittests links faster without recompile # .INTERMEDIATE: $(OBJ)
 
-ifdef TCOV
-CXXFLAGS+=--coverage -DDEBUG
-LDFLAGS+=--coverage
-TCOVFLAGS+=--branch-probabilities # --unconditional-branches --all-blocks
-LCOVFLAGS+=--rc lcov_branch_coverage=1
+ifdef LCOV
+    CXXFLAGS+=--coverage -DDEBUG
+    LDFLAGS+=--coverage
+    TCOVFLAGS+=--branch-probabilities # --unconditional-branches --all-blocks
+    LCOVFLAGS+=--rc lcov_branch_coverage=1
 #
 #TODO: git clone https://github.com/linux-test-project/lcov.git
 #
 ifdef MSYS
     TCOVFLAGS+=--relative-only --demangled-names --function-summaries
 endif
-tcov: clean threads_test thread_pool test_atomic_counter
+
+lcov: clean threads_test thread_pool test_atomic_counter
 	./test_atomic_counter
 	./thread_pool
 	-./threads_test --log_level=all -2
 	gcov --long-file-names $(TCOVFLAGS) thread.cpp > /dev/null 2>&1
-	lcov --capture --quiet $(LCOVFLAGS) --no-external --directory . --output-file coverage.info
-	lcov --list coverage.info $(LCOVFLAGS) | tee gcov-summary.txt
-	genhtml coverage.info $(LCOVFLAGS) --demangle-cpp --output-directory html
+	lcov --capture --quiet $(LCOVFLAGS) --no-external --directory . --output-file generated/coverage.info
+	lcov --list generated/coverage.info $(LCOVFLAGS) | tee generated/gcov-summary.txt
+	genhtml generated/coverage.info $(LCOVFLAGS) --demangle-cpp --output-directory generated/lcov/html
 endif
 
 
-.PHONY: all cmake ctest tcov test clean distclean cppcheck format
-all: $(PROGRAMS) ### doc
+.PHONY: all cmake ctest lcov test clean distclean cppcheck format
+all: $(PROGRAMS) #NO! doxygen
 
 Doxyfile::;
-doc: Doxyfile
+doxygen: Doxyfile
 	doxygen $<
 
 cmake: build
@@ -91,43 +93,43 @@ ctest: cmake
 	cd build && ctest -C debug
 
 # examples using boost libs
-lockfree_spsc_queue: CXXFLAGS+=--std=c++03
+lockfree_spsc_queue: CXXFLAGS+=--std=c++14
 lockfree_spsc_queue.o: lockfree_spsc_queue.cpp simple_stopwatch.hpp
 
 
-perf_shared_mutex: CXXFLAGS+=--std=c++03
+perf_shared_mutex: CXXFLAGS+=--std=c++14
 perf_shared_mutex.o: perf_shared_mutex.cpp simple_stopwatch.hpp
 
-chrono_io_ex1: CXXFLAGS+=--std=c++03
-shared_mutex: CXXFLAGS+=--std=c++03
-stopwatch_reporter_example: CXXFLAGS+=--std=c++03
-thread_tss_test: CXXFLAGS+=--std=c++03
+chrono_io_ex1: CXXFLAGS+=--std=c++14
+shared_mutex: CXXFLAGS+=--std=c++14
+stopwatch_reporter_example: CXXFLAGS+=--std=c++14
+thread_tss_test: CXXFLAGS+=--std=c++14
 
 
 #
 # asio demos
 #
--async_server: CXXFLAGS+=--std=c++03
--daytime_client: CXXFLAGS+=--std=c++03
--priority_scheduler: CXXFLAGS+=--std=c++03
+-async_server: CXXFLAGS+=--std=c++14
+-daytime_client: CXXFLAGS+=--std=c++14
+-priority_scheduler: CXXFLAGS+=--std=c++14
 
 
 #
 # executer and scheduler demos
 #
-ba_externallly_locked: CXXFLAGS+=--std=c++03
-default_executor: CXXFLAGS+=--std=c++03
-executor: CXXFLAGS+=--std=c++03
-serial_executor: CXXFLAGS+=--std=c++03
-shared_ptr: CXXFLAGS+=--std=c++03
-synchronized_person: CXXFLAGS+=--std=c++03
-thread_pool: CXXFLAGS+=--std=c++03
+ba_externallly_locked: CXXFLAGS+=--std=c++14
+default_executor: CXXFLAGS+=--std=c++14
+executor: CXXFLAGS+=--std=c++14
+serial_executor: CXXFLAGS+=--std=c++14
+shared_ptr: CXXFLAGS+=--std=c++14
+synchronized_person: CXXFLAGS+=--std=c++14
+thread_pool: CXXFLAGS+=--std=c++14
 
 
 # more examples using boost libs
-volatile: CXXFLAGS+=--std=c++03
-alarm_cond: CXXFLAGS+=--std=c++03
-enable_shared_from_this: CXXFLAGS+=--std=c++03
+volatile: CXXFLAGS+=--std=c++14
+alarm_cond: CXXFLAGS+=--std=c++14
+enable_shared_from_this: CXXFLAGS+=--std=c++14
 
 
 # NOTE: this test_suite using boost unit test framework needs c++14! CK
@@ -140,7 +142,7 @@ threads_test.o: threadpool.hpp
 # the Agent++V4.1.2 threads.hpp interfaces implemented with boost libs
 #
 threadpool.o: CPPFLAGS+=-D_NO_LOGGING
-threadpool.o: CXXFLAGS+=--std=c++98
+threadpool.o: CXXFLAGS+=--std=c++14
 threadpool.o: threadpool.cpp threadpool.hpp
 
 ifdef USE_AGENTPP
@@ -156,7 +158,7 @@ endif
 
 
 #NOTE: plain old posix not longer used!
-trylock_test: CXXFLAGS+=--std=c++03
+trylock_test: CXXFLAGS+=--std=c++14
 trylock_test.o: trylock_test.cpp simple_stopwatch.hpp
 trylock_test: trylock_test.o
 	$(LINK.cc) $< -o $@ $(LDLIBS)
@@ -172,10 +174,10 @@ trylock_test: trylock_test.o
 
 
 clean:
-	$(RM) $(PROGRAMS) *.o *.exe coverage.info *.gcda *.gcno
+	$(RM) $(PROGRAMS) *.o *.exe generated/coverage.info *.gcda *.gcno
 
 distclean: clean
-	$(RM) -r build *.d *.bak *.orig *~ *.stackdump *.dSYM
+	$(RM) -r build generated *.d *.bak *.orig *~ *.stackdump *.dSYM
 
 test: $(PROGRAMS)
 	./threads_test --log_level=all --run_test='Queue*'
@@ -197,7 +199,7 @@ test: $(PROGRAMS)
 	./trylock_test
 	# ./trylock_test +1
 	# ./trylock_test -1
-	./user_scheduler
+	## ./user_scheduler
 	./volatile
 	cat alarm_cond.txt | ./alarm_cond --wait
 

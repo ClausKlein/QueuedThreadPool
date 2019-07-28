@@ -446,8 +446,10 @@ void Thread::nsleep(time_t secs, long nanos)
 
 /*--------------------- class TaskManager --------------------------*/
 
-TaskManager::TaskManager(std::shared_ptr<ThreadPool> tp, size_t stack_size)
+TaskManager::TaskManager( // TODO std::shared_ptr<ThreadPool> tp,
+    ThreadPool* tp, size_t stack_size)
     : thread(this)
+    , threadPool(0)
 {
     DTRACE("");
     threadPool = tp;
@@ -622,7 +624,9 @@ ThreadPool::ThreadPool(size_t size)
     DTRACE("");
 
     for (size_t i = 0; i < size; i++) {
-        taskList.push_back(std::make_unique<TaskManager>(shared_from_this()));
+        taskList.push_back(std::make_unique<TaskManager>(this));
+        // TODO
+        // taskList.push_back(std::make_unique<TaskManager>(shared_from_this()));
     }
 }
 
@@ -632,8 +636,8 @@ ThreadPool::ThreadPool(size_t size, size_t stack_size)
     DTRACE("");
 
     for (size_t i = 0; i < size; i++) {
-        taskList.push_back(
-            std::make_unique<TaskManager>(shared_from_this(), stackSize));
+        taskList.push_back(std::make_unique<TaskManager>(this, stackSize));
+        // TODO std::make_unique<TaskManager>(shared_from_this(), stackSize));
     }
 }
 
@@ -695,7 +699,7 @@ bool QueuedThreadPool::assign(Runnable* task, bool withQueuing)
 void QueuedThreadPool::execute(Runnable* t)
 {
     DTRACE("");
-    boost::shared_ptr<Runnable> ptr_t(t);
+    std::shared_ptr<Runnable> ptr_t(t);
     if (ea && !ea->closed()) {
         boost::future<void> t1 =
             boost::async(*ea, (boost::bind(&Runnable::run, ptr_t)));

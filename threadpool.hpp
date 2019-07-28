@@ -35,6 +35,7 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #endif
 
 #include <list>
+#include <memory>
 #include <queue>
 #include <vector>
 
@@ -55,6 +56,28 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #include <boost/thread/locks.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread_only.hpp>
+
+#if 0
+#include <boost/smart_ptr/enable_shared_from_this.hpp>
+#include <boost/smart_ptr/make_shared.hpp>
+
+namespace own {
+template<typename T>
+using unique_ptr = std::unique_ptr<T>;
+
+template<typename T>
+using make_unique = std::make_unique<T>;
+
+template<typename T>
+using shared_ptr = std::shared_ptr<T>;
+
+template<typename T>
+using make_shared = std::make_shared<T>;
+
+template<typename T>
+using enable_shared_from_this = std::enable_shared_from_this<T>;
+}
+#endif
 
 // Do NOT change! CK
 #undef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
@@ -479,7 +502,8 @@ public:
      * Clone this thread. This method must not be called on
      * running threads.
      * see too:
-     * http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#c21-if-you-define-or-delete-any-default-operation-define-or-delete-them-all
+     * http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines
+     * #c21-if-you-define-or-delete-any-default-operation-define-or-delete-them-all
      */
     std::unique_ptr<Thread> clone()
     {
@@ -549,7 +573,7 @@ class TaskManager;
  */
 class AGENTPP_DECL ThreadPool
     : public Synchronized,
-      public virtual std::enable_shared_from_this<ThreadPool> {
+      public std::enable_shared_from_this<ThreadPool> {
 
 protected:
     std::vector<std::unique_ptr<TaskManager> > taskList;
@@ -766,8 +790,8 @@ public:
      * @param stack_size
      *    the stack size for the managed thread.
      */
-    TaskManager(std::shared_ptr<ThreadPool>,
-        size_t stack_size = AGENTPP_DEFAULT_STACKSIZE);
+    // TODO TaskManager(std::shared_ptr<ThreadPool> tp,
+    TaskManager(ThreadPool* tp, size_t stack_size = AGENTPP_DEFAULT_STACKSIZE);
 
     /**
      * Destructor will wait for thread to terminate.
@@ -810,12 +834,19 @@ public:
     /**
      * Clone this TaskManager.
      * see too:
-     * http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines#c21-if-you-define-or-delete-any-default-operation-define-or-delete-them-all
+     * http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines
+     * #c21-if-you-define-or-delete-any-default-operation-define-or-delete-them-all
+     * and
+     * https://clang.llvm.org/extra/clang-tidy/checks/cppcoreguidelines-owning-memory.html
      */
     std::unique_ptr<TaskManager> clone()
     {
-        return std::make_unique<TaskManager>(std::make_shared<ThreadPool>(
-            threadPool->size(), threadPool->get_stack_size()));
+        return std::make_unique<TaskManager>( // FIXME: prevent memoryleek! CK
+                                              // std::make_shared<ThreadPool>
+            new ThreadPool(threadPool->size(), threadPool->get_stack_size()));
+        // warning: initializing non-owner argument of type
+        // 'Agentpp::ThreadPool *&&' with a newly created 'gsl::owner<>'
+        // [cppcoreguidelines-owning-memory]
     }
 
 protected:
@@ -827,8 +858,9 @@ protected:
     inline bool has_task() { return (!go || task); }
 
     Thread thread;
-    std::shared_ptr<ThreadPool> threadPool;
-    Runnable* task; //TODO: should be a std::unique_ptr<Runnable>
+    // TODO std::shared_ptr<ThreadPool> threadPool;
+    ThreadPool* threadPool;
+    Runnable* task; // TODO: should be a std::unique_ptr<Runnable>
     volatile bool go;
 };
 

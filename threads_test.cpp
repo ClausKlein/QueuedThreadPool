@@ -273,8 +273,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
         BOOST_TEST(queuedThreadPool.is_busy());
 #endif
 
-        std::srand(static_cast<unsigned>(
-            std::time(0))); // use current time as seed for random generator
+        // NO! std::srand(static_cast<unsigned>(std::time(0)));
         unsigned i = 4;
         do {
             unsigned delay = arc4random() % 100;

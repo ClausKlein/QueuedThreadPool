@@ -5,7 +5,9 @@
 
 #include <iostream>
 
-boost::mutex mutex; // warning: initialization of 'mutex' with static storage duration may throw an exception that cannot be caught [cert-err58-cpp]
+boost::mutex
+    mutex; // warning: initialization of 'mutex' with static storage duration
+           // may throw an exception that cannot be caught [cert-err58-cpp]
 
 
 void init()
