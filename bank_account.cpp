@@ -1,3 +1,7 @@
+
+#define BOOST_ASIO_NO_DEPRECATED
+#include <boost/config.hpp>
+
 #include <boost/asio/post.hpp>
 #include <boost/asio/thread_pool.hpp>
 #include <boost/asio/use_future.hpp>

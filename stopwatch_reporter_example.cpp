@@ -6,12 +6,7 @@
 //  http://www.boost.org/LICENSE_1_0.txt See
 //  http://www.boost.org/libs/chrono/stopwatches for documentation.
 
-#define BOOST_CHRONO_VERSION 2
-
-#include <boost/chrono/chrono_io.hpp>
-#include <boost/chrono/stopwatches/reporters/stopwatch_reporter.hpp>
-#include <boost/chrono/stopwatches/reporters/system_default_formatter.hpp>
-#include <boost/chrono/stopwatches/strict_stopwatch.hpp>
+#include "simple_stopwatch.hpp"
 
 #include <cmath>
 

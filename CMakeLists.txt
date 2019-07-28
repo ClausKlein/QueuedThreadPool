@@ -1,16 +1,10 @@
-cmake_minimum_required(VERSION 3.9.1)
+cmake_minimum_required(VERSION 3.12.1)
 
 ## use ccache if found
 find_program(CCACHE_EXECUTABLE "ccache" HINTS /usr/local/bin /opt/local/bin)
 if(CCACHE_EXECUTABLE AND NOT CMAKE_TOOLCHAIN_FILE)
     message(STATUS "use ccache")
-    find_program(GXX_EXECUTABLE "g++" HINTS /usr/local/bin /opt/local/bin)
-    if(GXX_EXECUTABLE)
-      message(STATUS "GXX_EXECUTABLE FOUND")
-      set(CMAKE_COMPILER_IS_GNUCXX ON)
-      set(CMAKE_CXX_COMPILER "${CCACHE_EXECUTABLE}" CACHE PATH "ccache" FORCE)
-      set(CMAKE_CXX_COMPILER_ARG1 ${GXX_EXECUTABLE} CACHE PATH "the real g++" FORCE)
-    endif()
+    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_EXECUTABLE}" CACHE PATH "ccache" FORCE)
 endif()
 
 # The name of our project is "ThreadPoolTests". CMakeLists files in this project can
@@ -20,15 +14,34 @@ endif()
 project(ThreadPoolTests CXX)
 #====================
 
+message(STATUS "Configuring on/for ${CMAKE_SYSTEM_NAME}")
+
+
+## require a C++ standard
+set(CMAKE_CXX_STANDARD 17)
+option(CMAKE_CXX_EXTENSIONS "" OFF)
+option(CMAKE_CXX_STANDARD_REQUIRED "" ON)
+
+
+message(STATUS "Is the C++ compiler loaded? ${CMAKE_CXX_COMPILER_LOADED}")
+if(CMAKE_CXX_COMPILER_LOADED)
+  message(STATUS "The C++ compiler ID is: ${CMAKE_CXX_COMPILER_ID}")
+  message(STATUS "Is the C++ from GNU? ${CMAKE_COMPILER_IS_GNUCXX}")
+  message(STATUS "The C++ compiler version is: ${CMAKE_CXX_COMPILER_VERSION}")
+endif()
+
+
 # ----------------------------------------------------------------------
 # default cmake setup the build configuration for this project
 # ----------------------------------------------------------------------
-if( NOT CMAKE_BUILD_TYPE )
+if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Debug CACHE STRING
       "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
-      FORCE )
+      FORCE)
   ### add_definitions(-D_DEBUG)
 endif()
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+
 
 # ----------------------------------------------------------------------
 #
@@ -43,7 +56,7 @@ option(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE "name object files as main.o instead o
 
 option(CMAKE_DEPENDS_IN_PROJECT_ONLY "do not use system header files" ON)
 if(CMAKE_DEPENDS_IN_PROJECT_ONLY)
-  if(GXX_EXECUTABLE)
+  if(CMAKE_COMPILER_IS_GNUCXX)
     set(CMAKE_DEPFILE_FLAGS_C "-MMD" CACHE STRING "dependency flag" FORCE)
     set(CMAKE_DEPFILE_FLAGS_CXX "-MMD" CACHE STRING "dependency flag" FORCE)
   elseif(GHSMULTI)
@@ -53,7 +66,7 @@ if(CMAKE_DEPENDS_IN_PROJECT_ONLY)
 endif()
 
 
-option(USE_CXX_CPPCHECK "run clang-tidy along with the compiler and report any problems" ON)
+option(USE_CXX_CPPCHECK "run cppcheck along with the compiler and report any problems" OFF)
 if(USE_CXX_CPPCHECK)
   find_program(CMAKE_CXX_CPPCHECK cppcheck HINTS /usr/local/bin /opt/local/bin "C:/Program Files/Cppcheck" REQUIRED)
 endif()
@@ -65,20 +78,20 @@ endif()
 # UNIX : is TRUE on all UNIX-like OS's, including Apple OS X and CygWin
 # WIN32: is TRUE on Windows, including CygWin
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
-if( NOT UNIX )
+if(NOT UNIX)
   # This variable is a special case of the more-general
   # CMAKE_<CONFIG>_POSTFIX variable for the DEBUG configuration.
   # See variable CMAKE_<CONFIG>_POSTFIX.
   # Default filename postfix for libraries only under configuration <CONFIG>.
-  set( CMAKE_DEBUG_POSTFIX "D" CACHE STRING "Postfix added to the debug version of libraries and executables" )
+  set(CMAKE_DEBUG_POSTFIX "D" CACHE STRING "Postfix added to the debug version of libraries and executables")
   # Install path prefix, prepended onto install directories.
   # NOTE: can't be an OPTION; options are true/flase values only! ck
   set(CMAKE_INSTALL_PREFIX "C:/usr" CACHE STRING "Install path prefix")
-  message( "NOTE: CMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}")
+  message("NOTE: CMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}")
 
   option(LINK_STATIC_RUNTIME "Link the runtime libs static" OFF)
-  if( NOT BUILD_SHARED_LIBS AND LINK_STATIC_RUNTIME)
-    message( "MSV: Force cmake to link MSVCR.dll statically!" )
+  if(NOT BUILD_SHARED_LIBS AND LINK_STATIC_RUNTIME)
+    message("MSV: Force cmake to link MSVCR.dll statically!")
     foreach(flag_var
       CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
       CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO
@@ -87,10 +100,10 @@ if( NOT UNIX )
       )
       if(${flag_var} MATCHES "/MD")
         string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
-        message( "${flag_var}:'${${flag_var}}'" )
+        message("${flag_var}:'${${flag_var}}'")
         set(${flag_var} "${${flag_var}}" CACHE STRING "compiler flags used" FORCE)
       endif()
-    endforeach(flag_var)
+    endforeach()
   endif()
 
   # Disable incremental linking for debug only!
@@ -99,14 +112,14 @@ if( NOT UNIX )
   # http://www.openscenegraph.org/svn/osg/OpenSceneGraph/tags/OpenSceneGraph-2.6.0/CMakeLists.txt
   #
   # TBD: Also remove /EDITANDCONTINUE, which is incompatible with /INCREMENTAL:NO.
-  foreach (flag_type EXE MODULE SHARED)
+  foreach(flag_type EXE MODULE SHARED)
     set(flag_var CMAKE_${flag_type}_LINKER_FLAGS_DEBUG)
-    string (REGEX REPLACE "INCREMENTAL:YES" "INCREMENTAL:NO" flag_tmp "${${flag_var}}")
+    string(REGEX REPLACE "INCREMENTAL:YES" "INCREMENTAL:NO" flag_tmp "${${flag_var}}")
     ### string (REGEX REPLACE "/EDITANDCONTINUE" "" flag_tmp ${flag_tmp})
-    set (${flag_var} ${flag_tmp} CACHE STRING "Overriding default debug linker flags." FORCE)
+    set(${flag_var} ${flag_tmp} CACHE STRING "Overriding default debug linker flags." FORCE)
     mark_as_advanced(FORCE ${flag_var})
-    message( "${flag_var}:'${${flag_var}}'" )
-  endforeach ()
+    message("${flag_var}:'${${flag_var}}'")
+  endforeach()
 
 endif()
 # ----------------------------------------------------------------------
@@ -159,7 +172,7 @@ if(MSVC)
   ## set(CMAKE_STATIC_LIBRARY_PREFIX "lib" CACHE STRING "" FORCE)
 
 else()
-  if(GXX_EXECUTABLE)
+  if(CMAKE_COMPILER_IS_GNUCXX)
     # each error message will appear on a single line.
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmessage-length=0")
 
@@ -170,8 +183,8 @@ else()
     add_definitions(-Wextra)
     if(WARN_PEDANTIC)
       message("WARN_PEDANTIC: -Wall -Wextra -Wpedantic!")
-      add_definitions(-Wpedantic -Wno-unused-parameter -Wno-tautological-compare )
-      add_definitions(-Wunknown-pragmas -Woverloaded-virtual -Wtautological-compare )
+      add_definitions(-Wpedantic -Wno-unused-parameter -Wno-tautological-compare)
+      add_definitions(-Wunknown-pragmas -Woverloaded-virtual -Wtautological-compare)
     else()
       add_definitions(-Wno-unused-parameter -Wno-unknown-pragmas -Wno-tautological-compare)
     endif()
@@ -200,11 +213,11 @@ mark_as_advanced(FORCE WITH_LOGGING)
 option(USE_BOOST "build with BOOST support" ON)
 if(USE_BOOST)
   option(Boost_DEBUG "find boost at verbose mode"      ON)
-  option(Boost_USE_STATIC_LIBS "use static libs only"  ON)
+  option(Boost_USE_STATIC_LIBS "use static libs only" OFF)
   option(Boost_USE_MULTITHREADED "use -mt libs only"   ON)
   set(Boost_NO_BOOST_CMAKE        ON)
 
-  if( NOT $ENV{BOOST_ROOT} STREQUAL "")
+  if(NOT $ENV{BOOST_ROOT} STREQUAL "")
     set(BOOST_ROOT $ENV{BOOST_ROOT} CACHE PATH "path to boost install dir")
   else()
     set(BOOST_ROOT /usr/local CACHE PATH "path to boost install dir")
@@ -216,16 +229,20 @@ if(USE_BOOST)
   endif()
 
   find_package(Boost 1.67 COMPONENTS chrono atomic thread system
-          regex unit_test_framework ## log ### HINTS /usr/local /opt/local
+          unit_test_framework ## regex log filesystem
+          ### HINTS /usr/local /opt/local
   )   # NOTE: Not REQUIRED! CK
   if(Boost_FOUND)
     include_directories(BEFORE SYSTEM ${Boost_INCLUDE_DIR})
   elseif(IS_DIRECTORY ${BOOST_ROOT}/include)
     message(WARNING "BOOST header only usable!")
-    add_definitions(-DBOOST_ALL_NO_LIB)
     set(Boost_INCLUDE_DIR ${BOOST_ROOT}/include CACHE PATH "path to boost include dir")
     include_directories(BEFORE SYSTEM ${Boost_INCLUDE_DIR})
   endif()
+  add_definitions(-DBOOST_ALL_NO_LIB)
+  # starting with boost V1.69.0, there is no chrono/stopwatches!
+  # It not longer part of boost/chrono; NOTE: use zip file! CK
+  include_directories(include)
 endif()
 
 
@@ -240,19 +257,20 @@ if(USE_PTHREAD_LIBRARY)
 endif()
 
 
-option(USE_CTEST "build with unittests added by CK" ON)
-if(USE_BOOST OR USE_CTEST)
+include(CTest)
+if(USE_BOOST OR BUILD_TESTING)
 
-  # enable ctest
-  enable_testing()
 
   if(Boost_FOUND)
     # additional single file examples from boost/thread and boost/asio
     set(noinst_PROGRAMS
-        #C++14 async_future
-        async_server
-        #C++14 ba_externallly_locked
-        #C++14 bank_account
+        #C++14
+        async_future
+        #FIXME async_server
+        #C++14
+        ba_externallly_locked
+        #C++14
+        bank_account
         chrono_io_ex1
         daytime_client
         default_executor
@@ -260,8 +278,10 @@ if(USE_BOOST OR USE_CTEST)
         lockfree_spsc_queue
         make_future
         multi_thread_pass
-        #C++14 parallel_quick_sort
-        #C++14 perf_condition_variable
+        #C++14
+        parallel_quick_sort
+        #C++14
+        perf_condition_variable
         perf_shared_mutex
         serial_executor
         shared_monitor
@@ -275,13 +295,13 @@ if(USE_BOOST OR USE_CTEST)
         thread_pool
         thread_tss_test
         trylock_test
-        user_scheduler
+        #FIXME user_scheduler
         volatile
     )
 
     foreach(program ${noinst_PROGRAMS})
         add_executable(${program} ${program}.cpp)
-        set_target_properties(${program} PROPERTIES CXX_STANDARD 98)
+        set_target_properties(${program} PROPERTIES CXX_STANDARD 17)
         # target_compile_definitions(${program} PRIVATE
         #NO! -DBOOST_THREAD_VERSION=4
         #### -DBOOST_THREAD_PROVIDES_EXECUTORS
@@ -293,7 +313,7 @@ if(USE_BOOST OR USE_CTEST)
     if(USE_ASIO AND asio_FOUND)
       add_executable(test_priority_scheduler priority_scheduler.cpp)
       target_include_directories(test_priority_scheduler SYSTEM BEFORE PRIVATE ${asio_INCLUDE_DIR})
-      set_target_properties(test_priority_scheduler PROPERTIES CXX_STANDARD 14)
+      set_target_properties(test_priority_scheduler PROPERTIES CXX_STANDARD 17)
       target_link_libraries(test_priority_scheduler ${Boost_LIBRARIES} ${EXTRA_LIBS})
       add_test(NAME test_priority_scheduler COMMAND test_priority_scheduler)
     endif()
@@ -303,7 +323,7 @@ if(USE_BOOST OR USE_CTEST)
   add_executable(test_threads threads_test.cpp
     threadpool.cpp threadpool.hpp
   )
-  set_target_properties(test_threads PROPERTIES CXX_STANDARD 14)
+  set_target_properties(test_threads PROPERTIES CXX_STANDARD 17)
   target_link_libraries(test_threads ${Boost_LIBRARIES} ${EXTRA_LIBS})
   add_test(NAME test_threads COMMAND test_threads)
 

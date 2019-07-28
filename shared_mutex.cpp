@@ -7,12 +7,10 @@
 #define BOOST_THREAD_PROVIDES_SHARED_MUTEX_UPWARDS_CONVERSIONS
 #define BOOST_THREAD_PROVIDES_EXPLICIT_LOCK_CONVERSION
 #define BOOST_THREAD_PROVIDES_GENERIC_SHARED_MUTEX_ON_WIN
-#define BOOST_CHRONO_VERSION 2
+
+#include "simple_stopwatch.hpp"
 
 #include <boost/assert.hpp>
-#include <boost/chrono/chrono_io.hpp>
-#include <boost/chrono/stopwatches/reporters/stopwatch_reporter.hpp>
-#include <boost/chrono/stopwatches/strict_stopwatch.hpp>
 #include <boost/thread/lock_algorithms.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/shared_mutex.hpp>
@@ -70,7 +68,8 @@ void print(const A0&, const A1& a1, const A2&)
 namespace S
 {
 
-boost::shared_mutex mut;
+boost::shared_mutex mut;    // warning: initialization of 'mut' with static storage duration may throw an exception that cannot be caught [cert-err58-cpp]
+
 
 void reader()
 {

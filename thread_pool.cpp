@@ -74,17 +74,24 @@ int main()
 {
     BOOST_THREAD_LOG << " " << BOOST_CURRENT_FUNCTION << BOOST_THREAD_END_LOG;
     {
-        {
+        try {
             StopwatchReporter sw;
-            boost::basic_thread_pool tp;
+            boost::basic_thread_pool tp(2);
             submit_some(tp);
+            boost::future<int> t1 = boost::async(tp, &runOutOfMemroy);
+            boost::this_thread::sleep_for(ms(10));
+            std::cout << "\n t1 = " << t1.get() << std::endl;
+        } catch (std::exception& ex) {
+            std::cerr << "\n Exception " << ex.what() << std::endl;
+            // OK; expected CK
         }
+
         try {
             StopwatchReporter sw;
 
 #ifdef BOOST_THREAD_PROVIDES_EXECUTORS
             //==========================
-            boost::executor_adaptor<boost::basic_thread_pool> ea;
+            boost::executor_adaptor<boost::basic_thread_pool> ea(1);
             ea.submit(&p1);
             ea.submit(&p2);
             boost::future<int> t1 = boost::async(ea, &runOutOfMemroy);
@@ -96,11 +103,8 @@ int main()
 #endif
 
         } catch (std::exception& ex) {
-            std::cerr << "\n ERRORRRRR " << ex.what() << std::endl;
-            // return 1;
-        } catch (...) {
-            std::cerr << "\n ERRORRRRR exception thrown" << std::endl;
-            // return 2;
+            std::cerr << "\n Exception " << ex.what() << std::endl;
+            // OK; expected CK
         }
     }
     BOOST_THREAD_LOG << " " << BOOST_CURRENT_FUNCTION << BOOST_THREAD_END_LOG;

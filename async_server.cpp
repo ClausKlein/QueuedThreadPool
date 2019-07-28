@@ -6,7 +6,10 @@
 //
 // This sample code shows how to use asio to implement a server application
 // with TCP. An asynchronous TCP daytime server
-#define ASIO_NO_DEPRECATED
+
+//TODO: deprecated! boost::asio::io_service tcp::acceptor::get_io_service/get_io_context
+//FIXME #define BOOST_ASIO_NO_DEPRECATED
+#include <boost/config.hpp>
 
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
@@ -27,14 +30,14 @@ std::string make_daytime_string()
 
 
 class tcp_connection
-    // Using shared_ptr and enable_shared_from_this
+    // NOTE: Using shared_ptr and enable_shared_from_this
     // because we want to keep the tcp_connection object alive
     // as long as there is an operation that refers to it.
     : public boost::enable_shared_from_this<tcp_connection> {
 public:
     typedef boost::shared_ptr<tcp_connection> pointer;
 
-    static pointer create(boost::asio::io_service& io_service)
+    static pointer create(boost::asio::io_context& io_service)
     {
         return pointer(new tcp_connection(io_service));
     }
@@ -70,7 +73,7 @@ public:
     }
 
 private:
-    tcp_connection(boost::asio::io_service& io_service)
+    tcp_connection(boost::asio::io_context& io_service)
         : socket_(io_service)
     {}
     // handle_write() is responsible for any further actions
@@ -87,7 +90,7 @@ private:
 class tcp_server {
 public:
     // Constructor: initialises an acceptor to listen on TCP port 13.
-    tcp_server(boost::asio::io_service& io_service)
+    tcp_server(boost::asio::io_context& io_service)
         : acceptor_(io_service, tcp::endpoint(tcp::v4(), 13))
     {
         // start_accept() creates a socket and
@@ -101,7 +104,7 @@ private:
     {
         // creates a socket
         tcp_connection::pointer new_connection =
-            tcp_connection::create(acceptor_.get_io_service());
+            tcp_connection::create(acceptor_.get_io_context());
 
         // initiates an asynchronous accept operation
         // to wait for a new connection.
@@ -132,7 +135,7 @@ int main()
     try {
         // We need to create a server object to accept incoming client
         // connections.
-        boost::asio::io_service io_service;
+        boost::asio::io_context io_service;
 
         // The io_service object provides I/O services, such as sockets,
         // that the server object will use.
