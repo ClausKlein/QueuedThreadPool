@@ -337,7 +337,7 @@ Thread::~Thread()
     }
 }
 
-Runnable* Thread::get_runnable() { return runnable; }
+Runnable* Thread::get_runnable() const { return runnable; }
 
 void Thread::join()
 {

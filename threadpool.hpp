@@ -128,7 +128,7 @@ class ClonableBase {
 public:
     ClonableBase()          = default;
     virtual ~ClonableBase() = default;
-    // FIXME virtual std::unique_ptr<ClonableBase> clone() const = 0;
+    // TODO virtual std::unique_ptr<ClonableBase> clone() const = 0;
 
     ClonableBase(const ClonableBase&) = delete;
     ClonableBase& operator=(const ClonableBase&) = delete;
@@ -166,6 +166,7 @@ public:
     {}
     virtual ~Runnable() {}
 
+    virtual std::unique_ptr<Runnable> clone() const = 0;
     /**
      * When an object implementing interface Runnable is used to
      * create a thread, starting the thread causes the object's run
@@ -468,7 +469,7 @@ public:
      *    when created through the default constructor or the
      *    Runnable object given at creation time.
      */
-    Runnable* get_runnable();
+    Runnable* get_runnable() const;
 
     /**
      * Waits for this thread to die.
@@ -505,10 +506,10 @@ public:
      * http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines
      * #c21-if-you-define-or-delete-any-default-operation-define-or-delete-them-all
      */
-    std::unique_ptr<Thread> clone()
+    std::unique_ptr<Runnable> clone() const
     {
         BOOST_ASSERT(status != RUNNING);
-        return std::make_unique<Thread>(get_runnable());
+        return std::unique_ptr<Runnable>(get_runnable());
     }
 
 private:
@@ -839,7 +840,7 @@ public:
      * and
      * https://clang.llvm.org/extra/clang-tidy/checks/cppcoreguidelines-owning-memory.html
      */
-    std::unique_ptr<TaskManager> clone()
+    std::unique_ptr<Runnable> clone() const
     {
         return std::make_unique<TaskManager>( // FIXME: prevent memoryleek! CK
                                               // std::make_shared<ThreadPool>
