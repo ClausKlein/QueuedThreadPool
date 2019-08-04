@@ -257,7 +257,7 @@ if(USE_PTHREAD_LIBRARY)
 endif()
 
 
-include(CTest)
+enable_testing()
 if(USE_BOOST OR BUILD_TESTING)
 
 
