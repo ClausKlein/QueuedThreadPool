@@ -68,7 +68,9 @@ void print(const A0&, const A1& a1, const A2&)
 namespace S
 {
 
-boost::shared_mutex mut;    // warning: initialization of 'mut' with static storage duration may throw an exception that cannot be caught [cert-err58-cpp]
+boost::shared_mutex
+    mut; // warning: initialization of 'mut' with static storage duration
+         // may throw an exception that cannot be caught [cert-err58-cpp]
 
 
 void reader()

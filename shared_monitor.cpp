@@ -102,6 +102,8 @@ void A::compute(const A& x, const A& y)
     }
 }
 
+// warning: initialization of 'spsc_queue' with static storage duration may
+// throw an exception that cannot be caught [cert-err58-cpp]
 A a1;
 A a2;
 

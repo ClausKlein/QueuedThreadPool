@@ -17,7 +17,7 @@ using boost::asio::use_future;
 
 class bank_account {
     int balance_ = 0;
-    mutable thread_pool pool_{ 1 };
+    mutable thread_pool pool_ { 1 };
 
 public:
     void deposit(int amount)

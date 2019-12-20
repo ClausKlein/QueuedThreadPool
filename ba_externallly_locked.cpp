@@ -4,12 +4,12 @@
 //  accompanying file LICENSE_1_0.txt or copy at
 //  http://www.boost.org/LICENSE_1_0.txt)
 
-#define BOOST_THREAD_VERSION 4
+#define BOOST_THREAD_VERSION 5
+#include <boost/thread/mutex.hpp>
 
 #include <boost/thread/externally_locked.hpp>
 #include <boost/thread/lock_types.hpp>
 #include <boost/thread/lockable_adapter.hpp>
-#include <boost/thread/mutex.hpp>
 #include <boost/thread/strict_lock.hpp>
 #include <iostream>
 
@@ -109,4 +109,3 @@ int main()
     mgr.Checking2Savings(100);
     return 0;
 }
-

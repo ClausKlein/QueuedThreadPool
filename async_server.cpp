@@ -7,8 +7,9 @@
 // This sample code shows how to use asio to implement a server application
 // with TCP. An asynchronous TCP daytime server
 
-//TODO: deprecated! boost::asio::io_service tcp::acceptor::get_io_service/get_io_context
-//FIXME #define BOOST_ASIO_NO_DEPRECATED
+// TODO: deprecated! boost::asio::io_service
+// tcp::acceptor::get_io_service/get_io_context
+// FIXME #define BOOST_ASIO_NO_DEPRECATED
 #include <boost/config.hpp>
 
 #include <boost/asio.hpp>

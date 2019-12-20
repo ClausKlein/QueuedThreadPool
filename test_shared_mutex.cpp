@@ -7,8 +7,10 @@
 #include <boost/thread/caller_context.hpp>
 #include <boost/thread/detail/log.hpp>
 
-boost::shared_mutex mtx;
-int g_cnt(5000000/10); // 5M/10 => 4005472571 nanoseconds
+boost::shared_mutex
+    mtx; // warning: initialization of 'mutex' with static storage duration
+         // may throw an exception that cannot be caught [cert-err58-cpp]
+int g_cnt(5000000 / 10); // 5M/10 => 4005472571 nanoseconds
 
 void writer()
 {

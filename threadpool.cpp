@@ -564,7 +564,7 @@ void ThreadPool::execute(Runnable* t)
             }
         }
         DTRACE("Busy! Synchronized::wait()");
-        wait(arc4random() % 113); // wait_for(ms)
+        wait(rand() % 113); // wait_for(ms)
         // TODO wait(); // NOTE: forever until idle_notification() CK
     }
 }
@@ -645,11 +645,12 @@ ThreadPool::~ThreadPool()
 {
     DTRACE("");
 
-    terminate(); // FIXME: Call to virtual function during destruction
-
-    for (size_t i = 0; i < taskList.size(); i++) {
-        taskList[i].reset();
-    }
+    //    terminate(); // FIXME: warning: Call to virtual function during
+    //    destruction
+    //
+    //    for (size_t i = 0; i < taskList.size(); i++) {
+    //        taskList[i].reset();
+    //    }
 }
 
 /*--------------------- class QueuedThreadPool --------------------------*/

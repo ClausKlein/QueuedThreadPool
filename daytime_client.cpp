@@ -24,7 +24,7 @@ int main(int argc, char* argv[])
     try {
         if (argc != 2) {
             std::cerr << "Usage: client <host>" << std::endl;
-            return 0;   //NOTE: OK for ctest! CK
+            return 0; // NOTE: OK for ctest! CK
         }
 
         boost::asio::io_context io_context;
@@ -37,7 +37,7 @@ int main(int argc, char* argv[])
         boost::asio::connect(socket, endpoints);
 
         for (;;) {
-            boost::array<char, 128> buf = {0};
+            boost::array<char, 128> buf = { 0 };
             boost::system::error_code error;
 
             size_t len = socket.read_some(boost::asio::buffer(buf), error);

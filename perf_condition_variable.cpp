@@ -107,17 +107,17 @@ Stopwatch::rep benchmark_ping_pong(unsigned consumer_count)
     auto best_producer_time = std::numeric_limits<Stopwatch::rep>::max
     BOOST_PREVENT_MACRO_SUBSTITUTION();
 
-    std::vector<std::thread> consumers{ consumer_count };
+    std::vector<std::thread> consumers { consumer_count };
 
     // Run the benchmark 10 times and report the best time.
     for (int times = 10; times--;) {
-        S shared_data{ 1000, consumer_count };
+        S shared_data { 1000, consumer_count };
 
         // Start the consumers.
         for (unsigned i = 0; i < consumer_count; ++i)
-            consumers[i] = std::thread{ consumer_thread<S>, &shared_data };
+            consumers[i] = std::thread { consumer_thread<S>, &shared_data };
         // Start the producer and wait till it finishes.
-        std::thread{ producer_thread<S>, &shared_data }.join();
+        std::thread { producer_thread<S>, &shared_data }.join();
         // Wait till consumers finish.
         for (unsigned i = 0; i < consumer_count; ++i)
             consumers[i].join();
@@ -187,7 +187,7 @@ int main()
     printf("consumers,(std-boost)/std,std,boost\n");
     for (unsigned i = 1; i <= CONSUMER_MAX; ++i) {
         auto& b = best_times[i - 1];
-        printf("%d,%f,%lld,%lld\n", i, (b.std - b.boost) * 100. / b.std, b.std,
+        printf("%d,%f,%ld,%ld\n", i, (b.std - b.boost) * 100. / b.std, b.std,
             b.boost);
     }
     return 0;

@@ -69,7 +69,7 @@ public:
 
     virtual void run() BOOST_OVERRIDE
     {
-        Agentpp::Thread::sleep((arc4random() % 3) * delay); // ms
+        Agentpp::Thread::sleep((rand() % 3) * delay); // ms
 
         scoped_lock l(lock);
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << " called with: " << text);
@@ -278,10 +278,10 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
         BOOST_TEST(queuedThreadPool.is_busy());
 #endif
 
-        // NO! std::srand(static_cast<unsigned>(std::time(0)));
+        std::srand(static_cast<unsigned>(std::time(0)));
         unsigned i = 4;
         do {
-            unsigned delay = arc4random() % 100;
+            unsigned delay = rand() % 100;
             std::string msg(std::to_string(i));
             queuedThreadPool.execute(
                 new TestTask(msg + " Queuing ...", result, delay));
@@ -343,7 +343,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolLoad_test)
         unsigned i = 20;
         do {
             if (i > 5) {
-                unsigned delay = arc4random() % 100;
+                unsigned delay = rand() % 100;
                 defaultThreadPool.execute(
                     new TestTask("Running ...", result, delay));
                 // TODO BOOST_TEST(!defaultThreadPool.is_idle());

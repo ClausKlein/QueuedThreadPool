@@ -155,7 +155,7 @@ public:
 #if !defined BOOST_NO_CXX11_AUTO_DECLARATIONS
         auto memberSync = member.synchronize();
 #else
-        boost::strict_lock_ptr<Member> memberSync = member.synchronize();
+        boost::strict_lock_ptr<Member> memberSync       = member.synchronize();
 #endif
         Invariant(memberSync);
         memberSync->name = newName;

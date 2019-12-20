@@ -183,7 +183,7 @@ class Print {
 
 public:
     Print(int i)
-        : i_(i){};
+        : i_(i) {};
     void operator()() { std::cout << i_ << std::endl; }
 };
 

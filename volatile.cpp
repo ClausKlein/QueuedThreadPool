@@ -60,7 +60,7 @@ The user must be careful about defining the shared Widget objects as volatile.
  ***/
 class Widget {
 public:
-    Widget(){};
+    Widget() {};
     void Operation() const volatile;
     // ...
 

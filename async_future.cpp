@@ -21,7 +21,6 @@
 #include <future>
 #endif
 
-using boost::asio::bind_executor;
 using boost::asio::post;
 using boost::asio::thread_pool;
 using boost::asio::use_future;
