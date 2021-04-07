@@ -9,8 +9,7 @@ ifndef LCOV
 endif
 #=====================
 
-#NO! CK
-### USE_AGENTPP:=1
+#NO! CK USE_AGENTPP:=1
 
 CPPFLAGS+=-MMD
 CPPFLAGS+=-DBOOST_ALL_NO_LIB
@@ -133,7 +132,7 @@ enable_shared_from_this: CXXFLAGS+=--std=c++14
 
 
 # NOTE: this test_suite using boost unit test framework needs c++14! CK
-threads_test.o: CXXFLAGS+=--std=c++14
+threads_test.o: CXXFLAGS+=--std=c++17
 threads_test.o: threads_test.cpp simple_stopwatch.hpp
 threads_test.o: threadpool.hpp
 
@@ -141,8 +140,8 @@ threads_test.o: threadpool.hpp
 #
 # the Agent++V4.1.2 threads.hpp interfaces implemented with boost libs
 #
-threadpool.o: CPPFLAGS+=-D_NO_LOGGING
-threadpool.o: CXXFLAGS+=--std=c++14
+threadpool.o: CPPFLAGS+=-DNO_LOGGING
+threadpool.o: CXXFLAGS+=--std=c++17
 threadpool.o: threadpool.cpp threadpool.hpp
 
 ifdef USE_AGENTPP
@@ -179,7 +178,7 @@ clean:
 distclean: clean
 	$(RM) -r build generated *.d *.bak *.orig *~ *.stackdump *.dSYM
 
-test: $(PROGRAMS)
+test: threads_test #XXX $(PROGRAMS)
 	./threads_test --log_level=all --run_test='Queue*'
 	./threads_test --log_level=all --run_test='Sync*'
 	./threads_test --log_level=all --run_test='Thread*'
@@ -188,20 +187,20 @@ test: $(PROGRAMS)
 	timeout 50 ./threads_test --run_test=QueuedThreadPoolLoad_test -25
 	timeout 33 ./threads_test --run_test=test_lock_ten_other_thread_locks_in_different_order -25
 	#TODO ./threads_test --run_test=QueuedThreadPoolLoad_test -1000
-	./default_executor
-	#FIXME ./lockfree_spsc_queue
-	./perf_shared_mutex
-	./shared_mutex
-	./shared_ptr
-	./stopwatch_reporter_example
-	./test_atomic_counter
-	./thread_tss_test
-	./trylock_test
-	# ./trylock_test +1
-	# ./trylock_test -1
-	## ./user_scheduler
-	./volatile
-	cat alarm_cond.txt | ./alarm_cond --wait
+	# ./default_executor
+	# #FIXME ./lockfree_spsc_queue
+	# ./perf_shared_mutex
+	# ./shared_mutex
+	# ./shared_ptr
+	# ./stopwatch_reporter_example
+	# ./test_atomic_counter
+	# ./thread_tss_test
+	# ./trylock_test
+	# # ./trylock_test +1
+	# # ./trylock_test -1
+	# ## ./user_scheduler
+	# ./volatile
+	# cat alarm_cond.txt | ./alarm_cond --wait
 
 #NOTE: bash for loop:
 #	i=0 && while test $$i -lt 1000 && ./threads_test -t QueuedThreadPoolLoad_test ; do \

@@ -1,8 +1,8 @@
 //  simple_stopwatch.hpp
 //  ------------------------------------------------------------
 
-#ifndef SIMPLE_STOPWATCH__HPP
-#define SIMPLE_STOPWATCH__HPP
+#ifndef SIMPLE_STOPWATCH_HPP
+#define SIMPLE_STOPWATCH_HPP
 
 #define BOOST_CHRONO_VERSION 2
 #define BOOST_CHRONO_DONT_PROVIDE_HYBRID_ERROR_HANDLING 1
@@ -11,8 +11,8 @@
 
 #include "boost/chrono/stopwatches/reporters/stopwatch_reporter.hpp"
 #include "boost/chrono/stopwatches/reporters/system_default_formatter.hpp"
-#include "boost/chrono/stopwatches/strict_stopwatch.hpp"
 #include "boost/chrono/stopwatches/simple_stopwatch.hpp"
+#include "boost/chrono/stopwatches/strict_stopwatch.hpp"
 
 typedef boost::chrono::high_resolution_clock Clock;
 
@@ -49,7 +49,7 @@ public:
 
     simple_stopwatch()
         : start(Clock::now())
-    {}
+    { }
     typename Clock::duration elapsed() const { return Clock::now() - start; }
     rep seconds() const
     {

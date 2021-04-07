@@ -30,8 +30,7 @@ public:
         post(pool_, use_future([=] {
             if (balance_ >= amount)
                 balance_ -= amount;
-        }))
-            .get();
+        })).get();
     }
 
     int balance() const

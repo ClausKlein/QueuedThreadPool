@@ -37,7 +37,7 @@ public:
         : lockable_base_type()
         , checkingAcct_(*this)
         , savingsAcct_(*this)
-    {}
+    { }
     inline void Checking2Savings(int amount);
     inline void AMoreComplicatedChecking2Savings(int amount);
 

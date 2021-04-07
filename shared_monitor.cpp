@@ -39,7 +39,7 @@ class A {
 public:
     A()
         : data_(10000000)
-    {}
+    { }
     A(const A& a);
     A& operator=(const A& a);
 

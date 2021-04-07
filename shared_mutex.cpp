@@ -45,7 +45,7 @@ boost::recursive_mutex& cout_mut()
     return m;
 }
 
-void print() {}
+void print() { }
 
 template <class A0, class... Args>
 void print(const A0& a0, const Args&... args)

@@ -37,7 +37,7 @@ int& f1r()
     return i;
 }
 
-void p() {}
+void p() { }
 
 #if defined BOOST_THREAD_USES_MOVE
 boost::future<void> void_compute()

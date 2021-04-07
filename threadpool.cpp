@@ -42,7 +42,7 @@ src/threads.cpp > threadpool.cpp
 
 #include <iostream>
 
-#if !defined(_NO_LOGGING) && !defined(NDEBUG)
+#if !defined(NO_LOGGING) && !defined(NDEBUG)
 #include <boost/current_function.hpp>
 #define LOG_BEGIN(x, y) std::cout << BOOST_CURRENT_FUNCTION << ": "
 #define LOG(x) std::cout << (x) << ' '
@@ -51,7 +51,7 @@ src/threads.cpp > threadpool.cpp
 #define LOG_BEGIN(x, y)
 #define LOG(x)
 #define LOG_END
-#define _NO_LOGGING 1
+#define NO_LOGGING 1
 #endif
 
 /*
@@ -78,7 +78,7 @@ src/threads.cpp > threadpool.cpp
 namespace Agentpp
 {
 
-#ifndef _NO_LOGGING
+#ifndef NO_LOGGING
 static const char* loggerModuleName = "agent++.threads";
 #endif
 
@@ -87,7 +87,7 @@ static const char* loggerModuleName = "agent++.threads";
 Synchronized::Synchronized()
     : signal(false)
     , tid_(boost::thread::id())
-{}
+{ }
 
 Synchronized::~Synchronized()
 {
@@ -662,10 +662,11 @@ QueuedThreadPool::QueuedThreadPool(size_t size)
     , go(true)
 {
     DTRACE("");
-    if (!_size)
+    if (!_size) {
         this->stop(); // warning: Call to virtual function during construction
-    else
+    } else {
         ea = std::make_unique<boost::basic_thread_pool>(_size);
+    }
 }
 
 QueuedThreadPool::QueuedThreadPool(size_t size, size_t stack_size)
@@ -675,10 +676,11 @@ QueuedThreadPool::QueuedThreadPool(size_t size, size_t stack_size)
     , go(true)
 {
     DTRACE("");
-    if (!_size)
+    if (!_size) {
         this->stop(); // warning: Call to virtual function during construction
-    else
+    } else {
         ea = std::make_unique<boost::basic_thread_pool>(_size);
+    }
 }
 
 QueuedThreadPool::~QueuedThreadPool()
@@ -722,7 +724,7 @@ void QueuedThreadPool::run()
 
 size_t QueuedThreadPool::queue_length() { return (is_busy() ? 1 : 0); }
 
-void QueuedThreadPool::idle_notification() {}
+void QueuedThreadPool::idle_notification() { }
 
 bool QueuedThreadPool::is_idle()
 {
@@ -740,8 +742,9 @@ void QueuedThreadPool::stop()
 {
     DTRACE("");
     go = false;
-    if (ea)
+    if (ea) {
         ea->close();
+    }
 }
 
 } // namespace Agentpp

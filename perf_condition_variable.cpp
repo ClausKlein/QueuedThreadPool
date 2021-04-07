@@ -52,7 +52,7 @@ template <class Types> struct SharedData : Types {
         , counter()
         , semaphore(consumers) // Initialize to the number of consumers. (*)
         , producer_time()
-    {}
+    { }
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -187,7 +187,7 @@ int main()
     printf("consumers,(std-boost)/std,std,boost\n");
     for (unsigned i = 1; i <= CONSUMER_MAX; ++i) {
         auto& b = best_times[i - 1];
-        printf("%d,%f,%ld,%ld\n", i, (b.std - b.boost) * 100. / b.std, b.std,
+        printf("%d,%f,%lld,%lld\n", i, (b.std - b.boost) * 100. / b.std, b.std,
             b.boost);
     }
     return 0;

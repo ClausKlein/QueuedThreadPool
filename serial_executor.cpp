@@ -51,7 +51,7 @@ void submit_some(boost::serial_executor& tp)
 }
 
 
-void at_th_entry(boost::basic_thread_pool&) {}
+void at_th_entry(boost::basic_thread_pool&) { }
 
 int test_executor_adaptor()
 {

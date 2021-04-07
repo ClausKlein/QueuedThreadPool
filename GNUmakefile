@@ -6,7 +6,7 @@
 # Disable the built-in implicit rules.
 MAKEFLAGS+= --no-builtin-rules
 
-.PHONY: setup all test lcov install check format clean distclean
+.PHONY: setup show all test lcov install check format clean distclean
 
 PROJECT_NAME:=$(shell basename $${PWD})
 
@@ -25,24 +25,24 @@ CHECKS?='-*,cppcoreguidelines-*,-cppcoreguidelines-pro-*,-cppcoreguidelines-avoi
 CHECKS?='-*,portability-*,readability-*'
 CHECKS?='-*,misc-*,boost-*,cert-*,misc-unused-parameters'
 
+
 # prevent hard config of find_package(asio 1.14.1 CONFIG CMAKE_FIND_ROOT_PATH_BOTH)
 ifeq (NO${CROSS_COMPILE},NO)
-    ##XXX CC:=/opt/local/bin/clang
-    ##XXX CXX:=/opt/local/bin/clang++
+    #XXX CC:=/usr/local/opt/llvm/bin/clang
+    #XXX CXX:=/usr/local/opt/llvm/bin/clang++
 
-    # NOTE: Do not uses with DESTDIR! CMAKE_INSTALL_PREFIX?=/
-    DESTDIR?=/tmp/staging/$(PROJECT_NAME)
-    export DESTDIR
-
-    CMAKE_STAGING_PREFIX?=/usr/local
-    CMAKE_PREFIX_PATH?="${CMAKE_STAGING_PREFIX};/opt/local;/usr"
+    CMAKE_INSTALL_PREFIX?=/usr/local
+    export CMAKE_INSTALL_PREFIX
+    CMAKE_STAGING_PREFIX?=/tmp/staging/$(PROJECT_NAME)$(CMAKE_INSTALL_PREFIX)
+    CMAKE_PREFIX_PATH?="$(CMAKE_STAGING_PREFIX);$(CMAKE_INSTALL_PREFIX);/usr/local/opt/boost;/usr/local/opt/openssl;/usr"
 else
     CMAKE_STAGING_PREFIX?=/opt/sdhr/SDHR/staging/imx8m-sdhr/develop
     CMAKE_PREFIX_PATH?="${CMAKE_STAGING_PREFIX};${OECORE_TARGET_SYSROOT}"
 endif
 
-# NOTE: use
-#NO!    BUILD_TYPE=Coverage make lcov
+
+#NO! BUILD_TYPE?=Coverage
+# NOTE: use on shell$> BUILD_TYPE=Coverage make lcov
 BUILD_TYPE?=Debug
 BUILD_TYPE?=Release
 # GENERATOR:=Xcode
@@ -71,11 +71,12 @@ test: all
 	cd $(BUILD_DIR) && ctest -C $(BUILD_TYPE) .
 
 
-check: setup .configure-$(BUILD_TYPE) compile_commands.json
+check:: setup .configure-$(BUILD_TYPE) compile_commands.json
 	run-clang-tidy.py -header-filter=$(checkAllHeader) -checks=$(CHECKS) | tee run-clang-tidy.log 2>&1
 	egrep '\b(warning|error):' run-clang-tidy.log | perl -pe 's/(^.*) (warning|error):/\2/' | sort -u
 
 setup: $(BUILD_DIR) .clang-tidy compile_commands.json
+	find . -name CMakeLists.txt -o -name '*.cmake' -o -name '*.cmake.in' -o -name '*meson*' > .buildfiles.lst
 
 .configure-$(BUILD_TYPE): CMakeLists.txt
 	cd $(BUILD_DIR) && cmake -G $(GENERATOR) -Wdeprecated -Wdev \
@@ -91,12 +92,17 @@ compile_commands.json: .configure-$(BUILD_TYPE)
 $(BUILD_DIR): GNUmakefile
 	mkdir -p $@
 
-
 format: .clang-format
 	find . -type f \( -name '*.h' -o -name '*.hpp' -o -name '*.c' -o -name '*.cpp' \) -print0 | xargs -0 clang-format -style=file -i
 
+show: setup
+	cmake -S $(CURDIR) -B $(BUILD_DIR) -L
 
-lcov: $(BUILD_DIR) .configure-Coverage
+check:: $(BUILD_DIR)
+	cmake --build $(BUILD_DIR) --target $@ | tee run-clang-tidy.log 2>&1
+	egrep '\b(warning|error):' run-clang-tidy.log | perl -pe 's/(^.*) (warning|error):/\2/' | sort -u
+
+lcov: all .configure-Coverage
 	cmake --build $(BUILD_DIR) --target $@
 
 install: $(BUILD_DIR)
@@ -106,7 +112,7 @@ clean: $(BUILD_DIR)
 	cmake --build $(BUILD_DIR) --target $@
 
 distclean:
-	rm -rf $(BUILD_DIR) .configure-$(BUILD_TYPE) compile_commands.json *~ .*~ tags
+	rm -rf $(BUILD_DIR) .configure-$(BUILD_TYPE) .buildfiles.lst compile_commands.json *~ .*~ tags
 	find . -name '*~' -delete
 
 

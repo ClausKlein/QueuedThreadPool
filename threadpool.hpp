@@ -39,14 +39,13 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #include <queue>
 #include <vector>
 
-#if !defined BOOST_NO_CXX11_DECLTYPE
-#define BOOST_RESULT_OF_USE_DECLTYPE
-#endif
-
-#define BOOST_THREAD_QUEUE_DEPRECATE_OLD
+#define BOOST_SYSTEM_NO_DEPRECATED
+#define BOOST_THREAD_USES_CHRONO
+//XXX #define BOOST_THREAD_QUEUE_DEPRECATE_OLD
 #define BOOST_THREAD_PROVIDES_EXECUTORS
-#define BOOST_THREAD_VERSION 4
+#define BOOST_THREAD_VERSION 5
 #define BOOST_CHRONO_VERSION 2
+#define BOOST_CHRONO_DONT_PROVIDE_HYBRID_ERROR_HANDLING 1
 
 #include <boost/atomic.hpp>
 #include <boost/core/noncopyable.hpp>
@@ -163,8 +162,8 @@ class AGENTPP_DECL Runnable : public ClonableBase {
 public:
     Runnable()
         : ClonableBase()
-    {}
-    virtual ~Runnable() {}
+    { }
+    virtual ~Runnable() { }
 
     virtual std::unique_ptr<Runnable> clone() const = 0;
     /**
@@ -506,7 +505,7 @@ public:
      * http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines
      * #c21-if-you-define-or-delete-any-default-operation-define-or-delete-them-all
      */
-    std::unique_ptr<Runnable> clone() const
+    std::unique_ptr<Runnable> clone() const BOOST_OVERRIDE
     {
         BOOST_ASSERT(status != RUNNING);
         return std::unique_ptr<Runnable>(get_runnable());
@@ -760,7 +759,7 @@ protected:
      *
      * @note: the run() returns and the thread terminates too!
      */
-    virtual void stop() BOOST_OVERRIDE;
+    virtual void stop();
 
     // XXX inline bool has_task() { return (!go || !queue.empty()); }
 
@@ -812,12 +811,12 @@ public:
     /**
      * Start thread execution.
      */
-    virtual void start() BOOST_OVERRIDE { thread.start(); }
+    virtual void start() { thread.start(); }
 
     /**
      * Stop thread execution after having finished current task.
      */
-    virtual void stop() BOOST_OVERRIDE { go = false; }
+    virtual void stop() { go = false; }
 
     /**
      * Set the next task for execution. This will block until
@@ -840,7 +839,7 @@ public:
      * and
      * https://clang.llvm.org/extra/clang-tidy/checks/cppcoreguidelines-owning-memory.html
      */
-    std::unique_ptr<Runnable> clone() const
+    std::unique_ptr<Runnable> clone() const BOOST_OVERRIDE
     {
         return std::make_unique<TaskManager>( // FIXME: prevent memoryleek! CK
                                               // std::make_shared<ThreadPool>

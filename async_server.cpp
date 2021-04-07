@@ -76,12 +76,12 @@ public:
 private:
     tcp_connection(boost::asio::io_context& io_service)
         : socket_(io_service)
-    {}
+    { }
     // handle_write() is responsible for any further actions
     // for this client connection.
     void handle_write(const boost::system::error_code& /*error*/,
         size_t /*bytes_transferred*/)
-    {}
+    { }
 
     tcp::socket socket_;
     std::string m_message;

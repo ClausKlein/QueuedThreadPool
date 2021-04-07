@@ -1,27 +1,28 @@
-cmake_minimum_required(VERSION 3.12.1)
+cmake_minimum_required(VERSION 3.14...3.20)
 
 ## use ccache if found
 find_program(CCACHE_EXECUTABLE "ccache" HINTS /usr/local/bin /opt/local/bin)
 if(CCACHE_EXECUTABLE AND NOT CMAKE_TOOLCHAIN_FILE)
-    message(STATUS "use ccache")
-    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_EXECUTABLE}" CACHE PATH "ccache" FORCE)
+  message(STATUS "use ccache")
+  set(CMAKE_CXX_COMPILER_LAUNCHER
+      "${CCACHE_EXECUTABLE}"
+      CACHE PATH "ccache" FORCE
+  )
 endif()
 
 # The name of our project is "ThreadPoolTests". CMakeLists files in this project can
 # refer to the root source directory of the project as ${PROJECT_SOURCE_DIR}
 # and to the root binary directory of the project as ${PROJECT_BINARY_DIR}.
-#====================
+#===========================
 project(ThreadPoolTests CXX)
-#====================
+#===========================
 
 message(STATUS "Configuring on/for ${CMAKE_SYSTEM_NAME}")
 
-
 ## require a C++ standard
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 option(CMAKE_CXX_EXTENSIONS "" OFF)
 option(CMAKE_CXX_STANDARD_REQUIRED "" ON)
-
 
 message(STATUS "Is the C++ compiler loaded? ${CMAKE_CXX_COMPILER_LOADED}")
 if(CMAKE_CXX_COMPILER_LOADED)
@@ -30,47 +31,71 @@ if(CMAKE_CXX_COMPILER_LOADED)
   message(STATUS "The C++ compiler version is: ${CMAKE_CXX_COMPILER_VERSION}")
 endif()
 
-
 # ----------------------------------------------------------------------
 # default cmake setup the build configuration for this project
 # ----------------------------------------------------------------------
 if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Debug CACHE STRING
-      "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
-      FORCE)
+  set(CMAKE_BUILD_TYPE
+      Debug
+      CACHE
+        STRING
+        "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
+        FORCE
+  )
   ### add_definitions(-D_DEBUG)
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
-
 
 # ----------------------------------------------------------------------
 #
 # general user options for ninja and cppcheck
 #
 # ----------------------------------------------------------------------
-option(CMAKE_C_DEPFILE_EXTENSION_REPLACE "name depend files as main.d instead of main.c.d" ON)
-option(CMAKE_C_OUTPUT_EXTENSION_REPLACE "name object files as main.o instead of main.c.o" ON)
-option(CMAKE_CXX_DEPFILE_EXTENSION_REPLACE "name depend files as main.d instead of main.cpp.d" ON)
-option(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE "name object files as main.o instead of main.cpp.o" ON)
-
+option(CMAKE_C_DEPFILE_EXTENSION_REPLACE
+       "name depend files as main.d instead of main.c.d" ON
+)
+option(CMAKE_C_OUTPUT_EXTENSION_REPLACE
+       "name object files as main.o instead of main.c.o" ON
+)
+option(CMAKE_CXX_DEPFILE_EXTENSION_REPLACE
+       "name depend files as main.d instead of main.cpp.d" ON
+)
+option(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE
+       "name object files as main.o instead of main.cpp.o" ON
+)
 
 option(CMAKE_DEPENDS_IN_PROJECT_ONLY "do not use system header files" ON)
 if(CMAKE_DEPENDS_IN_PROJECT_ONLY)
   if(CMAKE_COMPILER_IS_GNUCXX)
-    set(CMAKE_DEPFILE_FLAGS_C "-MMD" CACHE STRING "dependency flag" FORCE)
-    set(CMAKE_DEPFILE_FLAGS_CXX "-MMD" CACHE STRING "dependency flag" FORCE)
+    set(CMAKE_DEPFILE_FLAGS_C
+        "-MMD"
+        CACHE STRING "dependency flag" FORCE
+    )
+    set(CMAKE_DEPFILE_FLAGS_CXX
+        "-MMD"
+        CACHE STRING "dependency flag" FORCE
+    )
   elseif(GHSMULTI)
-    set(CMAKE_DEPFILE_FLAGS_C "-MD" CACHE STRING "dependency flag" FORCE)
-    set(CMAKE_DEPFILE_FLAGS_CXX "-MD" CACHE STRING "dependency flag" FORCE)
+    set(CMAKE_DEPFILE_FLAGS_C
+        "-MD"
+        CACHE STRING "dependency flag" FORCE
+    )
+    set(CMAKE_DEPFILE_FLAGS_CXX
+        "-MD"
+        CACHE STRING "dependency flag" FORCE
+    )
   endif()
 endif()
 
-
-option(USE_CXX_CPPCHECK "run cppcheck along with the compiler and report any problems" OFF)
+option(USE_CXX_CPPCHECK
+       "run cppcheck along with the compiler and report any problems" OFF
+)
 if(USE_CXX_CPPCHECK)
-  find_program(CMAKE_CXX_CPPCHECK cppcheck HINTS /usr/local/bin /opt/local/bin "C:/Program Files/Cppcheck" REQUIRED)
+  find_program(
+    CMAKE_CXX_CPPCHECK cppcheck HINTS /usr/local/bin /opt/local/bin
+                                      "C:/Program Files/Cppcheck" REQUIRED
+  )
 endif()
-
 
 # ----------------------------------------------------------------------
 # Note: do not use WIN32, it is not unique! ck
@@ -83,25 +108,42 @@ if(NOT UNIX)
   # CMAKE_<CONFIG>_POSTFIX variable for the DEBUG configuration.
   # See variable CMAKE_<CONFIG>_POSTFIX.
   # Default filename postfix for libraries only under configuration <CONFIG>.
-  set(CMAKE_DEBUG_POSTFIX "D" CACHE STRING "Postfix added to the debug version of libraries and executables")
+  set(CMAKE_DEBUG_POSTFIX
+      "D"
+      CACHE STRING
+            "Postfix added to the debug version of libraries and executables"
+  )
   # Install path prefix, prepended onto install directories.
   # NOTE: can't be an OPTION; options are true/flase values only! ck
-  set(CMAKE_INSTALL_PREFIX "C:/usr" CACHE STRING "Install path prefix")
+  set(CMAKE_INSTALL_PREFIX
+      "C:/usr"
+      CACHE STRING "Install path prefix"
+  )
   message("NOTE: CMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}")
 
   option(LINK_STATIC_RUNTIME "Link the runtime libs static" OFF)
   if(NOT BUILD_SHARED_LIBS AND LINK_STATIC_RUNTIME)
     message("MSV: Force cmake to link MSVCR.dll statically!")
-    foreach(flag_var
-      CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
-      CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO
-      CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
-      CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO
-      )
+    foreach(
+      flag_var
+      CMAKE_C_FLAGS
+      CMAKE_C_FLAGS_DEBUG
+      CMAKE_C_FLAGS_RELEASE
+      CMAKE_C_FLAGS_MINSIZEREL
+      CMAKE_C_FLAGS_RELWITHDEBINFO
+      CMAKE_CXX_FLAGS
+      CMAKE_CXX_FLAGS_DEBUG
+      CMAKE_CXX_FLAGS_RELEASE
+      CMAKE_CXX_FLAGS_MINSIZEREL
+      CMAKE_CXX_FLAGS_RELWITHDEBINFO
+    )
       if(${flag_var} MATCHES "/MD")
         string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
         message("${flag_var}:'${${flag_var}}'")
-        set(${flag_var} "${${flag_var}}" CACHE STRING "compiler flags used" FORCE)
+        set(${flag_var}
+            "${${flag_var}}"
+            CACHE STRING "compiler flags used" FORCE
+        )
       endif()
     endforeach()
   endif()
@@ -114,9 +156,14 @@ if(NOT UNIX)
   # TBD: Also remove /EDITANDCONTINUE, which is incompatible with /INCREMENTAL:NO.
   foreach(flag_type EXE MODULE SHARED)
     set(flag_var CMAKE_${flag_type}_LINKER_FLAGS_DEBUG)
-    string(REGEX REPLACE "INCREMENTAL:YES" "INCREMENTAL:NO" flag_tmp "${${flag_var}}")
+    string(REGEX REPLACE "INCREMENTAL:YES" "INCREMENTAL:NO" flag_tmp
+                         "${${flag_var}}"
+    )
     ### string (REGEX REPLACE "/EDITANDCONTINUE" "" flag_tmp ${flag_tmp})
-    set(${flag_var} ${flag_tmp} CACHE STRING "Overriding default debug linker flags." FORCE)
+    set(${flag_var}
+        ${flag_tmp}
+        CACHE STRING "Overriding default debug linker flags." FORCE
+    )
     mark_as_advanced(FORCE ${flag_var})
     message("${flag_var}:'${${flag_var}}'")
   endforeach()
@@ -124,19 +171,20 @@ if(NOT UNIX)
 endif()
 # ----------------------------------------------------------------------
 
-
 # set this variable to specify a common place where CMake should put all
 # libraries and executables (instead of CMAKE_CURRENT_BINARY_DIR)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
 
 # Make sure the linker can find our the library once it is built.
-link_directories(${LIBRARY_OUTPUT_PATH})
-
+### link_directories(${LIBRARY_OUTPUT_PATH})
 
 # ----------------------------------------------------------------------
 option(USE_ASIO "use the standalon asio lib too" OFF)
-set(ASIO_ROOT /usr/local CACHE PATH "path to install dir")
+set(ASIO_ROOT
+    /usr/local
+    CACHE PATH "path to install dir"
+)
 if(USE_ASIO)
   find_package(asio 1.11 CONFIG HINTS ${ASIO_ROOT})
   if(asio_FOUND)
@@ -146,7 +194,6 @@ if(USE_ASIO)
   endif()
 endif()
 # ----------------------------------------------------------------------
-
 
 set(EXTRA_LIBS)
 option(WARN_PEDANTIC "Compile with security and all extra warnings" ON)
@@ -161,10 +208,16 @@ if(MSVC)
     # Disable Visual C++ Security Enhancements in the CRT
     # See http://msdn.microsoft.com/en-us/library/8ef0s5kh%28VS.100%29.aspx
     # This is non standard and Microsoft specific
-    add_definitions(-D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE -D_CRT_OBSOLETE_NO_WARNINGS)
+    add_definitions(
+      -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE
+      -D_CRT_OBSOLETE_NO_WARNINGS
+    )
     message("MSVC: no obsolete warnings!")
   endif()
-  set(EXTRA_LIBS ${EXTRA_LIBS} ws2_32 CACHE PATH "extra libraries used")
+  set(EXTRA_LIBS
+      ${EXTRA_LIBS} ws2_32
+      CACHE PATH "extra libraries used"
+  )
   mark_as_advanced(FORCE EXTRA_LIB)
 
   ###TODO: set(CMAKE_STATIC_LIBRARY_PREFIX lib)  # libboost_chrono-vc141-mt-x32-1_67.lib
@@ -183,68 +236,54 @@ else()
     add_definitions(-Wextra)
     if(WARN_PEDANTIC)
       message("WARN_PEDANTIC: -Wall -Wextra -Wpedantic!")
-      add_definitions(-Wpedantic -Wno-unused-parameter -Wno-tautological-compare)
-      add_definitions(-Wunknown-pragmas -Woverloaded-virtual -Wtautological-compare)
+      add_definitions(
+        -Wpedantic -Wno-unused-parameter -Wno-tautological-compare
+      )
+      add_definitions(
+        -Wunknown-pragmas -Woverloaded-virtual -Wtautological-compare
+      )
     else()
-      add_definitions(-Wno-unused-parameter -Wno-unknown-pragmas -Wno-tautological-compare)
+      add_definitions(
+        -Wno-unused-parameter -Wno-unknown-pragmas -Wno-tautological-compare
+      )
     endif()
   endif()
 endif()
 
-
-if(MSYS OR MINGW)
-  set(EXTRA_LIBS ${EXTRA_LIBS} ws2_32 CACHE PATH "extra libraries used")
-  mark_as_advanced(FORCE EXTRA_LIBS)
-  message(WARNING "crosscompile for windows, is this indented?")
-endif()
-
-
 option(DISABLE_LOGGING "if you do not want any logging output " ON)
 if(DISABLE_LOGGING)
-  set(WITH_LOGGING OFF CACHE BOOL "NO logging" FORCE)
+  set(WITH_LOGGING
+      OFF
+      CACHE BOOL "NO logging" FORCE
+  )
   add_definitions(-D_NO_LOGGING -DNDEBUG)
 else()
-  set(WITH_LOGGING ON CACHE BOOL "Use logging" FORCE)
+  set(WITH_LOGGING
+      ON
+      CACHE BOOL "Use logging" FORCE
+  )
   add_definitions(-DDEFAULT_LOG_PROFILE -DDEBUG)
 endif()
 mark_as_advanced(FORCE WITH_LOGGING)
 
-
 option(USE_BOOST "build with BOOST support" ON)
 if(USE_BOOST)
-  option(Boost_DEBUG "find boost at verbose mode"      ON)
+  option(Boost_DEBUG "find boost at verbose mode" OFF)
   option(Boost_USE_STATIC_LIBS "use static libs only" OFF)
-  option(Boost_USE_MULTITHREADED "use -mt libs only"   ON)
-  set(Boost_NO_BOOST_CMAKE        ON)
+  option(Boost_USE_MULTITHREADED "use -mt libs only" ON)
 
-  if(NOT $ENV{BOOST_ROOT} STREQUAL "")
-    set(BOOST_ROOT $ENV{BOOST_ROOT} CACHE PATH "path to boost install dir")
-  else()
-    set(BOOST_ROOT /usr/local CACHE PATH "path to boost install dir")
-  endif()
-
-  if(IS_DIRECTORY ${BOOST_ROOT}/stage/lib)
-    set(BOOST_LIBRARYDIR ${BOOST_ROOT}/stage/lib CACHE PATH "path to boost stage lib dir")
-    set(BOOST_INCLUDEDIR ${BOOST_ROOT} CACHE PATH "path to boost source dir")
-  endif()
-
-  find_package(Boost 1.67 COMPONENTS chrono atomic thread system
-          unit_test_framework ## regex log filesystem
-          ### HINTS /usr/local /opt/local
-  )   # NOTE: Not REQUIRED! CK
+  find_package(
+    Boost 1.71 COMPONENTS chrono atomic thread system
+                          unit_test_framework ## regex log filesystem
+  ) # NOTE: Not REQUIRED! CK
   if(Boost_FOUND)
     include_directories(BEFORE SYSTEM ${Boost_INCLUDE_DIR})
-  elseif(IS_DIRECTORY ${BOOST_ROOT}/include)
-    message(WARNING "BOOST header only usable!")
-    set(Boost_INCLUDE_DIR ${BOOST_ROOT}/include CACHE PATH "path to boost include dir")
-    include_directories(BEFORE SYSTEM ${Boost_INCLUDE_DIR})
+    add_definitions(-DBOOST_ALL_NO_LIB)
   endif()
-  add_definitions(-DBOOST_ALL_NO_LIB)
   # starting with boost V1.69.0, there is no chrono/stopwatches!
   # It not longer part of boost/chrono; NOTE: use zip file! CK
   include_directories(include)
 endif()
-
 
 option(USE_PTHREAD_LIBRARY "" OFF)
 if(USE_PTHREAD_LIBRARY)
@@ -256,10 +295,8 @@ if(USE_PTHREAD_LIBRARY)
   endif()
 endif()
 
-
 enable_testing()
 if(USE_BOOST OR BUILD_TESTING)
-
 
   if(Boost_FOUND)
     # additional single file examples from boost/thread and boost/asio
@@ -300,32 +337,33 @@ if(USE_BOOST OR BUILD_TESTING)
     )
 
     foreach(program ${noinst_PROGRAMS})
-        add_executable(${program} ${program}.cpp)
-        set_target_properties(${program} PROPERTIES CXX_STANDARD 17)
-        # target_compile_definitions(${program} PRIVATE
-        #NO! -DBOOST_THREAD_VERSION=4
-        #### -DBOOST_THREAD_PROVIDES_EXECUTORS
-        #)
-        target_link_libraries(${program} ${Boost_LIBRARIES} ${EXTRA_LIBS})
-        add_test(NAME ${program} COMMAND ${program})
+      add_executable(${program} ${program}.cpp)
+      set_target_properties(${program} PROPERTIES CXX_STANDARD 20)
+      # target_compile_definitions(${program} PRIVATE
+      #NO! -DBOOST_THREAD_VERSION=4
+      #### -DBOOST_THREAD_PROVIDES_EXECUTORS
+      #)
+      target_link_libraries(${program} ${Boost_LIBRARIES} ${EXTRA_LIBS})
+      add_test(NAME ${program} COMMAND ${program})
     endforeach()
 
     if(USE_ASIO AND asio_FOUND)
       add_executable(test_priority_scheduler priority_scheduler.cpp)
-      target_include_directories(test_priority_scheduler SYSTEM BEFORE PRIVATE ${asio_INCLUDE_DIR})
-      set_target_properties(test_priority_scheduler PROPERTIES CXX_STANDARD 17)
-      target_link_libraries(test_priority_scheduler ${Boost_LIBRARIES} ${EXTRA_LIBS})
+      target_include_directories(
+        test_priority_scheduler SYSTEM BEFORE PRIVATE ${asio_INCLUDE_DIR}
+      )
+      set_target_properties(test_priority_scheduler PROPERTIES CXX_STANDARD 20)
+      target_link_libraries(
+        test_priority_scheduler ${Boost_LIBRARIES} ${EXTRA_LIBS}
+      )
       add_test(NAME test_priority_scheduler COMMAND test_priority_scheduler)
     endif()
 
   endif()
 
-  add_executable(test_threads threads_test.cpp
-    threadpool.cpp threadpool.hpp
-  )
-  set_target_properties(test_threads PROPERTIES CXX_STANDARD 17)
-  target_link_libraries(test_threads ${Boost_LIBRARIES} ${EXTRA_LIBS})
-  add_test(NAME test_threads COMMAND test_threads)
+  add_executable(threads_test threads_test.cpp threadpool.cpp threadpool.hpp)
+  set_target_properties(threads_test PROPERTIES CXX_STANDARD 20)
+  target_link_libraries(threads_test ${Boost_LIBRARIES} ${EXTRA_LIBS})
+  add_test(NAME threads_test COMMAND threads_test)
 
 endif()
-

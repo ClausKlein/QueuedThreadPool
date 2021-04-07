@@ -29,7 +29,7 @@ template <typename ValueType> struct call_push {
     call_push(boost::sync_queue<ValueType>* q, boost::barrier* go)
         : q_(q)
         , go_(go)
-    {}
+    { }
     typedef void result_type;
     void operator()()
     {
@@ -45,7 +45,7 @@ template <typename ValueType> struct call_pull {
     call_pull(boost::sync_queue<ValueType>* q, boost::barrier* go)
         : q_(q)
         , go_(go)
-    {}
+    { }
     typedef ValueType result_type;
     ValueType operator()()
     {
@@ -61,7 +61,7 @@ template <typename ValueType> struct call_wait_pull {
     call_wait_pull(boost::sync_queue<ValueType>* q, boost::barrier* go)
         : q_(q)
         , go_(go)
-    {}
+    { }
     typedef boost::queue_op_status result_type;
     boost::queue_op_status operator()(ValueType& v)
     {
