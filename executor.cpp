@@ -6,7 +6,7 @@
 
 #include <boost/config.hpp>
 #if !defined BOOST_NO_CXX11_DECLTYPE
-#define BOOST_RESULT_OF_USE_DECLTYPE
+#    define BOOST_RESULT_OF_USE_DECLTYPE
 #endif
 
 #define BOOST_THREAD_VERSION 4

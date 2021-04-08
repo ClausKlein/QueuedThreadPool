@@ -14,8 +14,8 @@
 #include <iostream>
 
 #ifdef BOOST_MSVC
-#pragma warning( \
-    disable : 4355) // 'this' : used in base member initializer list
+#    pragma warning( \
+        disable : 4355) // 'this' : used in base member initializer list
 #endif
 
 using namespace boost;

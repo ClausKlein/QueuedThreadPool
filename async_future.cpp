@@ -18,7 +18,7 @@
 #include <iostream>
 
 #if defined(BOOST_ASIO_HAS_STD_FUTURE)
-#include <future>
+#    include <future>
 #endif
 
 using boost::asio::post;

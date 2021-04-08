@@ -10,7 +10,7 @@
 //#define BOOST_THREAD_USES_LOG
 #define BOOST_THREAD_USES_LOG_THREAD_ID
 #if !defined BOOST_NO_CXX11_DECLTYPE
-#define BOOST_RESULT_OF_USE_DECLTYPE
+#    define BOOST_RESULT_OF_USE_DECLTYPE
 #endif
 #include <boost/assert.hpp>
 #include <boost/thread/detail/log.hpp>
@@ -19,7 +19,7 @@
 #include <string>
 
 #ifdef BOOST_MSVC
-#pragma warning(disable : 4127) // conditional expression is constant
+#    pragma warning(disable : 4127) // conditional expression is constant
 #endif
 
 void p1()

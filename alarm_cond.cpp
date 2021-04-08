@@ -24,10 +24,10 @@
 
 
 #if defined(__cplusplus) && (__cplusplus >= 201103L)
-#include <chrono>
-#include <condition_variable>
-#include <mutex>
-#include <thread>
+#    include <chrono>
+#    include <condition_variable>
+#    include <mutex>
+#    include <thread>
 
 using std::chrono::duration;
 using std::chrono::seconds;
@@ -38,9 +38,9 @@ using namespace std;
 
 #else //##########################################
 
-#include <boost/thread.hpp>
-#include <boost/thread/condition_variable.hpp>
-#include <boost/thread/mutex.hpp>
+#    include <boost/thread.hpp>
+#    include <boost/thread/condition_variable.hpp>
+#    include <boost/thread/mutex.hpp>
 
 using boost::chrono::duration;
 using boost::chrono::seconds;
@@ -56,7 +56,7 @@ using namespace boost;
 
 
 #ifdef NDEBUG
-#define TRACE(x)
+#    define TRACE(x)
 #else
 static void TRACE(const std::string& msg)
 {
@@ -64,7 +64,7 @@ static void TRACE(const std::string& msg)
     lock_guard<mutex> lk(_mut);
     std::cerr << msg << std::endl;
 }
-#define VERBOSE
+#    define VERBOSE
 #endif
 
 

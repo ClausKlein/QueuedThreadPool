@@ -30,8 +30,8 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #define agent_pp_threadpool_hpp_
 
 #ifdef __INTEGRITY
-#include <integrity.h>
-#include <time.h>
+#    include <integrity.h>
+#    include <time.h>
 #endif
 
 #include <list>
@@ -41,7 +41,7 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 
 #define BOOST_SYSTEM_NO_DEPRECATED
 #define BOOST_THREAD_USES_CHRONO
-//XXX #define BOOST_THREAD_QUEUE_DEPRECATE_OLD
+// XXX #define BOOST_THREAD_QUEUE_DEPRECATE_OLD
 #define BOOST_THREAD_PROVIDES_EXECUTORS
 #define BOOST_THREAD_VERSION 5
 #define BOOST_CHRONO_VERSION 2
@@ -57,8 +57,8 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #include <boost/thread/thread_only.hpp>
 
 #if 0
-#include <boost/smart_ptr/enable_shared_from_this.hpp>
-#include <boost/smart_ptr/make_shared.hpp>
+#    include <boost/smart_ptr/enable_shared_from_this.hpp>
+#    include <boost/smart_ptr/make_shared.hpp>
 
 namespace own {
 template<typename T>
@@ -85,9 +85,9 @@ using enable_shared_from_this = std::enable_shared_from_this<T>;
 
 // This may be changed CK
 #ifdef _DEBUG
-#define DEBUG 1
-#undef NDEBUG
-#define AGENTPP_DEBUG
+#    define DEBUG 1
+#    undef NDEBUG
+#    define AGENTPP_DEBUG
 #endif
 
 // ONLY for DEMO: be carefully! CK
@@ -99,15 +99,15 @@ using enable_shared_from_this = std::enable_shared_from_this<T>;
 #define AGENTX_DEFAULT_THREAD_NAME "ThreadPool::Thread"
 
 #ifndef AGENTPP_OPAQUE_PTHREAD_T
-#define AGENTPP_OPAQUE_PTHREAD_T void*
+#    define AGENTPP_OPAQUE_PTHREAD_T void*
 #endif
 
 #ifndef AGENTPP_DECL
-#define AGENTPP_DECL
+#    define AGENTPP_DECL
 #endif
 
 #ifndef BOOST_OVERRIDE
-#define BOOST_OVERRIDE
+#    define BOOST_OVERRIDE
 #endif
 
 namespace Agentpp
@@ -209,12 +209,13 @@ public:
      *
      * @param timeout
      *    timeout in milliseconds.
-     * @param
-     *    return TRUE if timeout occurred, FALSE otherwise.
+     * @return
+     *    false if the predicate pred still evaluates to false after the
+     * rel_time timeout expired, otherwise true.
      *
      * @note asserted to be called with lock! CK
      */
-    bool wait(unsigned long timeout);
+    bool wait_for(unsigned long timeout);
 
     /**
      * Wakes up a single thread that is waiting on this
@@ -364,9 +365,9 @@ public:
     inline void wait(long timeout)
     {
         if (timeout < 0) {
-            sync.wait();
+            (void)sync.wait();
         } else {
-            sync.wait(timeout);
+            (void)sync.wait_for(timeout);
         }
     }
 

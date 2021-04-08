@@ -17,7 +17,8 @@
   _##  limitations under the License.
   _##
   _##  created and modified by claus.klein@arcormail.de
-unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS -DAGENTPP_USE_THREAD_POOL agent++/include/agent_pp/threads.h > threadpool.hpp
+unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
+-DAGENTPP_USE_THREAD_POOL agent++/include/agent_pp/threads.h > threadpool.hpp
   _##
   _##########################################################################*/
 
@@ -26,33 +27,28 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS -
 #define agent_pp_threadpool_hpp_
 
 #ifdef __INTEGRITY
-#include <integrity.h>
+#    include <integrity.h>
+#    define NO_LOGGING 1
 #endif
 
 #ifdef _WIN32
-    //XXX #if defined(ACE_HAS_POSIX_TIME)
-    #define HAVE_STRUCT_TIMESPEC
-    //XXX #endif
+#    define HAVE_STRUCT_TIMESPEC
 #else
-    #ifndef _POSIX_C_SOURCE
-        #define _POSIX_C_SOURCE 200112L
-    #endif
-    #include <unistd.h> // _POSIX_MONOTONIC_CLOCK _POSIX_TIMEOUTS _POSIX_TIMERS _POSIX_THREADS ...
+#    include <unistd.h> // _POSIX_MONOTONIC_CLOCK _POSIX_TIMEOUTS _POSIX_TIMERS _POSIX_THREADS ...
 #endif
 
-#include <pthread.h>
-#include <time.h>
-
-#include <list>
-#include <queue>
-#include <vector>
 #include <iostream>
+#include <list>
+#include <pthread.h>
+#include <queue>
+#include <time.h>
+#include <vector>
 
 #include <boost/current_function.hpp>
 #include <boost/noncopyable.hpp>
 
 #ifndef WIN32
-#define AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
+#    define AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD // TODO: check this! CK
 #endif
 
 #define AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
@@ -62,16 +58,15 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS -
 #define AGENTX_DEFAULT_THREAD_NAME "ThreadPool::Thread"
 #define AGENTPP_DECL
 
-#define NO_LOGGING 1
 #if !defined(NO_LOGGING) && !defined(NDEBUG)
-    #define LOG_BEGIN(x,y) std::cerr << BOOST_CURRENT_FUNCTION << ": "
-    #define LOG(x) std::cerr << x << ' '
-    #define LOG_END std::cerr << std::endl
+#    define LOG_BEGIN(x, y) std::cerr << BOOST_CURRENT_FUNCTION << ": "
+#    define LOG(x) std::cerr << x << ' '
+#    define LOG_END std::cerr << std::endl
 #else
-    #define LOG_BEGIN(x,y)
-    #define LOG(x)
-    #define LOG_END
-    #define NO_LOGGING 1
+#    define LOG_BEGIN(x, y)
+#    define LOG(x)
+#    define LOG_END
+#    define NO_LOGGING 1
 #endif
 
 /*
@@ -80,9 +75,10 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS -
  * std::cout. When DEBUG is not defined, it expands to nothing.
  */
 #ifdef DEBUG
-    #define DTRACE(arg) std::cout << BOOST_CURRENT_FUNCTION << ": " arg << std::endl
+#    define DTRACE(arg) \
+        std::cout << BOOST_CURRENT_FUNCTION << ": " arg << std::endl
 #else
-    #define DTRACE(arg)
+#    define DTRACE(arg)
 #endif
 
 namespace AgentppCK
@@ -111,12 +107,11 @@ namespace AgentppCK
  * @version 3.5
  */
 
-class AGENTPP_DECL Runnable
-{
+class AGENTPP_DECL Runnable {
 
 public:
     Runnable() { }
-    virtual ~Runnable()  { }
+    virtual ~Runnable() { }
 
     /**
      * When an object implementing interface Runnable is used to
@@ -133,8 +128,7 @@ public:
  * @author Frank Fock
  * @version 4.0
  */
-class AGENTPP_DECL Synchronized: private boost::noncopyable
-{
+class AGENTPP_DECL Synchronized : private boost::noncopyable {
 public:
     enum TryLockResult { LOCKED = 1, BUSY = 0, OWNED = -1 };
 
@@ -146,7 +140,7 @@ public:
      * invokes the notify() method or the notifyAll()
      * method for this object.
      */
-    void    wait();
+    void wait();
 
     /**
      * Causes current thread to wait until either another
@@ -159,18 +153,18 @@ public:
      * @param
      *    return TRUE if timeout occured, FALSE otherwise.
      */
-    bool    wait(unsigned long timeout);
+    bool wait(unsigned long timeout);
 
     /**
      * Wakes up a single thread that is waiting on this
      * object's monitor.
      */
-    void    notify();
+    void notify();
     /**
      * Wakes up all threads that are waiting on this object's
      * monitor.
      */
-    void    notify_all();
+    void notify_all();
 
     /**
      * Enter a critical section. If this thread owned this
@@ -180,7 +174,7 @@ public:
      * @return
      *    TRUE if the attempt was successful, FALSE otherwise.
      */
-    bool    lock();
+    bool lock();
 
 #if defined(_POSIX_TIMEOUTS) && _POSIX_TIMEOUTS > 0
     /**
@@ -193,7 +187,7 @@ public:
      * @return
      *    TRUE if the attempt was successful, FALSE otherwise.
      */
-    bool    lock(unsigned long timeout);
+    bool lock(unsigned long timeout);
 #endif
 
     /**
@@ -206,7 +200,7 @@ public:
      *     owns the lock; BUSY = if another thread owns the lock;
      *     OWNED if the lock is already owned by the calling thread.
      */
-    TryLockResult   trylock();
+    TryLockResult trylock();
 
     /**
      * Leave a critical section. If this thread called lock or trylock
@@ -216,20 +210,19 @@ public:
      *    TRUE if the unlock succeeded, FALSE if there was no lock
      *    to unlock.
      */
-    bool    unlock();
+    bool unlock();
 
 private:
-
 #ifndef NO_LOGGING
-    static int      next_id;
-    int             id;
+    static int next_id;
+    int id;
 #endif
 
 #ifndef _WIN32
     int cond_timed_wait(const timespec*);
 #endif
 
-    pthread_cond_t  cond;
+    pthread_cond_t cond;
     pthread_mutex_t monitor;
 };
 
@@ -243,8 +236,7 @@ private:
  * @author Frank Fock
  * @version 3.5
  */
-class AGENTPP_DECL Lock: private boost::noncopyable
-{
+class AGENTPP_DECL Lock : private boost::noncopyable {
 public:
     /**
      * Create a locking object for a Synchronized instance,
@@ -253,13 +245,17 @@ public:
      * @param sync
      *   a Synchronized instance.
      */
-    explicit Lock(Synchronized &s): sync(s) { sync.lock(); }
+    explicit Lock(Synchronized& s)
+        : sync(s)
+    {
+        sync.lock();
+    }
 
     /**
      * The destructor will release the lock on the sync
      * object.
      */
-    ~Lock()                        { sync.unlock(); }
+    ~Lock() { sync.unlock(); }
 
 
     /**
@@ -271,12 +267,12 @@ public:
      * @param timeout
      *    timeout in milliseconds.
      */
-    void    wait(long timeout)
+    void wait(long timeout) // FIXME: why NOT return bool? CK
     {
         if (timeout < 0) {
-            sync.wait();
+            (void)sync.wait();
         } else {
-            sync.wait(timeout);
+            (void)sync.wait(timeout);
         }
     }
 
@@ -284,10 +280,10 @@ public:
      * Wakes up a single thread that is waiting on this
      * object's monitor.
      */
-    void    notify()      { sync.notify(); }
+    void notify() { sync.notify(); }
 
 private:
-    Synchronized &sync;
+    Synchronized& sync;
 };
 
 class AGENTPP_DECL ThreadList;
@@ -308,8 +304,7 @@ class AGENTPP_DECL ThreadList;
  * @author Frank Fock
  * @version 3.5.7
  */
-class AGENTPP_DECL Thread : public Synchronized, public Runnable
-{
+class AGENTPP_DECL Thread : public Synchronized, public Runnable {
 
     enum ThreadStatus { IDLE, RUNNING, FINISHED };
 
@@ -328,7 +323,7 @@ public:
      * @param runnable
      *    a Runnable subclass.
      */
-    explicit Thread(Runnable *r);
+    explicit Thread(Runnable* r);
 
     /**
      * Destroy thread. If thread is running or has been finished but
@@ -343,7 +338,7 @@ public:
      * @param millis
      *    number of milliseconds to sleep.
      */
-    static  void      sleep(long millis);
+    static void sleep(long millis);
 
     /**
      * Causes the currently executing thread to sleep (cease
@@ -355,7 +350,7 @@ public:
      * @param nanos
      *    0-999999 additional nanoseconds to sleep.
      */
-    static  void      sleep(long millis, long nanos);
+    static void sleep(long millis, long nanos);
 
     /**
      * If this thread was constructed using a separate Runnable
@@ -364,7 +359,7 @@ public:
      *
      * Subclasses of Thread should override this method.
      */
-    virtual void      run();
+    virtual void run();
 
     /**
      * Get the Runnable object used for thread execution.
@@ -374,18 +369,18 @@ public:
      *    when created through the default constructor or the
      *    Runnable object given at creation time.
      */
-    Runnable*   get_runnable();
+    Runnable* get_runnable();
 
     /**
      * Waits for this thread to die.
      */
-    void              join();
+    void join();
 
     /**
      * Causes this thread to begin execution; the system calls the
      * run method of this thread.
      */
-    void              start();
+    void start();
 
     /**
      * Before calling the start method this method can be used
@@ -394,7 +389,7 @@ public:
      * @param stackSize
      *    the thread's stack size in bytes.
      */
-    void              set_stack_size(size_t s) { stackSize = s; }
+    void set_stack_size(size_t s) { stackSize = s; }
 
     /**
      * Check whether thread is alive.
@@ -402,7 +397,7 @@ public:
      * @return
      *    Returns TRUE if the thread is running; otherwise FALSE.
      */
-    bool    is_alive() const { return (status == RUNNING); }
+    bool is_alive() const { return (status == RUNNING); }
 
     /**
      * Clone this thread. This method must not be called on
@@ -411,12 +406,12 @@ public:
     Thread* clone() { return new Thread(get_runnable()); }
 
 private:
-    Runnable*         runnable;
-    ThreadStatus      status;
-    size_t            stackSize;
-    pthread_t         tid;
+    Runnable* runnable;
+    ThreadStatus status;
+    size_t stackSize;
+    pthread_t tid;
     static ThreadList threadList;
-    static void       nsleep(time_t secs, long nanos);
+    static void nsleep(time_t secs, long nanos);
 };
 
 
@@ -427,16 +422,31 @@ private:
  * @author Frank Fock
  * @version 3.5
  */
-class AGENTPP_DECL ThreadList : public Synchronized
-{
+class AGENTPP_DECL ThreadList : public Synchronized {
 public:
     ThreadList() { }
     ~ThreadList() { list.clear(); /* do no delete threads */ }
 
-    void    add(Thread* t)  { lock(); list.push_back(t); unlock(); }
-    void    remove(Thread* t)   { lock(); list.remove(t); unlock(); }
-    size_t  size() const    { return list.size(); }
-    Thread* last() { lock(); Thread* t = list.back(); unlock(); return t; }
+    void add(Thread* t)
+    {
+        lock();
+        list.push_back(t);
+        unlock();
+    }
+    void remove(Thread* t)
+    {
+        lock();
+        list.remove(t);
+        unlock();
+    }
+    size_t size() const { return list.size(); }
+    Thread* last()
+    {
+        lock();
+        Thread* t = list.back();
+        unlock();
+        return t;
+    }
 
 protected:
     std::list<Thread*> list;
@@ -453,12 +463,12 @@ class TaskManager;
  * @author Frank Fock
  * @version 3.5.19
  */
-class AGENTPP_DECL ThreadPool : public Synchronized
-{
+class AGENTPP_DECL ThreadPool : public Synchronized {
 
 protected:
     std::vector<TaskManager*> taskList;
     size_t stackSize;
+
 public:
     /**
      * Create a ThreadPool with a given number of threads.
@@ -525,7 +535,7 @@ public:
      * @return
      *   the stack size of each thread in this thread pool.
      */
-    size_t stack_size() const { return stackSize; }
+    size_t get_stack_size() const { return stackSize; }
 
     /**
      * Notifies the thread pool about an idle thread (synchronized).
@@ -539,7 +549,6 @@ public:
      */
     void terminate();
 };
-
 
 
 /**
@@ -557,12 +566,13 @@ public:
  */
 class AGENTPP_DECL QueuedThreadPool : public ThreadPool
 #ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
-    , public Thread
+    ,
+                                      public Thread
 #endif
 {
 
-    std::queue<Runnable*>     queue;
-    bool    go;
+    std::queue<Runnable*> queue;
+    bool go;
 
 public:
     /**
@@ -596,7 +606,7 @@ public:
      * Execute a task. The task will be deleted after call of
      * its run() method.
      */
-    void    execute(Runnable*);
+    void execute(Runnable*);
 
     /**
      * Gets the current number of queued tasks.
@@ -633,18 +643,18 @@ public:
     /**
      * Notifies the thread pool about an idle thread.
      */
-    virtual void    idle_notification();
+    virtual void idle_notification();
 
 private:
     /**
      * Runs the queue processing loop.
      */
-    void    run();
+    void run();
 
     /**
      * @note asserted to be called with lock! CK
      **/
-    bool    assign(Runnable* task, bool withQueuing = true);
+    bool assign(Runnable* task, bool withQueuing = true);
 };
 
 
@@ -655,8 +665,7 @@ private:
  * @author Frank Fock
  * @version 3.5.19
  */
-class AGENTPP_DECL TaskManager : public Synchronized, public Runnable
-{
+class AGENTPP_DECL TaskManager : public Synchronized, public Runnable {
     friend class ThreadPool;
 
 public:
@@ -669,8 +678,7 @@ public:
      * @param stackSize
      *    the stack size for the managed thread.
      */
-    TaskManager(ThreadPool*,
-                size_t stackSize = AGENTPP_DEFAULT_STACKSIZE);
+    TaskManager(ThreadPool*, size_t stackSize = AGENTPP_DEFAULT_STACKSIZE);
 
     /**
      * Destructor will wait for thread to terminate.
@@ -684,7 +692,7 @@ public:
      *   TRUE if the thread managed by this TaskManager does
      *   not currently execute any task; FALSE otherwise.
      */
-    bool is_idle()  { return (!task && thread.is_alive()); }
+    bool is_idle() { return (!task && thread.is_alive()); }
 
     /**
      * Set the next task for execution. This will block until
@@ -697,37 +705,37 @@ public:
      *   FALSE if another thread has assigned a task concurrently.
      *   In the latter case, the task has not been assigned!
      */
-    bool  set_task(Runnable*);
+    bool set_task(Runnable*);
 
     /**
      * Clone this TaskManager.
      */
-    TaskManager*    clone()
+    TaskManager* clone()
     {
         return new TaskManager(
-                   new ThreadPool(threadPool->size(), threadPool->stack_size()));
+            new ThreadPool(threadPool->size(), threadPool->get_stack_size()));
     }
 
 protected:
-    Thread  thread;
+    Thread thread;
     ThreadPool* threadPool;
-    Runnable*   task;
+    Runnable* task;
     /**
      * Start thread execution.
      */
-    void    start() { thread.start(); }
+    void start() { thread.start(); }
     /**
      * Stop thread execution after having finished current task.
      *
      * @note asserted to be called with lock! CK
      */
-    void    stop()  { go = false; }
-    void    run();
-    bool    go;
+    void stop() { go = false; }
+    void run();
+    bool go;
 };
 
 
-//NOTE: not used by CK
+// NOTE: not used by CK
 #if 0
 /**
  * The ThreadManager class provides functionality to control the

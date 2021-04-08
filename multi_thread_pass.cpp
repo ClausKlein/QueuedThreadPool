@@ -11,7 +11,7 @@
 #include <boost/config.hpp>
 
 #if !defined BOOST_NO_CXX11_DECLTYPE
-#define BOOST_RESULT_OF_USE_DECLTYPE
+#    define BOOST_RESULT_OF_USE_DECLTYPE
 #endif
 
 #define BOOST_THREAD_VERSION 4
@@ -212,7 +212,7 @@ void test_concurrent_pull_on_queue()
                     return q.pull();
                 }
 #else
-#warning BOOST_NO_CXX11_LAMBDAS
+#    warning BOOST_NO_CXX11_LAMBDAS
                 call_pull<ValueType>(&q, &go)
 #endif
             );

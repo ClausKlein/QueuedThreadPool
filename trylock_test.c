@@ -14,12 +14,12 @@
 
 
 #ifndef _POSIX_C_SOURCE
-#ifdef __APPLE__
-#define _POSIX_C_SOURCE 200809L
+#    ifdef __APPLE__
+#        define _POSIX_C_SOURCE 200809L
 // XXX #define _DARWIN_C_SOURCE
-#else
-#define _POSIX_C_SOURCE 200112L
-#endif
+#    else
+#        define _POSIX_C_SOURCE 200112L
+#    endif
 #endif
 
 
@@ -40,9 +40,9 @@
  * expands to nothing.
  */
 #ifndef NDEBUG
-#define DPRINTF(arg) printf arg
+#    define DPRINTF(arg) printf arg
 #else
-#define DPRINTF(arg)
+#    define DPRINTF(arg)
 #endif
 
 /*
@@ -106,7 +106,7 @@ void* counter_thread(void* arg)
     while (time(NULL) < end_time) {
 
 #ifdef PTHREAD_MUTEX_RECURSIVE
-#warning "recursive mutex used"
+#    warning "recursive mutex used"
         if (recursive) {
             printf("recursive usage:\n");
             status = pthread_mutex_lock(&mutex);
@@ -134,7 +134,7 @@ void* counter_thread(void* arg)
         }
 
 #ifdef PTHREAD_MUTEX_RECURSIVE
-#warning "recursive mutex used"
+#    warning "recursive mutex used"
         if (recursive) {
             status = pthread_mutex_unlock(&mutex);
             if (status != 0) {

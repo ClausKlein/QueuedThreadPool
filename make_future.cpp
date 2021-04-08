@@ -7,7 +7,7 @@
 #include <boost/config.hpp>
 
 #if !defined BOOST_NO_CXX11_DECLTYPE
-#define BOOST_RESULT_OF_USE_DECLTYPE
+#    define BOOST_RESULT_OF_USE_DECLTYPE
 #endif
 
 // TODO: BOOST_THREAD_VERSION should be 4! CK
@@ -52,14 +52,14 @@ boost::future<int> compute(int x)
     if (x == 0)
         return boost::make_ready_future(0);
 
-#ifdef BOOST_NO_CXX11_RVALUE_REFERENCES
-#warning BOOST_NO_CXX11_RVALUE_REFERENCES
+#    ifdef BOOST_NO_CXX11_RVALUE_REFERENCES
+#        warning BOOST_NO_CXX11_RVALUE_REFERENCES
     if (x < 0)
         return boost::make_exceptional_future<int>(std::logic_error("Error"));
-#else
+#    else
     if (x < 0)
         return boost::make_exceptional(std::logic_error("Error"));
-#endif
+#    endif
 
     // boost::future<int> f1 = boost::async([]() { return x+1; });
     boost::future<int> f1 = boost::async(boost::launch::async, f1);
@@ -93,14 +93,14 @@ boost::shared_future<int> shared_compute(int x)
     if (x == 0)
         return boost::make_ready_future(0).share();
 
-#ifdef BOOST_NO_CXX11_RVALUE_REFERENCES
+#    ifdef BOOST_NO_CXX11_RVALUE_REFERENCES
     if (x < 0)
         return boost::make_exceptional_future<int>(std::logic_error("Error"))
             .share();
-#else
+#    else
     if (x < 0)
         return boost::make_exceptional(std::logic_error("Error"));
-#endif
+#    endif
 
     // boost::future<int> f1 = boost::async([]() { return x+1; });
     boost::shared_future<int> f1 =

@@ -1,6 +1,6 @@
 #if defined(__cplusplus) && (__cplusplus >= 201103L)
-#define BOOST_THREAD_VERSION 4
-#define BOOST_THREAD_PROVIDES_EXECUTORS
+#    define BOOST_THREAD_VERSION 4
+#    define BOOST_THREAD_PROVIDES_EXECUTORS
 #endif
 
 #include <asio/dispatch.hpp>

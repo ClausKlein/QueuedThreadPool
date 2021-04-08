@@ -134,15 +134,15 @@ enable_shared_from_this: CXXFLAGS+=--std=c++14
 # NOTE: this test_suite using boost unit test framework needs c++14! CK
 threads_test.o: CXXFLAGS+=--std=c++17
 threads_test.o: threads_test.cpp simple_stopwatch.hpp
-threads_test.o: threadpool.hpp
+threads_test.o: possix/threadpool.hpp
 
 
 #
 # the Agent++V4.1.2 threads.hpp interfaces implemented with boost libs
 #
-threadpool.o: CPPFLAGS+=-DNO_LOGGING
-threadpool.o: CXXFLAGS+=--std=c++17
-threadpool.o: threadpool.cpp threadpool.hpp
+possix/threadpool.o: CPPFLAGS+=-DNO_LOGGING
+possix/threadpool.o: CXXFLAGS+=--std=c++98
+possix/threadpool.o: possix/threadpool.cpp possix/threadpool.hpp
 
 ifdef USE_AGENTPP
 threads_test: CPPFLAGS+=-DPOSIX_THREADS
@@ -151,7 +151,8 @@ threads_test: LDLIBS+= -lboost_unit_test_framework$(MT)
 threads_test: LDLIBS:= -lsnmp++ -lagent++ -lcrypto
 threads_test: threads_test.o
 else
-threads_test: threadpool.o threads_test.o
+threads_test: CPPFLAGS+=-DUSE_AGENTPP_CK
+threads_test: possix/threadpool.o threads_test.o
 endif
 	$(LINK.cc) $< $@.o -o $@ $(LDLIBS)
 
