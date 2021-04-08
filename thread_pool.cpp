@@ -9,7 +9,7 @@
 #include <boost/config.hpp>
 
 #if !defined BOOST_NO_CXX11_DECLTYPE
-#define BOOST_RESULT_OF_USE_DECLTYPE
+#    define BOOST_RESULT_OF_USE_DECLTYPE
 #endif
 
 #define BOOST_THREAD_VERSION 4
@@ -28,7 +28,7 @@
 #include <iostream>
 
 #ifdef BOOST_MSVC
-#pragma warning(disable : 4127) // conditional expression is constant
+#    pragma warning(disable : 4127) // conditional expression is constant
 #endif
 
 

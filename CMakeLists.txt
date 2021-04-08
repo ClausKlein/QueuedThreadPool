@@ -87,166 +87,34 @@ if(CMAKE_DEPENDS_IN_PROJECT_ONLY)
   endif()
 endif()
 
-option(USE_CXX_CPPCHECK
-       "run cppcheck along with the compiler and report any problems" OFF
-)
+option(USE_CXX_CPPCHECK "run cppcheck along with the compiler" OFF)
 if(USE_CXX_CPPCHECK)
-  find_program(
-    CMAKE_CXX_CPPCHECK cppcheck HINTS /usr/local/bin /opt/local/bin
-                                      "C:/Program Files/Cppcheck" REQUIRED
-  )
+  find_program(CMAKE_CXX_CPPCHECK cppcheck REQUIRED)
 endif()
-
-# ----------------------------------------------------------------------
-# Note: do not use WIN32, it is not unique! ck
-# from http://www.cmake.org/Wiki/CMake_Useful_Variables#System_.26_Compiler_Information
-# UNIX : is TRUE on all UNIX-like OS's, including Apple OS X and CygWin
-# WIN32: is TRUE on Windows, including CygWin
-option(BUILD_SHARED_LIBS "Build shared libraries" ON)
-if(NOT UNIX)
-  # This variable is a special case of the more-general
-  # CMAKE_<CONFIG>_POSTFIX variable for the DEBUG configuration.
-  # See variable CMAKE_<CONFIG>_POSTFIX.
-  # Default filename postfix for libraries only under configuration <CONFIG>.
-  set(CMAKE_DEBUG_POSTFIX
-      "D"
-      CACHE STRING
-            "Postfix added to the debug version of libraries and executables"
-  )
-  # Install path prefix, prepended onto install directories.
-  # NOTE: can't be an OPTION; options are true/flase values only! ck
-  set(CMAKE_INSTALL_PREFIX
-      "C:/usr"
-      CACHE STRING "Install path prefix"
-  )
-  message("NOTE: CMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}")
-
-  option(LINK_STATIC_RUNTIME "Link the runtime libs static" OFF)
-  if(NOT BUILD_SHARED_LIBS AND LINK_STATIC_RUNTIME)
-    message("MSV: Force cmake to link MSVCR.dll statically!")
-    foreach(
-      flag_var
-      CMAKE_C_FLAGS
-      CMAKE_C_FLAGS_DEBUG
-      CMAKE_C_FLAGS_RELEASE
-      CMAKE_C_FLAGS_MINSIZEREL
-      CMAKE_C_FLAGS_RELWITHDEBINFO
-      CMAKE_CXX_FLAGS
-      CMAKE_CXX_FLAGS_DEBUG
-      CMAKE_CXX_FLAGS_RELEASE
-      CMAKE_CXX_FLAGS_MINSIZEREL
-      CMAKE_CXX_FLAGS_RELWITHDEBINFO
-    )
-      if(${flag_var} MATCHES "/MD")
-        string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
-        message("${flag_var}:'${${flag_var}}'")
-        set(${flag_var}
-            "${${flag_var}}"
-            CACHE STRING "compiler flags used" FORCE
-        )
-      endif()
-    endforeach()
-  endif()
-
-  # Disable incremental linking for debug only!
-  #
-  # Example from OpenSceneGraph:
-  # http://www.openscenegraph.org/svn/osg/OpenSceneGraph/tags/OpenSceneGraph-2.6.0/CMakeLists.txt
-  #
-  # TBD: Also remove /EDITANDCONTINUE, which is incompatible with /INCREMENTAL:NO.
-  foreach(flag_type EXE MODULE SHARED)
-    set(flag_var CMAKE_${flag_type}_LINKER_FLAGS_DEBUG)
-    string(REGEX REPLACE "INCREMENTAL:YES" "INCREMENTAL:NO" flag_tmp
-                         "${${flag_var}}"
-    )
-    ### string (REGEX REPLACE "/EDITANDCONTINUE" "" flag_tmp ${flag_tmp})
-    set(${flag_var}
-        ${flag_tmp}
-        CACHE STRING "Overriding default debug linker flags." FORCE
-    )
-    mark_as_advanced(FORCE ${flag_var})
-    message("${flag_var}:'${${flag_var}}'")
-  endforeach()
-
-endif()
-# ----------------------------------------------------------------------
 
 # set this variable to specify a common place where CMake should put all
 # libraries and executables (instead of CMAKE_CURRENT_BINARY_DIR)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
 
-# Make sure the linker can find our the library once it is built.
-### link_directories(${LIBRARY_OUTPUT_PATH})
-
 # ----------------------------------------------------------------------
-option(USE_ASIO "use the standalon asio lib too" OFF)
+option(USE_ASIO "use the standalon asio lib too" ON)
 set(ASIO_ROOT
-    /usr/local
+    $ENV{ASIO_ROOT}
     CACHE PATH "path to install dir"
 )
 if(USE_ASIO)
-  find_package(asio 1.11 CONFIG HINTS ${ASIO_ROOT})
-  if(asio_FOUND)
-    # TODO: how to use the imported asio_INCLUDE_DIR? CK
-    # NO! include_directories(BEFORE SYSTEM ${ASIO_ROOT}/include)
-    set(asio_INCLUDE_DIR ${ASIO_ROOT}/include)
-  endif()
+  find_package(asio 1.14 CONFIG HINTS ${ASIO_ROOT})
 endif()
 # ----------------------------------------------------------------------
 
 set(EXTRA_LIBS)
 option(WARN_PEDANTIC "Compile with security and all extra warnings" ON)
-if(MSVC)
-  ###NO! add_definitions(-DWIN32)
-  if(NOT WARN_PEDANTIC)
-    message("MSVC: no secure warnings!")
-    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
-  endif()
-  if(MSVC_VERSION GREATER 1399)
-    # If using Visual C++ 2005 (MSVC80) and greater (MSVC_VERSION=1400)
-    # Disable Visual C++ Security Enhancements in the CRT
-    # See http://msdn.microsoft.com/en-us/library/8ef0s5kh%28VS.100%29.aspx
-    # This is non standard and Microsoft specific
-    add_definitions(
-      -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_DEPRECATE
-      -D_CRT_OBSOLETE_NO_WARNINGS
-    )
-    message("MSVC: no obsolete warnings!")
-  endif()
-  set(EXTRA_LIBS
-      ${EXTRA_LIBS} ws2_32
-      CACHE PATH "extra libraries used"
-  )
-  mark_as_advanced(FORCE EXTRA_LIB)
-
-  ###TODO: set(CMAKE_STATIC_LIBRARY_PREFIX lib)  # libboost_chrono-vc141-mt-x32-1_67.lib
-  ## set(CMAKE_FIND_LIBRARY_PREFIXES "lib" CACHE STRING "" FORCE)
-  ## set(CMAKE_STATIC_LIBRARY_PREFIX "lib" CACHE STRING "" FORCE)
-
-else()
-  if(CMAKE_COMPILER_IS_GNUCXX)
-    # each error message will appear on a single line.
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fmessage-length=0")
-
-    ###FIXME Run the Clang Static Analyzer only.
-    ###FIXME add_definitions(--analyze)
-
-    add_definitions(-Wall)
-    add_definitions(-Wextra)
-    if(WARN_PEDANTIC)
-      message("WARN_PEDANTIC: -Wall -Wextra -Wpedantic!")
-      add_definitions(
-        -Wpedantic -Wno-unused-parameter -Wno-tautological-compare
-      )
-      add_definitions(
-        -Wunknown-pragmas -Woverloaded-virtual -Wtautological-compare
-      )
-    else()
-      add_definitions(
-        -Wno-unused-parameter -Wno-unknown-pragmas -Wno-tautological-compare
-      )
-    endif()
+if(CMAKE_COMPILER_IS_GNUCXX)
+  add_definitions(-Wall -Wextra)
+  if(WARN_PEDANTIC)
+    message("WARN_PEDANTIC: -Wall -Wextra -Wpedantic!")
+    add_definitions(-Wpedantic -Wno-unused-parameter -Wno-tautological-compare)
   endif()
 endif()
 
@@ -273,16 +141,15 @@ if(USE_BOOST)
   option(Boost_USE_MULTITHREADED "use -mt libs only" ON)
 
   find_package(
-    Boost 1.71 COMPONENTS chrono atomic thread system
-                          unit_test_framework ## regex log filesystem
-  ) # NOTE: Not REQUIRED! CK
+    Boost 1.71 CONFIG REQUIRED COMPONENTS atomic chrono filesystem thread
+                                          unit_test_framework
+  )
   if(Boost_FOUND)
-    include_directories(BEFORE SYSTEM ${Boost_INCLUDE_DIR})
     add_definitions(-DBOOST_ALL_NO_LIB)
+    # starting with boost V1.69.0, there is no chrono/stopwatches!
+    # It not longer part of boost/chrono; NOTE: use zip file! CK
+    include_directories(include)
   endif()
-  # starting with boost V1.69.0, there is no chrono/stopwatches!
-  # It not longer part of boost/chrono; NOTE: use zip file! CK
-  include_directories(include)
 endif()
 
 option(USE_PTHREAD_LIBRARY "" OFF)
@@ -291,12 +158,12 @@ if(USE_PTHREAD_LIBRARY)
   if(PTHREAD_LIBRARY)
     message(STATUS "pthread library found")
     list(APPEND EXTRA_LIBS ${PTHREAD_LIBRARY})
-    add_definitions(-DPOSIX_THREADS)
+    #XXX add_definitions(-DPOSIX_THREADS)
   endif()
 endif()
 
-enable_testing()
 if(USE_BOOST OR BUILD_TESTING)
+  enable_testing()
 
   if(Boost_FOUND)
     # additional single file examples from boost/thread and boost/asio
@@ -339,31 +206,37 @@ if(USE_BOOST OR BUILD_TESTING)
     foreach(program ${noinst_PROGRAMS})
       add_executable(${program} ${program}.cpp)
       set_target_properties(${program} PROPERTIES CXX_STANDARD 20)
-      # target_compile_definitions(${program} PRIVATE
-      #NO! -DBOOST_THREAD_VERSION=4
-      #### -DBOOST_THREAD_PROVIDES_EXECUTORS
-      #)
       target_link_libraries(${program} ${Boost_LIBRARIES} ${EXTRA_LIBS})
       add_test(NAME ${program} COMMAND ${program})
     endforeach()
 
     if(USE_ASIO AND asio_FOUND)
       add_executable(test_priority_scheduler priority_scheduler.cpp)
-      target_include_directories(
-        test_priority_scheduler SYSTEM BEFORE PRIVATE ${asio_INCLUDE_DIR}
-      )
-      set_target_properties(test_priority_scheduler PROPERTIES CXX_STANDARD 20)
+      target_compile_definitions(test_priority_scheduler PRIVATE ASIO_NO_DEPRECATED)
       target_link_libraries(
-        test_priority_scheduler ${Boost_LIBRARIES} ${EXTRA_LIBS}
+        test_priority_scheduler asio::standalone ${Boost_LIBRARIES}
+        ${EXTRA_LIBS}
       )
       add_test(NAME test_priority_scheduler COMMAND test_priority_scheduler)
     endif()
 
-  endif()
+    add_executable(threads_test threads_test.cpp threadpool.cpp threadpool.hpp)
+    target_link_libraries(
+      threads_test Boost::unit_test_framework Boost::chrono Boost::thread
+    )
+    add_test(NAME threads_test COMMAND threads_test)
 
-  add_executable(threads_test threads_test.cpp threadpool.cpp threadpool.hpp)
-  set_target_properties(threads_test PROPERTIES CXX_STANDARD 20)
-  target_link_libraries(threads_test ${Boost_LIBRARIES} ${EXTRA_LIBS})
-  add_test(NAME threads_test COMMAND threads_test)
+    add_executable(
+      threads_test_possix threads_test.cpp possix/threadpool.cpp
+                          possix/threadpool.hpp
+    )
+    target_link_libraries(
+      threads_test_possix Boost::unit_test_framework Boost::chrono
+      Boost::thread
+    )
+    target_compile_definitions(threads_test_possix PRIVATE USE_AGENTPP_CK)
+    add_test(NAME threads_test_possix COMMAND threads_test_possix)
+
+  endif()
 
 endif()

@@ -6,11 +6,11 @@ BasedOnStyle:  WebKit
 #< ColumnLimit: 0
 ColumnLimit: 79
 # ---
-#< AllowShortFunctionsOnASingleLine: All
+AllowShortFunctionsOnASingleLine: All
 #XXX AllowShortFunctionsOnASingleLine: Inline
 # ---
-#< SortIncludes:    true
-#< SortUsingDeclarations: true
+SortIncludes:    true
+SortUsingDeclarations: true
 #XXX SortIncludes:    false
 #XXX SortUsingDeclarations: false
 # ---
@@ -32,12 +32,12 @@ BraceWrapping:
   SplitEmptyNamespace: true
 
 #TODO: The preprocessor directive indenting style to use.
-# IndentPPDirectives: AfterHash
+IndentPPDirectives: AfterHash
 # ---
 BinPackArguments: true
 BinPackParameters: true
 BreakBeforeBinaryOperators: NonAssignment
-# DerivePointerAlignment: false
+DerivePointerAlignment: false
 # PointerAlignment: Right
 AlignEscapedNewlines: DontAlign
 AlignAfterOpenBracket: DontAlign

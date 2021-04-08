@@ -1,5 +1,6 @@
 #=====================
 #   configure part
+# BOOST_ROOT?=/usr
 BOOST_ROOT?=/usr/local
 MT?=-mt
 CXX:=ccache /usr/bin/g++
@@ -9,13 +10,13 @@ ifndef LCOV
 endif
 #=====================
 
-#NO! CK USE_AGENTPP:=1
+#NO! CK: USE_AGENTPP:=1
 
 CPPFLAGS+=-MMD
 CPPFLAGS+=-DBOOST_ALL_NO_LIB
 CPPFLAGS+=-I$(BOOST_ROOT)/include -I$(CURDIR)/include
 LDFLAGS+= -L$(BOOST_ROOT)/lib
-LDLIBS:= -lboost_chrono$(MT) -lboost_thread$(MT) -lboost_system$(MT)
+LDLIBS:= -lboost_chrono$(MT) -lboost_thread$(MT) -lboost_system$(MT) -lpthread
 
 CXXFLAGS+=-Wpedantic -Wextra -Wall -Wno-unused-parameter ## -Wno-c++11-long-long -Wno-long-long
 
@@ -134,15 +135,15 @@ enable_shared_from_this: CXXFLAGS+=--std=c++14
 # NOTE: this test_suite using boost unit test framework needs c++14! CK
 threads_test.o: CXXFLAGS+=--std=c++17
 threads_test.o: threads_test.cpp simple_stopwatch.hpp
-threads_test.o: threadpool.hpp
+threads_test.o: possix/threadpool.hpp
 
 
 #
 # the Agent++V4.1.2 threads.hpp interfaces implemented with boost libs
 #
-threadpool.o: CPPFLAGS+=-DNO_LOGGING
-threadpool.o: CXXFLAGS+=--std=c++17
-threadpool.o: threadpool.cpp threadpool.hpp
+possix/threadpool.o: CPPFLAGS+=-DNO_LOGGING
+possix/threadpool.o: CXXFLAGS+=--std=c++98
+possix/threadpool.o: possix/threadpool.cpp possix/threadpool.hpp
 
 ifdef USE_AGENTPP
 threads_test: CPPFLAGS+=-DPOSIX_THREADS
@@ -151,7 +152,8 @@ threads_test: LDLIBS+= -lboost_unit_test_framework$(MT)
 threads_test: LDLIBS:= -lsnmp++ -lagent++ -lcrypto
 threads_test: threads_test.o
 else
-threads_test: threadpool.o threads_test.o
+threads_test: CPPFLAGS+=-DUSE_AGENTPP_CK
+threads_test: possix/threadpool.o threads_test.o
 endif
 	$(LINK.cc) $< $@.o -o $@ $(LDLIBS)
 
@@ -179,14 +181,14 @@ distclean: clean
 	$(RM) -r build generated *.d *.bak *.orig *~ *.stackdump *.dSYM
 
 test: threads_test #XXX $(PROGRAMS)
-	./threads_test --log_level=all --run_test='Queue*'
 	./threads_test --log_level=all --run_test='Sync*'
 	./threads_test --log_level=all --run_test='Thread*'
-	timeout 10 ./threads_test --log_level=success --random
 	timeout 10 ./threads_test --run_test=ThreadPool_test -25
-	timeout 50 ./threads_test --run_test=QueuedThreadPoolLoad_test -25
-	timeout 33 ./threads_test --run_test=test_lock_ten_other_thread_locks_in_different_order -25
-	#TODO ./threads_test --run_test=QueuedThreadPoolLoad_test -1000
+	timeout 10 ./threads_test --log_level=success --random
+	./threads_test --log_level=all --run_test='Queue*'
+	timeout 60 ./threads_test --run_test=QueuedThreadPoolLoad_test -25
+	timeout 2400 ./threads_test --run_test=QueuedThreadPoolLoad_test -1000
+	#NO! timeout 33 ./threads_test --run_test=test_lock_ten_other_thread_locks_in_different_order -25
 	# ./default_executor
 	# #FIXME ./lockfree_spsc_queue
 	# ./perf_shared_mutex

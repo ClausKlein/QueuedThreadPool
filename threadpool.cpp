@@ -28,30 +28,26 @@ src/threads.cpp > threadpool.cpp
 #define BOOST_THREAD_USES_LOG
 #define BOOST_THREAD_USES_LOG_THREAD_ID
 #include <boost/assert.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/thread/detail/log.hpp>
 #include <boost/thread/future.hpp>
 
 #ifndef BOOST_MSVC
-#include <unistd.h> // _POSIX_THREADS ...
-#endif
-
-#ifdef POSIX_THREADS
-#include <pthread.h>
+#    include <unistd.h> // _POSIX_THREADS ...
 #endif
 
 #include <iostream>
 
 #if !defined(NO_LOGGING) && !defined(NDEBUG)
-#include <boost/current_function.hpp>
-#define LOG_BEGIN(x, y) std::cout << BOOST_CURRENT_FUNCTION << ": "
-#define LOG(x) std::cout << (x) << ' '
-#define LOG_END std::cout << std::endl
+#    include <boost/current_function.hpp>
+#    define LOG_BEGIN(x, y) std::cout << BOOST_CURRENT_FUNCTION << ": "
+#    define LOG(x) std::cout << (x) << ' '
+#    define LOG_END std::cout << std::endl
 #else
-#define LOG_BEGIN(x, y)
-#define LOG(x)
-#define LOG_END
-#define NO_LOGGING 1
+#    define LOG_BEGIN(x, y)
+#    define LOG(x)
+#    define LOG_END
+#    define NO_LOGGING 1
 #endif
 
 /*
@@ -60,19 +56,19 @@ src/threads.cpp > threadpool.cpp
  * std::cout. When DEBUG is not defined, it expands to nothing.
  */
 #ifdef AGENTPP_DEBUG
-#define DTRACE(arg) \
-    BOOST_THREAD_LOG << BOOST_CURRENT_FUNCTION << ": " << arg \
-                     << BOOST_THREAD_END_LOG
-#define THIS_THREAD_YIELD boost::this_thread::sleep_for(ms(10));
+#    define DTRACE(arg) \
+        BOOST_THREAD_LOG << BOOST_CURRENT_FUNCTION << ": " << arg \
+                         << BOOST_THREAD_END_LOG
+#    define THIS_THREAD_YIELD boost::this_thread::sleep_for(ms(10));
 #else
-#define DTRACE(arg)
-#ifndef AGENTPP_USE_YIELD
-#define THIS_THREAD_YIELD \
-    while (false) \
-        ;
-#else
-#define THIS_THREAD_YIELD boost::this_thread::yield();
-#endif
+#    define DTRACE(arg)
+#    ifndef AGENTPP_USE_YIELD
+#        define THIS_THREAD_YIELD \
+            while (false) \
+                ;
+#    else
+#        define THIS_THREAD_YIELD boost::this_thread::yield();
+#    endif
 #endif
 
 namespace Agentpp
@@ -127,7 +123,9 @@ void Synchronized::wait()
 }
 
 // TODO: should be bool wait_for(duration)
-bool Synchronized::wait(unsigned long timeout)
+// return false if the predicate pred still evaluates to false after the
+// rel_time timeout expired, otherwise true.
+bool Synchronized::wait_for(unsigned long timeout)
 {
     DTRACE(signal);
     BOOST_ASSERT(is_locked_by_this_thread());
@@ -386,14 +384,12 @@ void Thread::start()
         pthread_attr_setschedpolicy(&attr, policy);
         pthread_attr_setschedparam(&attr, &param);
 
-#if defined(__linux__) && defined(_GNU_SOURCE)
-        pthread_attr_setthreadname_np(&attr, AGENTX_DEFAULT_THREAD_NAME);
-#elif defined(__INTEGRITY)
+#    if defined(__INTEGRITY)
         pthread_attr_setthreadname(&attr, AGENTX_DEFAULT_THREAD_NAME);
-#elif defined(__APPLE__)
+#    elif defined(__APPLE__)
 // NOTE: must be set from within the thread (can't specify thread ID)
 // NO! pthread_setname_np(AGENTX_DEFAULT_THREAD_NAME);
-#endif
+#    endif
 
         pthread_attr_setstacksize(&attr, stackSize);
         int err = pthread_create(&tid, &attr, thread_starter, this);
@@ -407,6 +403,10 @@ void Thread::start()
             status = FINISHED; // NOTE: we are not started, see join()! CK
         } else {
             status = RUNNING;
+
+#    if defined(__linux__) && defined(_GNU_SOURCE)
+            pthread_setname_np(tid, AGENTX_DEFAULT_THREAD_NAME);
+#    endif
         }
         pthread_attr_destroy(&attr);
     } else {
@@ -564,7 +564,7 @@ void ThreadPool::execute(Runnable* t)
             }
         }
         DTRACE("Busy! Synchronized::wait()");
-        wait(rand() % 113); // wait_for(ms)
+        wait_for(rand() % 113); // wait_for(ms)
         // TODO wait(); // NOTE: forever until idle_notification() CK
     }
 }

@@ -21,7 +21,7 @@
 #include <iostream>
 
 #ifdef DEBUG
-#define VERBOSE
+#    define VERBOSE
 #endif
 
 using namespace boost;

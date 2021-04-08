@@ -29,7 +29,7 @@ class A {
 #elif MODE == SHARED
     typedef boost::shared_mutex mutex_type;
 #else
-#error MODE not set
+#    error MODE not set
 #endif
 
     typedef std::vector<double> C;
@@ -54,7 +54,7 @@ A::A(const A& a)
 #elif MODE == SHARED
     boost::shared_lock<mutex_type> lk(a.mut_);
 #else
-#error MODE not set
+#    error MODE not set
 #endif
 
     data_ = a.data_;
@@ -70,7 +70,7 @@ A& A::operator=(const A& a)
 #elif MODE == SHARED
         boost::shared_lock<mutex_type> lk2(a.mut_, boost::defer_lock);
 #else
-#error MODE not set
+#    error MODE not set
 #endif
 
         boost::lock(lk1, lk2);
@@ -91,7 +91,7 @@ void A::compute(const A& x, const A& y)
     boost::shared_lock<mutex_type> lk2(x.mut_, boost::defer_lock);
     boost::shared_lock<mutex_type> lk3(y.mut_, boost::defer_lock);
 #else
-#error MODE not set
+#    error MODE not set
 #endif
 
     boost::lock(lk1, lk2, lk3);

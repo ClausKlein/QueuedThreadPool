@@ -7,6 +7,8 @@
 #define BOOST_CHRONO_VERSION 2
 #define BOOST_CHRONO_DONT_PROVIDE_HYBRID_ERROR_HANDLING 1
 
+#include <time.h>
+
 #include <boost/chrono/chrono_io.hpp>
 
 #include "boost/chrono/stopwatches/reporters/stopwatch_reporter.hpp"
