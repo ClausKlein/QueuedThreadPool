@@ -28,7 +28,7 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 
 #ifdef __INTEGRITY
 #    include <integrity.h>
-#    define NO_LOGGING 1
+#    define NO_LOGGING
 #endif
 
 #ifdef _WIN32
@@ -47,11 +47,10 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #include <boost/current_function.hpp>
 #include <boost/noncopyable.hpp>
 
-#ifndef WIN32
-#    define AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD // TODO: check this! CK
-#endif
-
+// NOTE: do not change! CK
+#define AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
 #define AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
+
 #define AGENTPP_DEFAULT_STACKSIZE 0x10000UL
 #define AGENTPP_OPAQUE_PTHREAD_T void*
 #define AGENTX_DEFAULT_PRIORITY 32
@@ -359,7 +358,7 @@ public:
      *
      * Subclasses of Thread should override this method.
      */
-    virtual void run();
+    virtual void run() override;
 
     /**
      * Get the Runnable object used for thread execution.
@@ -582,7 +581,7 @@ public:
      *    the number of threads started for performing tasks.
      *    The default value is 4 threads.
      */
-    explicit QueuedThreadPool(size_t size = 4);
+    explicit QueuedThreadPool(size_t size = 1);
 
 
     /**
@@ -730,7 +729,7 @@ protected:
      * @note asserted to be called with lock! CK
      */
     void stop() { go = false; }
-    void run();
+    void run() override;
     bool go;
 };
 

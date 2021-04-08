@@ -404,10 +404,9 @@ void Thread::start()
         } else {
             status = RUNNING;
 
-#if defined(__linux__) && defined(_GNU_SOURCE)
+#    if defined(__linux__) && defined(_GNU_SOURCE)
             pthread_setname_np(tid, AGENTX_DEFAULT_THREAD_NAME);
-#endif
-
+#    endif
         }
         pthread_attr_destroy(&attr);
     } else {

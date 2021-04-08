@@ -83,10 +83,9 @@ public:
 
     virtual void run() BOOST_OVERRIDE
     {
-        scoped_lock l(lock);
-
         Thread::sleep((rand() % 3) * delay); // ms
 
+        scoped_lock l(lock);
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << " called with: " << text);
         size_t hash = boost::hash_value(text);
         result.push(hash);
@@ -272,10 +271,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
 
         BOOST_TEST_MESSAGE(
             "queuedThreadPool.size: " << queuedThreadPool.size());
-
-#if !defined(USE_AGENTPP_CK)
-        BOOST_TEST(queuedThreadPool.size() == 1UL); // TODO: check this! CK
-#endif                                              // !defined(USE_AGENTPP_CK)
+        BOOST_TEST(queuedThreadPool.size() == 1UL);
 
         BOOST_TEST(
             queuedThreadPool.get_stack_size() == AGENTPP_DEFAULT_STACKSIZE);
@@ -321,7 +317,6 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
     BOOST_TEST(TestTask::run_count() == 9UL, "All task has to be executed!");
     TestTask::reset_counter();
 
-#if !defined(USE_AGENTPP_CK)
     BOOST_TEST_MESSAGE("NOTE: checking the order of execution");
     for (size_t i = 1; i < 10; i++) {
         size_t value;
@@ -335,8 +330,6 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
             }
         }
     }
-#endif
-
 }
 
 BOOST_AUTO_TEST_CASE(QueuedThreadPoolLoad_test)
@@ -928,6 +921,7 @@ int main(int argc, char* argv[])
 
     do {
         StopwatchReporter sw;
+        srand(time(NULL));
 
         error = ::boost::unit_test::unit_test_main(init_func, argc, argv);
 

@@ -10,7 +10,7 @@ ifndef LCOV
 endif
 #=====================
 
-#NO! CK USE_AGENTPP:=1
+#NO! CK: USE_AGENTPP:=1
 
 CPPFLAGS+=-MMD
 CPPFLAGS+=-DBOOST_ALL_NO_LIB

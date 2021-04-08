@@ -26,7 +26,6 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 
 #include <errno.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #ifdef _WIN32
@@ -116,7 +115,7 @@ int Synchronized::next_id = 0;
         if (err) { \
             LOG_BEGIN(loggerModuleName, ERROR_LOG | 0); \
             LOG("Constructing Synchronized failed at '" #x "' with (err)"); \
-            LOG(err); \
+            LOG(strerror(err)); \
             LOG_END; \
         } \
     } while (0)
@@ -250,14 +249,12 @@ bool Synchronized::wait(unsigned long timeout)
 #    endif
 
     int err = cond_timed_wait(&ts);
-    if (err != 0) {
-        fputs(strerror(err), stderr);
-
+    if (err) {
         switch (err) {
         case EINVAL:
             LOG_BEGIN(loggerModuleName, WARNING_LOG | 1);
             LOG("Synchronized: wait with timeout returned (error)");
-            LOG(err);
+            LOG(strerror(err));
             LOG_END;
         // fallthrough
         case ETIMEDOUT:
@@ -266,7 +263,7 @@ bool Synchronized::wait(unsigned long timeout)
         default:
             LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
             LOG("Synchronized: wait with timeout returned (error)");
-            LOG(err);
+            LOG(strerror(err));
             LOG_END;
             break;
         }
@@ -283,7 +280,7 @@ void Synchronized::notify()
     if (err) {
         LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
         LOG("Synchronized: notify failed (err)");
-        LOG(err);
+        LOG(strerror(err));
         LOG_END;
     }
 }
@@ -295,7 +292,7 @@ void Synchronized::notify_all()
     if (err) {
         LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
         LOG("Synchronized: notify_all failed (err)");
-        LOG(err);
+        LOG(strerror(err));
         LOG_END;
     }
 }
@@ -389,7 +386,7 @@ bool Synchronized::unlock()
         LOG_BEGIN(loggerModuleName, WARNING_LOG | 1);
         LOG("Synchronized: unlock failed (id)(error)");
         LOG(id);
-        LOG(err);
+        LOG(strerror(err));
         LOG_END;
         return false;
     }
@@ -496,7 +493,7 @@ void Thread::join()
         if (err) {
             LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
             LOG("Thread: join failed (error)");
-            LOG(err);
+            LOG(strerror(err));
             LOG_END;
         }
         status = IDLE;
@@ -538,7 +535,7 @@ void Thread::start()
         if (err) {
             LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
             LOG("Thread: cannot start thread (error)");
-            LOG(err);
+            LOG(strerror(err));
             LOG_END;
 
             DTRACE("Error: cannot start thread!");
@@ -549,7 +546,6 @@ void Thread::start()
 #if defined(__linux__) && defined(_GNU_SOURCE)
             pthread_setname_np(tid, AGENTX_DEFAULT_THREAD_NAME);
 #endif
-
         }
         pthread_attr_destroy(&attr);
     } else {

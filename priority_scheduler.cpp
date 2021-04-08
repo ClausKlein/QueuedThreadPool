@@ -6,7 +6,7 @@
 #include <asio/dispatch.hpp>
 #include <asio/execution_context.hpp>
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
