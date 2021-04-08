@@ -1,5 +1,6 @@
 #=====================
 #   configure part
+# BOOST_ROOT?=/usr
 BOOST_ROOT?=/usr/local
 MT?=-mt
 CXX:=ccache /usr/bin/g++
@@ -15,7 +16,7 @@ CPPFLAGS+=-MMD
 CPPFLAGS+=-DBOOST_ALL_NO_LIB
 CPPFLAGS+=-I$(BOOST_ROOT)/include -I$(CURDIR)/include
 LDFLAGS+= -L$(BOOST_ROOT)/lib
-LDLIBS:= -lboost_chrono$(MT) -lboost_thread$(MT) -lboost_system$(MT)
+LDLIBS:= -lboost_chrono$(MT) -lboost_thread$(MT) -lboost_system$(MT) -lpthread
 
 CXXFLAGS+=-Wpedantic -Wextra -Wall -Wno-unused-parameter ## -Wno-c++11-long-long -Wno-long-long
 
@@ -180,14 +181,14 @@ distclean: clean
 	$(RM) -r build generated *.d *.bak *.orig *~ *.stackdump *.dSYM
 
 test: threads_test #XXX $(PROGRAMS)
-	./threads_test --log_level=all --run_test='Queue*'
 	./threads_test --log_level=all --run_test='Sync*'
 	./threads_test --log_level=all --run_test='Thread*'
-	timeout 10 ./threads_test --log_level=success --random
 	timeout 10 ./threads_test --run_test=ThreadPool_test -25
-	timeout 50 ./threads_test --run_test=QueuedThreadPoolLoad_test -25
-	timeout 33 ./threads_test --run_test=test_lock_ten_other_thread_locks_in_different_order -25
-	#TODO ./threads_test --run_test=QueuedThreadPoolLoad_test -1000
+	timeout 10 ./threads_test --log_level=success --random
+	./threads_test --log_level=all --run_test='Queue*'
+	timeout 60 ./threads_test --run_test=QueuedThreadPoolLoad_test -25
+	timeout 2400 ./threads_test --run_test=QueuedThreadPoolLoad_test -1000
+	#NO! timeout 33 ./threads_test --run_test=test_lock_ten_other_thread_locks_in_different_order -25
 	# ./default_executor
 	# #FIXME ./lockfree_spsc_queue
 	# ./perf_shared_mutex

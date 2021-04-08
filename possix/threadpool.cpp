@@ -25,6 +25,7 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #include "threadpool.hpp"
 
 #include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -438,6 +439,8 @@ void* thread_starter(void* t)
 
 #if defined(__APPLE__)
     pthread_setname_np(AGENTX_DEFAULT_THREAD_NAME);
+#elif defined(__linux__) && defined(_GNU_SOURCE)
+    pthread_setname_np(pthread_self(), AGENTX_DEFAULT_THREAD_NAME);
 #endif
 
     thread->get_runnable()->run();
@@ -523,9 +526,7 @@ void Thread::start()
         pthread_attr_setschedpolicy(&attr, policy);
         pthread_attr_setschedparam(&attr, &param);
 
-#if defined(__linux__) && defined(_GNU_SOURCE)
-        pthread_attr_setthreadname_np(&attr, AGENTX_DEFAULT_THREAD_NAME);
-#elif defined(__INTEGRITY)
+#if defined(__INTEGRITY)
         pthread_attr_setthreadname(&attr, AGENTX_DEFAULT_THREAD_NAME);
 #elif defined(__APPLE__)
         // NOTE: must be set from within the thread (can't specify thread ID)
@@ -544,6 +545,11 @@ void Thread::start()
             status = FINISHED; // NOTE: we are not started, see join()! CK
         } else {
             status = RUNNING;
+
+#if defined(__linux__) && defined(_GNU_SOURCE)
+            pthread_setname_np(tid, AGENTX_DEFAULT_THREAD_NAME);
+#endif
+
         }
         pthread_attr_destroy(&attr);
     } else {

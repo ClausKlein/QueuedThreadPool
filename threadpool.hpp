@@ -34,6 +34,10 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #    include <time.h>
 #endif
 
+#ifdef POSIX_THREADS
+#    include <pthread.h>
+#endif
+
 #include <list>
 #include <memory>
 #include <queue>

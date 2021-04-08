@@ -321,6 +321,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
     BOOST_TEST(TestTask::run_count() == 9UL, "All task has to be executed!");
     TestTask::reset_counter();
 
+#if !defined(USE_AGENTPP_CK)
     BOOST_TEST_MESSAGE("NOTE: checking the order of execution");
     for (size_t i = 1; i < 10; i++) {
         size_t value;
@@ -334,6 +335,8 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
             }
         }
     }
+#endif
+
 }
 
 BOOST_AUTO_TEST_CASE(QueuedThreadPoolLoad_test)

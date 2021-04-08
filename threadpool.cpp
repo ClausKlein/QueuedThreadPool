@@ -28,16 +28,12 @@ src/threads.cpp > threadpool.cpp
 #define BOOST_THREAD_USES_LOG
 #define BOOST_THREAD_USES_LOG_THREAD_ID
 #include <boost/assert.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/thread/detail/log.hpp>
 #include <boost/thread/future.hpp>
 
 #ifndef BOOST_MSVC
 #    include <unistd.h> // _POSIX_THREADS ...
-#endif
-
-#ifdef POSIX_THREADS
-#    include <pthread.h>
 #endif
 
 #include <iostream>
@@ -388,9 +384,7 @@ void Thread::start()
         pthread_attr_setschedpolicy(&attr, policy);
         pthread_attr_setschedparam(&attr, &param);
 
-#    if defined(__linux__) && defined(_GNU_SOURCE)
-        pthread_attr_setthreadname_np(&attr, AGENTX_DEFAULT_THREAD_NAME);
-#    elif defined(__INTEGRITY)
+#    if defined(__INTEGRITY)
         pthread_attr_setthreadname(&attr, AGENTX_DEFAULT_THREAD_NAME);
 #    elif defined(__APPLE__)
 // NOTE: must be set from within the thread (can't specify thread ID)
@@ -409,6 +403,11 @@ void Thread::start()
             status = FINISHED; // NOTE: we are not started, see join()! CK
         } else {
             status = RUNNING;
+
+#if defined(__linux__) && defined(_GNU_SOURCE)
+            pthread_setname_np(tid, AGENTX_DEFAULT_THREAD_NAME);
+#endif
+
         }
         pthread_attr_destroy(&attr);
     } else {
