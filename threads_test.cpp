@@ -242,6 +242,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_busy_test)
 
 #ifdef USE_BUSY_TEST
         // XXX BOOST_TEST(threadPool.is_busy());
+#endif
 
         do {
             BOOST_TEST_MESSAGE(
@@ -252,7 +253,6 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_busy_test)
 
         threadPool.terminate();
         BOOST_TEST_MESSAGE("outstanding tasks: " << TestTask::task_count());
-#endif
     }
     BOOST_TEST(TestTask::task_count() == 0UL, "All task has to be deleted!");
     TestTask::reset_counter();

@@ -238,22 +238,22 @@ if(USE_BOOST OR BUILD_TESTING)
   target_link_libraries(test_trylock Boost::chrono Boost::thread)
   add_test(NAME test_trylock COMMAND test_trylock)
 
-  add_executable(threads_test threads_test.cpp threadpool.cpp threadpool.hpp)
-  set_target_properties(threads_test PROPERTIES CXX_STANDARD 17)
-  target_link_libraries(
-    threads_test Boost::unit_test_framework Boost::chrono Boost::thread
-  )
-  add_test(NAME threads_test COMMAND threads_test --log_level=success)
-  add_test(NAME threads_test-random COMMAND threads_test --log_level=success
-                                            --random
-  )
-  add_test(NAME threads_test-thread COMMAND threads_test --log_level=success
-                                            --run_test=ThreadPool_test -25
-  )
-  add_test(NAME threads_test-queue
-           COMMAND threads_test --log_level=success
-                   --run_test=QueuedThreadPoolLoad_test -25
-  )
+  # add_executable(threads_test threads_test.cpp threadpool.cpp threadpool.hpp)
+  # set_target_properties(threads_test PROPERTIES CXX_STANDARD 17)
+  # target_link_libraries(
+  #   threads_test Boost::unit_test_framework Boost::chrono Boost::thread
+  # )
+  # add_test(NAME threads_test COMMAND threads_test --log_level=success)
+  # add_test(NAME threads_test-random COMMAND threads_test --log_level=success
+  #                                           --random
+  # )
+  # add_test(NAME threads_test-thread COMMAND threads_test --log_level=success
+  #                                           --run_test=ThreadPool_test -25
+  # )
+  # add_test(NAME threads_test-queue
+  #          COMMAND threads_test --log_level=success
+  #                  --run_test=QueuedThreadPoolLoad_test -25
+  # )
 
   add_executable(
     threads_test_possix threads_test.cpp possix/threadpool.cpp
