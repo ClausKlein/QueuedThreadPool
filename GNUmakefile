@@ -8,7 +8,7 @@ MAKEFLAGS+= --no-builtin-rules
 
 .PHONY: setup show all test lcov install check format clean distclean
 
-PROJECT_NAME:=$(shell basename $${PWD})
+PROJECT_NAME:=$(shell basename $(CURDIR))
 
 ##################################################
 # begin of config part

@@ -10,12 +10,9 @@ if(CCACHE_EXECUTABLE AND NOT CMAKE_TOOLCHAIN_FILE)
   )
 endif()
 
-# The name of our project is "ThreadPoolTests". CMakeLists files in this project can
-# refer to the root source directory of the project as ${PROJECT_SOURCE_DIR}
-# and to the root binary directory of the project as ${PROJECT_BINARY_DIR}.
-#===========================
-project(ThreadPoolTests CXX)
-#===========================
+#================================
+project(AgentPro LANGUAGES CXX C)
+#================================
 
 message(STATUS "Configuring on/for ${CMAKE_SYSTEM_NAME}")
 
@@ -165,7 +162,7 @@ endif()
 if(USE_BOOST OR BUILD_TESTING)
   enable_testing()
 
-  if(Boost_FOUND)
+  if(BUILD_TESTING)
     # additional single file examples from boost/thread and boost/asio
     set(noinst_PROGRAMS
         #C++14
@@ -212,31 +209,73 @@ if(USE_BOOST OR BUILD_TESTING)
 
     if(USE_ASIO AND asio_FOUND)
       add_executable(test_priority_scheduler priority_scheduler.cpp)
-      target_compile_definitions(test_priority_scheduler PRIVATE ASIO_NO_DEPRECATED)
+      target_compile_definitions(
+        test_priority_scheduler PRIVATE ASIO_NO_DEPRECATED
+      )
       target_link_libraries(
         test_priority_scheduler asio::standalone ${Boost_LIBRARIES}
         ${EXTRA_LIBS}
       )
       add_test(NAME test_priority_scheduler COMMAND test_priority_scheduler)
     endif()
-
-    add_executable(threads_test threads_test.cpp threadpool.cpp threadpool.hpp)
-    target_link_libraries(
-      threads_test Boost::unit_test_framework Boost::chrono Boost::thread
-    )
-    add_test(NAME threads_test COMMAND threads_test)
-
-    add_executable(
-      threads_test_possix threads_test.cpp possix/threadpool.cpp
-                          possix/threadpool.hpp
-    )
-    target_link_libraries(
-      threads_test_possix Boost::unit_test_framework Boost::chrono
-      Boost::thread
-    )
-    target_compile_definitions(threads_test_possix PRIVATE USE_AGENTPP_CK)
-    add_test(NAME threads_test_possix COMMAND threads_test_possix)
-
   endif()
 
+  # additional tests from me (CK)
+  add_executable(test_mutexattr test_mutexattr.c)
+  set_target_properties(test_mutexattr PROPERTIES CXX_STANDARD 99)
+  target_link_libraries(test_mutexattr ${PTHREAD_LIBRARY})
+  add_test(NAME test_mutexattr COMMAND test_mutexattr)
+  add_test(NAME test_mutexattr-recursive COMMAND test_mutexattr -1)
+  add_test(NAME test_mutexattr-errorcheck COMMAND test_mutexattr 1)
+
+  add_executable(test_thread_tss thread_tss_test.cpp)
+  set_target_properties(test_thread_tss PROPERTIES CXX_STANDARD 98)
+  target_link_libraries(test_thread_tss Boost::thread)
+  add_test(NAME test_thread_tss COMMAND test_trylock)
+
+  add_executable(test_trylock trylock_test.cpp)
+  set_target_properties(test_trylock PROPERTIES CXX_STANDARD 17)
+  target_link_libraries(test_trylock Boost::chrono Boost::thread)
+  add_test(NAME test_trylock COMMAND test_trylock)
+
+  add_executable(threads_test threads_test.cpp threadpool.cpp threadpool.hpp)
+  set_target_properties(threads_test PROPERTIES CXX_STANDARD 17)
+  target_link_libraries(
+    threads_test Boost::unit_test_framework Boost::chrono Boost::thread
+  )
+  add_test(NAME threads_test COMMAND threads_test --log_level=success)
+  add_test(NAME threads_test-random COMMAND threads_test --log_level=success
+                                            --random
+  )
+  add_test(NAME threads_test-thread COMMAND threads_test --log_level=success
+                                            --run_test=ThreadPool_test -25
+  )
+  add_test(NAME threads_test-queue
+           COMMAND threads_test --log_level=success
+                   --run_test=QueuedThreadPoolLoad_test -25
+  )
+
+  add_executable(
+    threads_test_possix threads_test.cpp possix/threadpool.cpp
+                        possix/threadpool.hpp
+  )
+  target_link_libraries(
+    threads_test_possix Boost::unit_test_framework Boost::chrono Boost::thread
+  )
+  set_target_properties(threads_test_possix PROPERTIES CXX_STANDARD 17)
+  target_compile_definitions(threads_test_possix PRIVATE USE_AGENTPP_CK)
+  add_test(NAME threads_test_possix COMMAND threads_test_possix
+                                            --log_level=success
+  )
+  add_test(NAME threads_test_possix-random COMMAND threads_test_possix
+                                                   --log_level=success --random
+  )
+  add_test(NAME threads_test_possix-thread
+           COMMAND threads_test_possix --log_level=success
+                   --run_test=ThreadPool_test -25
+  )
+  add_test(NAME threads_test_possix-queue
+           COMMAND threads_test_possix --log_level=success
+                   --run_test=QueuedThreadPoolLoad_test -25
+  )
 endif()
