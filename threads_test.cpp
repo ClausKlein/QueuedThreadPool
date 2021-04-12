@@ -75,13 +75,13 @@ public:
     }
 
 #ifndef USE_AGENTPP_CK
-    virtual std::unique_ptr<Runnable> clone() const BOOST_OVERRIDE
+    std::unique_ptr<Runnable> clone() const BOOST_OVERRIDE
     {
         return std::make_unique<TestTask>(text, result, delay);
     }
 #endif
 
-    virtual void run() BOOST_OVERRIDE
+    void run() BOOST_OVERRIDE
     {
         Thread::sleep((rand() % 3) * delay); // ms
 
@@ -577,14 +577,14 @@ BOOST_AUTO_TEST_CASE(SyncWait_test)
 class BadTask : public Runnable {
 public:
     BadTask() {};
-    virtual void run() BOOST_OVERRIDE
+    void run() BOOST_OVERRIDE
     {
         std::cout << "Hello world!" << std::endl;
         throw std::runtime_error("Fatal Error, can't continue!");
     };
 
 #ifndef USE_AGENTPP_CK
-    virtual std::unique_ptr<Runnable> clone() const BOOST_OVERRIDE
+    std::unique_ptr<Runnable> clone() const BOOST_OVERRIDE
     {
         return std::make_unique<BadTask>();
     }

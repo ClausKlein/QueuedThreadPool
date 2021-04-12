@@ -328,7 +328,7 @@ public:
      * Destroy thread. If thread is running or has been finished but
      * not joined yet, then join it.
      */
-    virtual ~Thread();
+    ~Thread() BOOST_OVERRIDE;
 
     /**
      * Causes the currently executing thread to sleep (temporarily
@@ -358,7 +358,7 @@ public:
      *
      * Subclasses of Thread should override this method.
      */
-    virtual void run() override;
+    void run() BOOST_OVERRIDE;
 
     /**
      * Get the Runnable object used for thread execution.
@@ -599,13 +599,13 @@ public:
     /**
      * Destructor will wait for termination of all threads.
      */
-    virtual ~QueuedThreadPool();
+    ~QueuedThreadPool() BOOST_OVERRIDE;
 
     /**
      * Execute a task. The task will be deleted after call of
      * its run() method.
      */
-    void execute(Runnable*);
+    void execute(Runnable*) BOOST_OVERRIDE;
 
     /**
      * Gets the current number of queued tasks.
@@ -622,7 +622,7 @@ public:
      *    TRUE if non of the threads in the pool is currently
      *    executing any task and the queue is emtpy().
      */
-    virtual bool is_idle();
+    bool is_idle() BOOST_OVERRIDE;
 
     /**
      * Check whether the ThreadPool is busy
@@ -632,7 +632,7 @@ public:
      *    TRUE if all of the threads in the pool is currently
      *    executing any task or the queue is not empty.
      */
-    virtual bool is_busy();
+    bool is_busy() BOOST_OVERRIDE;
 
     /**
      * Stop queue processing.
@@ -642,13 +642,13 @@ public:
     /**
      * Notifies the thread pool about an idle thread.
      */
-    virtual void idle_notification();
+    void idle_notification() BOOST_OVERRIDE;
 
 private:
     /**
      * Runs the queue processing loop.
      */
-    void run();
+    void run() BOOST_OVERRIDE;
 
     /**
      * @note asserted to be called with lock! CK
@@ -682,7 +682,7 @@ public:
     /**
      * Destructor will wait for thread to terminate.
      */
-    virtual ~TaskManager();
+    ~TaskManager() BOOST_OVERRIDE;
 
     /**
      * Check whether this thread is idle or not.
@@ -729,7 +729,7 @@ protected:
      * @note asserted to be called with lock! CK
      */
     void stop() { go = false; }
-    void run() override;
+    void run() BOOST_OVERRIDE;
     bool go;
 };
 

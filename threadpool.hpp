@@ -167,7 +167,7 @@ public:
     Runnable()
         : ClonableBase()
     { }
-    virtual ~Runnable() { }
+    ~Runnable() BOOST_OVERRIDE { }
 
     virtual std::unique_ptr<Runnable> clone() const = 0;
     /**
@@ -433,7 +433,7 @@ public:
      * Destroy thread. If thread is running or has been finished but
      * not joined yet, then join it.
      */
-    virtual ~Thread();
+    ~Thread() BOOST_OVERRIDE;
 
     /**
      * Causes the currently executing thread to sleep (temporarily
@@ -463,7 +463,7 @@ public:
      *
      * Subclasses of Thread should override this method.
      */
-    virtual void run() BOOST_OVERRIDE;
+    void run() BOOST_OVERRIDE;
 
     /**
      * Get the Runnable object used for thread execution.
@@ -609,7 +609,7 @@ public:
     /**
      * Destructor will wait for termination of all threads.
      */
-    virtual ~ThreadPool();
+    ~ThreadPool() BOOST_OVERRIDE;
 
     /**
      * Execute a task. The task will be deleted after call of
@@ -709,13 +709,13 @@ public:
     /**
      * Destructor will wait for termination of all threads.
      */
-    virtual ~QueuedThreadPool();
+    ~QueuedThreadPool() BOOST_OVERRIDE;
 
     /**
      * Execute a task. The task will be deleted after call of
      * its run() method.
      */
-    virtual void execute(Runnable*) BOOST_OVERRIDE;
+    void execute(Runnable*) BOOST_OVERRIDE;
 
     /**
      * Gets the current number of queued tasks (SYNCHRONIZED).
@@ -733,7 +733,7 @@ public:
     /**
      * Notifies the thread pool about an idle thread (SYNCHRONIZED).
      */
-    virtual void idle_notification() BOOST_OVERRIDE;
+    void idle_notification() BOOST_OVERRIDE;
 
     /**
      * Check whether QueuedThreadPool is idle or not (SYNCHRONIZED).
@@ -742,7 +742,7 @@ public:
      *    TRUE if non of the threads in the pool is currently
      *    executing any task and the queue is emtpy().
      */
-    virtual bool is_idle() BOOST_OVERRIDE;
+    bool is_idle() BOOST_OVERRIDE;
 
     /**
      * Check whether the ThreadPool is busy (i.e., all threads are
@@ -752,11 +752,11 @@ public:
      *    TRUE if non of the threads in the pool is currently
      *    idle (not executing any task).
      */
-    virtual bool is_busy() BOOST_OVERRIDE;
+    bool is_busy() BOOST_OVERRIDE;
 
-    virtual size_t size() const BOOST_OVERRIDE { return _size; }
+    size_t size() const BOOST_OVERRIDE { return _size; }
 
-    virtual void terminate() BOOST_OVERRIDE;
+    void terminate() BOOST_OVERRIDE;
 
 protected:
     /**
@@ -801,7 +801,7 @@ public:
     /**
      * Destructor will wait for thread to terminate.
      */
-    virtual ~TaskManager();
+    ~TaskManager() BOOST_OVERRIDE;
 
     /**
      * Check whether this thread is idle or not.
@@ -858,7 +858,7 @@ protected:
     /**
      * Runs the task (SYNCHRONIZED).
      */
-    virtual void run() BOOST_OVERRIDE;
+    void run() BOOST_OVERRIDE;
 
     inline bool has_task() { return (!go || task); }
 
