@@ -601,7 +601,6 @@ BOOST_AUTO_TEST_CASE(ThreadTaskThrow_test)
 }
 #endif
 
-#if 0
 BOOST_AUTO_TEST_CASE(ThreadLivetime_test)
 {
     Stopwatch sw;
@@ -614,26 +613,17 @@ BOOST_AUTO_TEST_CASE(ThreadLivetime_test)
     }
     BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
 }
-#endif
 
 BOOST_AUTO_TEST_CASE(ThreadNanoSleep_test)
 {
-    Stopwatch sw;
-    Thread::sleep(1, 999);
-    ns d = sw.elapsed() - ms(2);
-    BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
-    BOOST_TEST(d < ns(max_diff));
-}
-
-BOOST_AUTO_TEST_CASE(ThreadSleep_test)
-{
     {
         Stopwatch sw;
-        Thread::sleep(BOOST_THREAD_TEST_TIME_MS); // ms
-        ns d = sw.elapsed() - ms(BOOST_THREAD_TEST_TIME_MS);
+        Thread::sleep(1, 999); // ms + ns
+        ns d = sw.elapsed() - (ms(1) + ns(999));
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
         BOOST_TEST(d < ns(max_diff));
     }
+
     {
         Stopwatch sw;
         Thread::sleep(BOOST_THREAD_TEST_TIME_MS, 999999); // ms + ns
@@ -641,6 +631,15 @@ BOOST_AUTO_TEST_CASE(ThreadSleep_test)
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
         BOOST_TEST(d < ns(max_diff));
     }
+}
+
+BOOST_AUTO_TEST_CASE(ThreadSleep_test)
+{
+    Stopwatch sw;
+    Thread::sleep(BOOST_THREAD_TEST_TIME_MS); // ms
+    ns d = sw.elapsed() - ms(BOOST_THREAD_TEST_TIME_MS);
+    BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
+    BOOST_TEST(d < ns(max_diff));
 }
 
 struct wait_data {
