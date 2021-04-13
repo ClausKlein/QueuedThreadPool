@@ -17,7 +17,7 @@ project(AgentPro LANGUAGES CXX C)
 message(STATUS "Configuring on/for ${CMAKE_SYSTEM_NAME}")
 
 ## require a C++ standard
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 option(CMAKE_CXX_EXTENSIONS "" OFF)
 option(CMAKE_CXX_STANDARD_REQUIRED "" ON)
 
@@ -105,7 +105,6 @@ if(USE_ASIO)
 endif()
 # ----------------------------------------------------------------------
 
-set(EXTRA_LIBS)
 option(WARN_PEDANTIC "Compile with security and all extra warnings" ON)
 if(CMAKE_COMPILER_IS_GNUCXX)
   add_definitions(-Wall -Wextra)
@@ -149,15 +148,7 @@ if(USE_BOOST)
   endif()
 endif()
 
-option(USE_PTHREAD_LIBRARY "" OFF)
-if(USE_PTHREAD_LIBRARY)
-  find_library(PTHREAD_LIBRARY pthread)
-  if(PTHREAD_LIBRARY)
-    message(STATUS "pthread library found")
-    list(APPEND EXTRA_LIBS ${PTHREAD_LIBRARY})
-    #XXX add_definitions(-DPOSIX_THREADS)
-  endif()
-endif()
+find_package(Threads REQUIRED)
 
 if(USE_BOOST OR BUILD_TESTING)
   enable_testing()
@@ -203,7 +194,7 @@ if(USE_BOOST OR BUILD_TESTING)
     foreach(program ${noinst_PROGRAMS})
       add_executable(${program} ${program}.cpp)
       set_target_properties(${program} PROPERTIES CXX_STANDARD 20)
-      target_link_libraries(${program} ${Boost_LIBRARIES} ${EXTRA_LIBS})
+      target_link_libraries(${program} ${Boost_LIBRARIES} Threads::Threads)
       add_test(NAME ${program} COMMAND ${program})
     endforeach()
 
@@ -213,8 +204,7 @@ if(USE_BOOST OR BUILD_TESTING)
         test_priority_scheduler PRIVATE ASIO_NO_DEPRECATED
       )
       target_link_libraries(
-        test_priority_scheduler asio::standalone ${Boost_LIBRARIES}
-        ${EXTRA_LIBS}
+        test_priority_scheduler asio::standalone ${Boost_LIBRARIES} Threads::Threads
       )
       add_test(NAME test_priority_scheduler COMMAND test_priority_scheduler)
     endif()
@@ -223,7 +213,7 @@ if(USE_BOOST OR BUILD_TESTING)
   # additional tests from me (CK)
   add_executable(test_mutexattr test_mutexattr.c)
   set_target_properties(test_mutexattr PROPERTIES CXX_STANDARD 99)
-  target_link_libraries(test_mutexattr ${PTHREAD_LIBRARY})
+  target_link_libraries(test_mutexattr Threads::Threads )
   add_test(NAME test_mutexattr COMMAND test_mutexattr)
   add_test(NAME test_mutexattr-recursive COMMAND test_mutexattr -1)
   add_test(NAME test_mutexattr-errorcheck COMMAND test_mutexattr 1)
@@ -264,6 +254,7 @@ if(USE_BOOST OR BUILD_TESTING)
   )
   set_target_properties(threads_test_possix PROPERTIES CXX_STANDARD 17)
   target_compile_definitions(threads_test_possix PRIVATE USE_AGENTPP_CK)
+  target_include_directories(threads_test_possix PRIVATE .)
   add_test(NAME threads_test_possix COMMAND threads_test_possix
                                             --log_level=success
   )

@@ -40,10 +40,11 @@ using namespace Agentpp;
 #include <vector>
 
 #if !defined BOOST_THREAD_TEST_TIME_MS
-#    ifdef BOOST_THREAD_PLATFORM_WIN32
-#        define BOOST_THREAD_TEST_TIME_MS 100
-#    else
+#    if defined(__linux__) || defined(__APPLE__)
 #        define BOOST_THREAD_TEST_TIME_MS 75
+#    else
+// Windows, Cygwin, msys all need this
+#        define BOOST_THREAD_TEST_TIME_MS 250
 #    endif
 #endif
 
@@ -170,6 +171,7 @@ BOOST_AUTO_TEST_CASE(ThreadPool_busy_test)
         threadPool.terminate();
         BOOST_TEST_MESSAGE("outstanding tasks: " << TestTask::task_count());
 #endif
+
     }
     BOOST_TEST(TestTask::task_count() == 0UL, "All task has to be deleted!");
     TestTask::reset_counter();
@@ -205,10 +207,6 @@ BOOST_AUTO_TEST_CASE(ThreadPool_test)
         BOOST_TEST(threadPool.is_idle());
 
         threadPool.terminate();
-        BOOST_TEST_MESSAGE("outstanding tasks: " << TestTask::task_count());
-        //############################
-        BOOST_TEST(TestTask::task_count() == 0UL);
-        //############################
     }
     BOOST_TEST(TestTask::task_count() == 0UL, "All task has to be deleted!");
     BOOST_TEST(TestTask::run_count() == 5UL, "All task has to be executed!");
@@ -309,9 +307,6 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
 
         queuedThreadPool.terminate();
         BOOST_TEST_MESSAGE("outstanding tasks: " << TestTask::task_count());
-        //############################
-        BOOST_TEST(TestTask::task_count() == 0UL);
-        //############################
     }
     BOOST_TEST(TestTask::task_count() == 0UL, "All task has to be deleted!");
     BOOST_TEST(TestTask::run_count() == 9UL, "All task has to be executed!");
@@ -324,7 +319,6 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
             if (i >= 4) {
                 std::string msg(
                     boost::lexical_cast<std::string>(i) + " Queuing ...");
-                //###XXX### BOOST_TEST_MESSAGE("expected msg: " << msg);
                 BOOST_TEST(boost::hash_value(value) == boost::hash_value(msg),
                     "expected msg: " << msg);
             }
@@ -505,9 +499,12 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolIndependency_test)
     }
     BOOST_TEST(firstThreadPool.is_idle());
     firstThreadPool.terminate();
+    Thread::sleep(BOOST_THREAD_TEST_TIME_MS); // ms
 
+    //############################
     BOOST_TEST(TestTask::task_count() == 0UL, "ALL task has to be deleted!");
     BOOST_TEST(TestTask::run_count() == n, "All task has to be executed!");
+    //############################
 
     TestTask::reset_counter();
 }

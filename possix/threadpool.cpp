@@ -22,7 +22,7 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
   _##
   _##########################################################################*/
 
-#include "threadpool.hpp"
+#include "possix/threadpool.hpp"
 
 #include <errno.h>
 #include <stdio.h>
@@ -692,6 +692,7 @@ void ThreadPool::execute(Runnable* t)
 {
     Lock l(*this);
     TaskManager* tm = 0;
+    // FIXME: only while not stopped! CK
     while (!tm) {
         for (std::vector<TaskManager*>::iterator cur = taskList.begin();
              cur != taskList.end(); ++cur) {
@@ -871,6 +872,11 @@ bool QueuedThreadPool::assign(Runnable* t, bool withQueuing)
 
 void QueuedThreadPool::execute(Runnable* t)
 {
+    if (is_stopped()) {
+        delete t;
+        return;
+    }
+
 #ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     {
         Thread::lock();
@@ -985,7 +991,7 @@ bool QueuedThreadPool::is_busy()
 {
 #ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     Thread::lock();
-    bool result = !queue.empty() || ThreadPool::is_busy();
+    bool result = is_stopped() || !queue.empty() || ThreadPool::is_busy();
     Thread::unlock();
 #else
     Lock l(*this);

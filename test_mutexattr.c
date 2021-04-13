@@ -8,9 +8,11 @@
  * counter_thread.
  */
 
-#ifndef _POSIX_C_SOURCE
-#    warning "_POSIX_C_SOURCE not defined"
-// NO! CK #define _POSIX_C_SOURCE 200112L
+#ifdef __linux__
+#    include <features.h>
+#    ifndef _POSIX_C_SOURCE
+#        error "_POSIX_C_SOURCE not defined"
+#    endif
 #endif
 
 #include <assert.h>
@@ -20,6 +22,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h> // _POSIX_MONOTONIC_CLOCK _POSIX_TIMEOUTS _POSIX_TIMERS _POSIX_THREADS ...
+
+#ifdef __APPLE__
+#    ifndef __DARWIN_C_LEVEL
+#        error "__DARWIN_C_LEVEL not defined!"
+#    endif
+#endif
 
 #define SPIN 10000000
 

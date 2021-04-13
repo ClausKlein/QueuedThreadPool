@@ -50,6 +50,9 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 // NOTE: do not change! CK
 #define AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
 #undef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
+#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
+#    define AGENTPP_USE_IMPLIZIT_START
+#endif
 
 #define AGENTPP_DEFAULT_STACKSIZE 0x10000UL
 #define AGENTPP_OPAQUE_PTHREAD_T void*
@@ -571,7 +574,7 @@ class AGENTPP_DECL QueuedThreadPool : public ThreadPool
 {
 
     std::queue<Runnable*> queue;
-    bool go;
+    volatile bool go;
 
 public:
     /**
@@ -638,6 +641,8 @@ public:
      * Stop queue processing.
      */
     void stop();
+
+    bool is_stopped() { return !go; }
 
     /**
      * Notifies the thread pool about an idle thread.

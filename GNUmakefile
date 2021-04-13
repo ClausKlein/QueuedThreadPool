@@ -29,8 +29,8 @@ CHECKS?='-*,misc-*,boost-*,cert-*,misc-unused-parameters'
 
 # prevent hard config of find_package(asio 1.14.1 CONFIG CMAKE_FIND_ROOT_PATH_BOTH)
 ifeq (NO${CROSS_COMPILE},NO)
-    CC:=/usr/local/opt/llvm/bin/clang
-    CXX:=/usr/local/opt/llvm/bin/clang++
+    #XXX CC:=/usr/local/opt/llvm/bin/clang
+    #XXX CXX:=/usr/local/opt/llvm/bin/clang++
 
     CMAKE_INSTALL_PREFIX?=/usr/local
     export CMAKE_INSTALL_PREFIX
@@ -68,8 +68,8 @@ all: setup .configure-$(BUILD_TYPE)
 	cmake --build $(BUILD_DIR)
 
 test: all
-	cd $(BUILD_DIR) && ctest -C $(BUILD_TYPE) --rerun-failed --output-on-failure .
-	cd $(BUILD_DIR) && ctest -C $(BUILD_TYPE) .
+	cd $(BUILD_DIR) && ctest -C $(BUILD_TYPE) --timeout 60 --rerun-failed --output-on-failure .
+	cd $(BUILD_DIR) && ctest -C $(BUILD_TYPE) --timeout 60 .
 
 
 check:: setup .configure-$(BUILD_TYPE) compile_commands.json
