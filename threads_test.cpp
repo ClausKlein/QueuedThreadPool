@@ -171,7 +171,6 @@ BOOST_AUTO_TEST_CASE(ThreadPool_busy_test)
         threadPool.terminate();
         BOOST_TEST_MESSAGE("outstanding tasks: " << TestTask::task_count());
 #endif
-
     }
     BOOST_TEST(TestTask::task_count() == 0UL, "All task has to be deleted!");
     TestTask::reset_counter();
@@ -567,7 +566,8 @@ BOOST_AUTO_TEST_CASE(SyncWait_test)
         ns d = sw.elapsed();
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
         BOOST_TEST(d >= ms(BOOST_THREAD_TEST_TIME_MS - 1));
-        // TODO: error: in "SyncWait_test": check d >= ms(75) has failed [74892559 nanoseconds < 75 milliseconds]
+        // TODO: error: in "SyncWait_test": check d >= ms(75) has failed
+        // [74892559 nanoseconds < 75 milliseconds]
     }
 }
 
@@ -638,7 +638,8 @@ BOOST_AUTO_TEST_CASE(ThreadSleep_test)
     Stopwatch sw;
     Thread::sleep(BOOST_THREAD_TEST_TIME_MS); // 75 ms -> 75000000 nanoseconds
     ns d = sw.elapsed();
-    BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed()); // i.e.: 168410479 nanoseconds
+    BOOST_TEST_MESSAGE(
+        BOOST_CURRENT_FUNCTION << sw.elapsed()); // i.e.: 168410479 nanoseconds
     BOOST_TEST(d >= ns(BOOST_THREAD_TEST_TIME_MS));
 }
 

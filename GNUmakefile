@@ -31,6 +31,8 @@ CHECKS?='-*,misc-*,boost-*,cert-*,misc-unused-parameters'
 ifeq (NO${CROSS_COMPILE},NO)
     #XXX CC:=/usr/local/opt/llvm/bin/clang
     #XXX CXX:=/usr/local/opt/llvm/bin/clang++
+    CC:=clang
+    CXX:=clang++
 
     CMAKE_INSTALL_PREFIX?=/usr/local
     export CMAKE_INSTALL_PREFIX
@@ -49,6 +51,7 @@ BUILD_TYPE?=Release
 # GENERATOR:=Xcode
 GENERATOR?=Ninja
 
+ThreadSanitizer=?0
 # end of config part
 ##################################################
 
@@ -83,7 +86,7 @@ setup: $(BUILD_DIR) .clang-tidy compile_commands.json
 	cd $(BUILD_DIR) && cmake -G $(GENERATOR) -Wdeprecated -Wdev \
       -DUSE_LCOV=$(USE_LOCV) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
       -DCMAKE_PREFIX_PATH=$(CMAKE_PREFIX_PATH) \
-      -DCMAKE_STAGING_PREFIX=$(CMAKE_STAGING_PREFIX) \
+      -DCMAKE_STAGING_PREFIX=$(CMAKE_STAGING_PREFIX) -DUSE_ThreadSanitizer=${ThreadSanitizer}\
       -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_C_COMPILER=${CC} -DCMAKE_CXX_COMPILER=${CXX} $(CURDIR)
 	touch $@
 
