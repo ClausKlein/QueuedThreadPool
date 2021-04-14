@@ -47,7 +47,6 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #include <boost/noncopyable.hpp>
 
 // NOTE: do not change! CK
-#define AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
 #define AGENTPP_USE_IMPLIZIT_START
 
 #define AGENTPP_DEFAULT_STACKSIZE 0x10000UL
@@ -433,9 +432,10 @@ public:
         Lock l(*this);
         list.remove(t);
     }
-    size_t size() { 
+    size_t size()
+    {
         Lock l(*this);
-        return list.size(); 
+        return list.size();
     }
 
     Thread* last()
@@ -560,9 +560,7 @@ public:
  */
 class AGENTPP_DECL QueuedThreadPool : public ThreadPool, public Runnable {
 
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     Thread thread;
-#endif
 
     std::queue<Runnable*> queue;
     volatile bool go;
@@ -608,11 +606,7 @@ public:
      */
     size_t queue_length()
     {
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
         Lock l(thread);
-#else
-        Lock l(*this);
-#endif
         return queue.size();
     }
 
@@ -660,6 +654,8 @@ private:
      * @note asserted to be called with lock! CK
      **/
     bool is_stopped() { return !go; }
+
+    void EmptyQueue();
 };
 
 /**
@@ -744,53 +740,6 @@ private:
     }
     void run() BOOST_OVERRIDE;
 };
-
-// NOTE: not used by CK
-#if 0
-/**
- * The ThreadManager class provides functionality to control the
- * execution of threads.
- *
- * @author Frank Fock
- * @version 3.5.3
- */
-class AGENTPP_DECL ThreadManager: public Synchronized
-{
-
-public:
-
-    /**
-     * Default constructor
-     */
-    ThreadManager();
-
-    /**
-     * Destructor
-     */
-    virtual ~ThreadManager();
-
-    /**
-     * Start synchronized execution.
-     */
-    void    start_synch();
-    /**
-     * End synchronized execution.
-     */
-    void    end_synch();
-
-    /**
-     * Start global synchronized execution.
-     */
-    static  void    start_global_synch();
-    /**
-     * End global synchronized execution.
-     */
-    static  void    end_global_synch();
-
-private:
-    static Synchronized global_lock;
-};
-#endif
 
 } // namespace AgentppCK
 

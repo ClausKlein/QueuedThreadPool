@@ -42,65 +42,6 @@ namespace AgentppCK
 static const char* loggerModuleName = "agent++.threads";
 #endif
 
-// NOTE: not used by CK
-#if 0
-Synchronized ThreadManager::global_lock;
-
-/**
- * Default constructor
- */
-ThreadManager::ThreadManager()
-{
-}
-
-/**
- * Destructor
- */
-ThreadManager::~ThreadManager()
-{
-#    ifndef NO_FAST_MUTEXES
-#        warning "NO_FAST_MUTEXES not set"
-    //###FIXME### check this! CK
-    //TODO: what should this help? CK
-    if (trylock() == LOCKED) {
-        unlock();
-    }
-#    endif
-}
-
-/**
- * Start synchronized execution.
- */
-void ThreadManager::start_synch()
-{
-    lock();
-}
-
-/**
- * End synchronized execution.
- */
-void ThreadManager::end_synch()
-{
-    unlock();
-}
-
-/**
- * Start global synchronized execution.
- */
-void ThreadManager::start_global_synch()
-{
-    global_lock.lock();
-}
-
-/**
- * End global synchronized execution.
- */
-void ThreadManager::end_global_synch()
-{
-    global_lock.unlock();
-}
-#endif
-
 /*--------------------- class Synchronized -------------------------*/
 
 #ifndef NO_LOGGING
@@ -782,52 +723,41 @@ ThreadPool::~ThreadPool()
 
 QueuedThreadPool::QueuedThreadPool(size_t size)
     : ThreadPool(size)
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     , thread(this)
-#endif
     , go(true)
 {
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     thread.start();
-#endif
 }
 
 QueuedThreadPool::QueuedThreadPool(size_t size, size_t stack_size)
     : ThreadPool(size, stack_size)
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     , thread(this)
-#endif
     , go(true)
 {
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     thread.start();
-#endif
+}
+
+void QueuedThreadPool::EmptyQueue()
+{
+    Lock l(thread);
+    while (!queue.empty()) {
+        Runnable* t = queue.front();
+        queue.pop();
+        if (t) {
+            delete t;
+            DTRACE("queue entry (task) deleted");
+        }
+    }
 }
 
 QueuedThreadPool::~QueuedThreadPool()
 {
     stop();
 
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     thread.join();
     DTRACE("thread joined");
-#endif
 
-    {
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
-        Lock l(thread);
-#else
-        Lock l(*this);
-#endif
-        while (!queue.empty()) {
-            Runnable* t = queue.front();
-            queue.pop();
-            if (t) {
-                delete t;
-                DTRACE("queue entry (task) deleted");
-            }
-        }
-    }
+    EmptyQueue();
 
     ThreadPool::terminate();
 }
@@ -861,10 +791,8 @@ bool QueuedThreadPool::assign(Runnable* t, bool withQueuing)
         LOG_END;
         queue.push(t);
 
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
         DTRACE("busy! task queued; Thread::notify()");
         thread.notify();
-#endif
 
         return true;
     }
@@ -874,9 +802,6 @@ bool QueuedThreadPool::assign(Runnable* t, bool withQueuing)
 
 void QueuedThreadPool::execute(Runnable* t)
 {
-
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
-    {
         Lock l(thread);
 
         if (is_stopped()) {
@@ -889,32 +814,12 @@ void QueuedThreadPool::execute(Runnable* t)
         LOG_END;
         queue.push(t);
         thread.notify();
-    }
-#else  // AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
-    {
-        Lock l(*this);
-
-        if (is_stopped()) {
-            delete t;
-            return;
-        }
-
-        if (queue.empty()) {
-            assign(t);
-        } else {
-            queue.push(t);
-        }
-    }
-#endif // AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
+  
 }
 
 void QueuedThreadPool::run()
 {
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     Lock l(thread);
-#else
-    Lock l(*this);
-#endif
 
     while (go) {
         if (!queue.empty()) {
@@ -925,11 +830,6 @@ void QueuedThreadPool::run()
             if (t) {
                 if (assign(t, false)) { // NOTE: without queuing! CK
                     queue.pop();        // OK, now we pop this entry
-
-#ifndef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
-                    return;
-#endif
-
                 } else {
                     DTRACE("busy! Thread::sleep()");
                     // NOTE: wait some ms to prevent notify() loops while busy!
@@ -939,19 +839,14 @@ void QueuedThreadPool::run()
             }
         }
 
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
         // NOTE: for idle_notification ... CK
         thread.wait(1234); // ms
-#else
-        return;
-#endif
     }
 }
 
 void QueuedThreadPool::idle_notification()
 {
 
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     Lock l(thread);
 
     LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
@@ -961,49 +856,30 @@ void QueuedThreadPool::idle_notification()
     thread.notify();
 
     ThreadPool::idle_notification();
-#else
-    // TODO: the additional thread may be prevented by call run() here? CK
-    run();
-#endif
 }
 
 bool QueuedThreadPool::is_idle()
 {
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     Lock l(thread);
     bool result = thread.is_alive() && queue.empty() && ThreadPool::is_idle();
-#else
-    Lock l(*this);
-    bool result = queue.empty() && ThreadPool::is_idle();
-#endif
 
     return result;
 }
 
 bool QueuedThreadPool::is_busy()
 {
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     Lock l(thread);
     bool result =
         !thread.is_alive() || !queue.empty() || ThreadPool::is_busy();
-#else
-    Lock l(*this);
-    bool result = !queue.empty() || ThreadPool::is_busy();
-#endif
 
     return result;
 }
 
 void QueuedThreadPool::stop()
 {
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     Lock l(thread);
     go = false;
     thread.notify();
-#else
-    Lock l(*this);
-    go = false;
-#endif
 }
 
 } // namespace AgentppCK
