@@ -39,7 +39,6 @@ if(NOT CMAKE_BUILD_TYPE)
         "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
         FORCE
   )
-  ### add_definitions(-D_DEBUG)
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
@@ -122,7 +121,7 @@ if(DISABLE_LOGGING)
       OFF
       CACHE BOOL "NO logging" FORCE
   )
-  add_definitions(-D_NO_LOGGING -DNDEBUG)
+  add_definitions(-D_NO_LOGGING) 
 else()
   set(WITH_LOGGING
       ON
@@ -206,7 +205,8 @@ if(USE_BOOST OR BUILD_TESTING)
         test_priority_scheduler PRIVATE ASIO_NO_DEPRECATED
       )
       target_link_libraries(
-        test_priority_scheduler asio::standalone ${Boost_LIBRARIES} Threads::Threads
+        test_priority_scheduler asio::standalone ${Boost_LIBRARIES}
+        Threads::Threads
       )
       add_test(NAME test_priority_scheduler COMMAND test_priority_scheduler)
     endif()
@@ -219,7 +219,7 @@ if(USE_BOOST OR BUILD_TESTING)
     target_compile_options(test_mutexattr PRIVATE -fsanitize=thread -O1)
     target_link_options(test_mutexattr PRIVATE -fsanitize=thread -O1)
   endif()
-  target_link_libraries(test_mutexattr Threads::Threads )
+  target_link_libraries(test_mutexattr Threads::Threads)
   add_test(NAME test_mutexattr COMMAND test_mutexattr)
   add_test(NAME test_mutexattr-recursive COMMAND test_mutexattr -1)
   add_test(NAME test_mutexattr-errorcheck COMMAND test_mutexattr 1)
@@ -272,15 +272,17 @@ if(USE_BOOST OR BUILD_TESTING)
   add_test(NAME threads_test_possix COMMAND threads_test_possix
                                             --log_level=success
   )
-  add_test(NAME threads_test_possix-random COMMAND threads_test_possix
-                                                   --log_level=success --random
-  )
-  add_test(NAME threads_test_possix-thread
-           COMMAND threads_test_possix --log_level=success
-                   --run_test=ThreadPool_test -25
-  )
-  add_test(NAME threads_test_possix-queue
-           COMMAND threads_test_possix --log_level=success
-                   --run_test=QueuedThreadPoolLoad_test -25
-  )
+  if(NOT USE_ThreadSanitizer)
+    add_test(NAME threads_test_possix-random
+             COMMAND threads_test_possix --log_level=success --random
+    )
+    add_test(NAME threads_test_possix-thread
+             COMMAND threads_test_possix --log_level=success
+                     --run_test=ThreadPool_test -25
+    )
+    add_test(NAME threads_test_possix-queue
+             COMMAND threads_test_possix --log_level=success
+                     --run_test=QueuedThreadPoolLoad_test -25
+    )
+  endif()
 endif()

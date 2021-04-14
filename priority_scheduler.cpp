@@ -18,7 +18,6 @@
 using asio::dispatch;
 using asio::execution_context;
 
-
 class priority_scheduler : public execution_context {
 public:
     // A class that satisfies the Executor requirements.
@@ -177,7 +176,6 @@ private:
     bool stopped_;
 };
 
-
 class Print {
     int i_;
 
@@ -186,7 +184,6 @@ public:
         : i_(i) {};
     void operator()() { std::cout << i_ << std::endl; }
 };
-
 
 int main()
 {

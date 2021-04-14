@@ -25,7 +25,6 @@ void f1(long j)
     std::cout << __FILE__ << "[" << __LINE__ << "]" << std::endl;
 }
 
-
 int main()
 {
     std::cout << __FILE__ << "[" << __LINE__ << "]" << std::endl;

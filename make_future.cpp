@@ -18,7 +18,6 @@
 #include <exception>
 #include <iostream>
 
-
 // FIXME: why? CK
 namespace boost
 {
@@ -26,8 +25,7 @@ template <typename T> exception_ptr make_exception_ptr(T v)
 {
     return copy_exception(v);
 }
-}
-
+} // namespace boost
 
 int f1() { return 5; }
 
@@ -108,7 +106,6 @@ boost::shared_future<int> shared_compute(int x)
     return f1;
 }
 #endif
-
 
 int main()
 {

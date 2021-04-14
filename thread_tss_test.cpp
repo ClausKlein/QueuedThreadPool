@@ -9,7 +9,6 @@ boost::mutex
     mutex; // warning: initialization of 'mutex' with static storage duration
            // may throw an exception that cannot be caught [cert-err58-cpp]
 
-
 void init()
 {
     static boost::thread_specific_ptr<bool> tls;

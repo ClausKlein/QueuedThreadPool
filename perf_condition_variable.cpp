@@ -56,7 +56,6 @@ template <class Types> struct SharedData : Types {
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
-
 template <class S> void producer_thread(S* shared_data)
 {
     Stopwatch sw;

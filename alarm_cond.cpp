@@ -22,7 +22,6 @@
 #include <sstream>
 #include <string>
 
-
 #if defined(__cplusplus) && (__cplusplus >= 201103L)
 #    include <chrono>
 #    include <condition_variable>
@@ -50,10 +49,8 @@ using boost::chrono::time_point;
 using namespace boost;
 #endif //##########################################
 
-
 #include <boost/algorithm/string/trim.hpp>
 #include <boost/current_function.hpp>
-
 
 #ifdef NDEBUG
 #    define TRACE(x)
@@ -66,7 +63,6 @@ static void TRACE(const std::string& msg)
 }
 #    define VERBOSE
 #endif
-
 
 namespace Alarm
 {
@@ -82,8 +78,7 @@ typedef struct alarm_tag {
     time_point<steady_clock> time;
     std::string message;
 } alarm_t;
-}
-
+} // namespace Alarm
 
 //==================================
 // shared data, mutex, and condition
@@ -94,7 +89,6 @@ time_point<steady_clock> current_alarm(seconds(0LL));
 const time_point<steady_clock> ZERO(seconds(0LL));
 bool enabled = true;
 //==================================
-
 
 /*
  * Insert alarm entry on list, in order of time.
@@ -166,7 +160,6 @@ static time_point<steady_clock> alarm_insert(Alarm::alarm_t* alarm)
     assert(longest != NULL);
     return longest->time;
 }
-
 
 /*
  * The alarm thread's start routine.
@@ -250,7 +243,6 @@ void alarm_thread(void)
     TRACE(
         std::string(BOOST_CURRENT_FUNCTION) + " stopped"); // use concatenation
 }
-
 
 int main(int arc, char** argv)
 {

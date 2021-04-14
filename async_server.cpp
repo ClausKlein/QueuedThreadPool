@@ -29,7 +29,6 @@ std::string make_daytime_string()
     return std::ctime(&now);
 }
 
-
 class tcp_connection
     // NOTE: Using shared_ptr and enable_shared_from_this
     // because we want to keep the tcp_connection object alive
@@ -87,7 +86,6 @@ private:
     std::string m_message;
 };
 
-
 class tcp_server {
 public:
     // Constructor: initialises an acceptor to listen on TCP port 13.
@@ -129,7 +127,6 @@ private:
 
     tcp::acceptor acceptor_;
 };
-
 
 int main()
 {

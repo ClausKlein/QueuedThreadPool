@@ -12,7 +12,6 @@
  * timesliced.
  */
 
-
 #ifndef _POSIX_C_SOURCE
 #    ifdef __APPLE__
 #        define _POSIX_C_SOURCE 200809L
@@ -21,7 +20,6 @@
 #        define _POSIX_C_SOURCE 200112L
 #    endif
 #endif
-
 
 #include <assert.h>
 #include <errno.h>

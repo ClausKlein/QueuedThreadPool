@@ -25,7 +25,6 @@
 
 #include <boost/thread/caller_context.hpp>
 
-
 boost::generic_executor_ref default_executor()
 {
     static boost::basic_thread_pool tp(4);
@@ -38,7 +37,6 @@ void p2()
     boost::this_thread::sleep_for(boost::chrono::milliseconds(200));
     std::cout << BOOST_CONTEXTOF << std::endl;
 }
-
 
 void p1()
 {

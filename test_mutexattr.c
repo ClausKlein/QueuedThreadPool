@@ -29,7 +29,7 @@
 #    endif
 #endif
 
-#define SPIN 10000000
+#define SPIN 10
 
 /*
  * Define a macro that can be used for diagnostic output from
@@ -142,7 +142,7 @@ void* counter_thread(void* arg)
         }
 #endif
 
-        sleep(1);
+        usleep(10000);
     }
 
     printf("Counter Thread finished, counter is now %ld\n", counter / SPIN);
@@ -164,7 +164,7 @@ void* monitor_thread(void* arg)
      * seconds.
      */
     while (time(NULL) < end_time) {
-        sleep(1);
+        usleep(10000);
         status = pthread_mutex_trylock(&mutex);
         if (status != EBUSY) {
             if (status != 0) {
@@ -217,7 +217,7 @@ int main(int argc, char* argv[])
     pthread_mutex_init(&mutex, &attr);
     pthread_mutexattr_destroy(&attr);
 
-    end_time = time(NULL) + 60 / 10; /* Run for 1/10 minute */
+    end_time = time(NULL) + 1; /* Run for 3 sec */
     status   = pthread_create(&counter_thread_id, NULL, counter_thread, NULL);
     if (status != 0) {
         err_abort(status, "Create counter thread");

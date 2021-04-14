@@ -43,7 +43,6 @@ private:
 };
 typedef boost::synchronized_value<Person> Person_ts;
 
-
 // class SafeMemberPerson {
 // public:
 //  SafeMemberPerson(unsigned int age) :
@@ -87,7 +86,6 @@ private:
     };
     boost::synchronized_value<Member> member;
 };
-
 
 class Person2 {
 public:

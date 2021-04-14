@@ -3,7 +3,6 @@
 // accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
-
 #ifndef BOOST_THREAD_TESTABLE_LOCKABLE_HPP
 #define BOOST_THREAD_TESTABLE_LOCKABLE_HPP
 
@@ -139,7 +138,7 @@ struct is_testable_lockable<testable_mutex<Lockable> > : true_type {
 //    return true;
 //  }
 
-}
+} // namespace boost
 
 #include <boost/config/abi_suffix.hpp>
 

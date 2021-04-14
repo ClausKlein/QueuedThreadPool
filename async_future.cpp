@@ -25,7 +25,6 @@ using boost::asio::post;
 using boost::asio::thread_pool;
 using boost::asio::use_future;
 
-
 // Run a (lambda) function asynchronously and wait for the result:
 int main()
 {

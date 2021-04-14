@@ -63,7 +63,6 @@ template <typename T> struct sorter {
     }
 };
 
-
 template <typename T> std::list<T> parallel_quick_sort(std::list<T>& input)
 {
     if (input.empty()) {
@@ -73,7 +72,6 @@ template <typename T> std::list<T> parallel_quick_sort(std::list<T>& input)
 
     return s.do_sort(input);
 }
-
 
 int main()
 {

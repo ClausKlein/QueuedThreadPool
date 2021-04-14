@@ -19,7 +19,6 @@
 #include <iostream>
 #include <vector>
 
-
 enum { reading, writing };
 int state = reading;
 
@@ -64,14 +63,12 @@ void print(const A0&, const A1& a1, const A2&)
 }
 #endif
 
-
 namespace S
 {
 
 boost::shared_mutex
     mut; // warning: initialization of 'mut' with static storage duration
          // may throw an exception that cannot be caught [cert-err58-cpp]
-
 
 void reader()
 {
@@ -198,8 +195,7 @@ void test_shared_mutex()
     }
     std::cout << __FILE__ << "[" << __LINE__ << "]" << std::endl;
 }
-} // S
-
+} // namespace S
 
 namespace U
 {
@@ -596,8 +592,7 @@ void test_upgrade_mutex()
     }
     std::cout << __FILE__ << "[" << __LINE__ << "]" << std::endl;
 }
-} // U
-
+} // namespace U
 
 namespace Assignment
 {
@@ -655,7 +650,7 @@ public:
     }
 };
 
-} // Assignment
+} // namespace Assignment
 
 static void temp()
 {
@@ -665,7 +660,6 @@ static void temp()
     shared_lock<upgrade_mutex> sl;
     sl = BOOST_THREAD_MAKE_RV_REF(shared_lock<upgrade_mutex>(boost::move(ul)));
 }
-
 
 int main()
 {

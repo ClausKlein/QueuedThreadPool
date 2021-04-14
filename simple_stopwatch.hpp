@@ -61,7 +61,7 @@ public:
 };
 
 typedef simple_stopwatch<Clock> SimpleStopwatch;
-}
+} // namespace simple
 
 typedef boost::chrono::strict_stopwatch<> StrictStopwatch;
 typedef boost::chrono::simple_stopwatch<> Stopwatch;

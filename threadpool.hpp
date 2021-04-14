@@ -125,7 +125,6 @@ typedef boost::chrono::milliseconds ms;
 typedef boost::chrono::microseconds us;
 typedef boost::chrono::nanoseconds ns;
 
-
 // NOTE: this prevents prevent slicing too! CK
 class ClonableBase {
 public:

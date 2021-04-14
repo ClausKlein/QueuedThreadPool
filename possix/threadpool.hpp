@@ -22,7 +22,6 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
   _##
   _##########################################################################*/
 
-
 #ifndef agent_pp_threadpool_hpp_
 #define agent_pp_threadpool_hpp_
 
@@ -49,10 +48,7 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 
 // NOTE: do not change! CK
 #define AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
-#undef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
-#    define AGENTPP_USE_IMPLIZIT_START
-#endif
+#define AGENTPP_USE_IMPLIZIT_START
 
 #define AGENTPP_DEFAULT_STACKSIZE 0x10000UL
 #define AGENTPP_OPAQUE_PTHREAD_T void*
@@ -259,7 +255,6 @@ public:
      */
     ~Lock() { sync.unlock(); }
 
-
     /**
      * Causes current thread to wait until either another
      * thread invokes the notify() method or the notifyAll()
@@ -269,7 +264,7 @@ public:
      * @param timeout
      *    timeout in milliseconds.
      */
-    void wait(long timeout) // FIXME: why NOT return bool? CK
+    void wait(long timeout) // TODO: why NOT return bool? CK
     {
         if (timeout < 0) {
             (void)sync.wait();
@@ -416,7 +411,6 @@ private:
     static void nsleep(time_t secs, long nanos);
 };
 
-
 /**
  * The ThreadList class implements a singleton class that holds
  * a list of all currently running Threads.
@@ -431,32 +425,31 @@ public:
 
     void add(Thread* t)
     {
-        lock();
+        Lock l(*this);
         list.push_back(t);
-        unlock();
     }
     void remove(Thread* t)
     {
-        lock();
+        Lock l(*this);
         list.remove(t);
-        unlock();
     }
-    size_t size() const { return list.size(); }
+    size_t size() { 
+        Lock l(*this);
+        return list.size(); 
+    }
+
     Thread* last()
     {
-        lock();
+        Lock l(*this);
         Thread* t = list.back();
-        unlock();
         return t;
     }
 
-protected:
+private:
     std::list<Thread*> list;
 };
 
-
 class TaskManager;
-
 
 /**
  * The ThreadPool class provides a pool of threads that can be
@@ -467,9 +460,10 @@ class TaskManager;
  */
 class AGENTPP_DECL ThreadPool : public Synchronized {
 
+    size_t stackSize;
+
 protected:
     std::vector<TaskManager*> taskList;
-    size_t stackSize;
 
 public:
     /**
@@ -480,7 +474,6 @@ public:
      *    The default value is 4 threads.
      */
     explicit ThreadPool(size_t size = 4);
-
 
     /**
      * Create a ThreadPool with a given number of threads and
@@ -552,7 +545,6 @@ public:
     void terminate();
 };
 
-
 /**
  * The QueuedThreadPool class provides a pool of threads that can be
  * used to perform an arbitrary number of tasks. If a task is added
@@ -566,12 +558,11 @@ public:
  * @author Frank Fock
  * @version 3.5.18
  */
-class AGENTPP_DECL QueuedThreadPool : public ThreadPool
+class AGENTPP_DECL QueuedThreadPool : public ThreadPool, public Runnable {
+
 #ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
-    ,
-                                      public Thread
+    Thread thread;
 #endif
-{
 
     std::queue<Runnable*> queue;
     volatile bool go;
@@ -585,7 +576,6 @@ public:
      *    The default value is 4 threads.
      */
     explicit QueuedThreadPool(size_t size = 1);
-
 
     /**
      * Create a ThreadPool with a given number of threads and
@@ -616,7 +606,15 @@ public:
      * @return
      *    the number of tasks that are currently queued.
      */
-    size_t queue_length() const { return queue.size(); }
+    size_t queue_length()
+    {
+#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
+        Lock l(thread);
+#else
+        Lock l(*this);
+#endif
+        return queue.size();
+    }
 
     /**
      * Check whether QueuedThreadPool is idle or not.
@@ -642,8 +640,6 @@ public:
      */
     void stop();
 
-    bool is_stopped() { return !go; }
-
     /**
      * Notifies the thread pool about an idle thread.
      */
@@ -659,8 +655,12 @@ private:
      * @note asserted to be called with lock! CK
      **/
     bool assign(Runnable* task, bool withQueuing = true);
-};
 
+    /**
+     * @note asserted to be called with lock! CK
+     **/
+    bool is_stopped() { return !go; }
+};
 
 /**
  * The TaskManager class controls the execution of tasks on
@@ -696,7 +696,11 @@ public:
      *   TRUE if the thread managed by this TaskManager does
      *   not currently execute any task; FALSE otherwise.
      */
-    bool is_idle() { return (!task && thread.is_alive()); }
+    bool is_idle()
+    {
+        // TODO: Lock(*this);
+        return (!task && thread.is_alive());
+    }
 
     /**
      * Set the next task for execution. This will block until
@@ -720,24 +724,26 @@ public:
             new ThreadPool(threadPool->size(), threadPool->get_stack_size()));
     }
 
-protected:
+private:
     Thread thread;
     ThreadPool* threadPool;
     Runnable* task;
+    volatile bool go;
+
     /**
      * Start thread execution.
      */
     void start() { thread.start(); }
     /**
      * Stop thread execution after having finished current task.
-     *
-     * @note asserted to be called with lock! CK
      */
-    void stop() { go = false; }
+    void stop()
+    {
+        Lock l(*this);
+        go = false;
+    }
     void run() BOOST_OVERRIDE;
-    bool go;
 };
-
 
 // NOTE: not used by CK
 #if 0
@@ -786,7 +792,6 @@ private:
 };
 #endif
 
-
-}
+} // namespace AgentppCK
 
 #endif

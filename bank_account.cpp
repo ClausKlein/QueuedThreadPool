@@ -39,7 +39,6 @@ public:
     }
 };
 
-
 int main()
 {
     bank_account acct;

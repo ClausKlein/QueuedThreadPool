@@ -16,7 +16,6 @@
 #include <iostream>
 #include <vector>
 
-
 #define EXCLUSIVE 1
 #define SHARED 2
 

@@ -31,7 +31,6 @@
 
 #include <iostream>
 
-
 #if defined BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION \
     && !defined BOOST_NO_CXX11_RVALUE_REFERENCES
 static boost::future<void> p(boost::future<void> f)
@@ -84,7 +83,6 @@ void submit_some(boost::executor& tp)
         tp.submit(&p1);
     }
 }
-
 
 void at_th_entry(boost::basic_thread_pool&)
 {
@@ -250,7 +248,6 @@ int test_executor_adaptor()
 
     return 0;
 }
-
 
 int main()
 {

@@ -33,7 +33,6 @@ int counter      = 0;
 const int cycles = 1000;
 const int worker = 2;
 
-
 void monitor()
 {
     do {
@@ -51,7 +50,6 @@ void monitor()
     } while (true);
 }
 
-
 void unique()
 {
     int cycle(0);
@@ -60,7 +58,6 @@ void unique()
         ++counter;
     }
 }
-
 
 int main()
 {

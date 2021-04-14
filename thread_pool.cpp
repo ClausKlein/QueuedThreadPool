@@ -31,7 +31,6 @@
 #    pragma warning(disable : 4127) // conditional expression is constant
 #endif
 
-
 int runOutOfMemroy()
 {
     BOOST_THREAD_LOG << " " << BOOST_CURRENT_FUNCTION << BOOST_THREAD_END_LOG;

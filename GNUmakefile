@@ -26,21 +26,17 @@ CHECKS?='-*,cppcoreguidelines-*,-cppcoreguidelines-pro-*,-cppcoreguidelines-avoi
 CHECKS?='-*,portability-*,readability-*'
 CHECKS?='-*,misc-*,boost-*,cert-*,misc-unused-parameters'
 
+ThreadSanitizer?=0
 
 # prevent hard config of find_package(asio 1.14.1 CONFIG CMAKE_FIND_ROOT_PATH_BOTH)
 ifeq (NO${CROSS_COMPILE},NO)
     #XXX CC:=/usr/local/opt/llvm/bin/clang
     #XXX CXX:=/usr/local/opt/llvm/bin/clang++
-    CC:=clang
-    CXX:=clang++
 
     CMAKE_INSTALL_PREFIX?=/usr/local
     export CMAKE_INSTALL_PREFIX
     CMAKE_STAGING_PREFIX?=/tmp/staging/$(PROJECT_NAME)$(CMAKE_INSTALL_PREFIX)
     CMAKE_PREFIX_PATH?="$(CMAKE_STAGING_PREFIX);$(CMAKE_INSTALL_PREFIX);/usr/local/opt/boost;/usr/local/opt/openssl;/usr"
-else
-    CMAKE_STAGING_PREFIX?=/opt/sdhr/SDHR/staging/imx8m-sdhr/develop
-    CMAKE_PREFIX_PATH?="${CMAKE_STAGING_PREFIX};${OECORE_TARGET_SYSROOT}"
 endif
 
 
@@ -48,10 +44,10 @@ endif
 # NOTE: use on shell$> BUILD_TYPE=Coverage make lcov
 BUILD_TYPE?=Debug
 BUILD_TYPE?=Release
+
 # GENERATOR:=Xcode
 GENERATOR?=Ninja
 
-ThreadSanitizer=?0
 # end of config part
 ##################################################
 

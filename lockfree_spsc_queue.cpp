@@ -8,7 +8,6 @@
 
 #include <iostream>
 
-
 const size_t iterations = 10000000;
 
 typedef int data_type;
@@ -23,7 +22,6 @@ boost::lockfree::spsc_queue<data_type, boost::lockfree::capacity<1024> >
 boost::atomic<bool> done(false);
 
 using namespace boost::chrono;
-
 
 void producer(void)
 {
@@ -40,7 +38,6 @@ void producer(void)
               << duration_fmt(duration_style::symbol) << timer.elapsed()
               << std::endl;
 }
-
 
 void consumer(void)
 {
@@ -62,7 +59,6 @@ void consumer(void)
               << duration_fmt(duration_style::symbol) << timer.elapsed()
               << std::endl;
 }
-
 
 int main(int, char**)
 {
