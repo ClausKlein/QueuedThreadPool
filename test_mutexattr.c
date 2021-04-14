@@ -15,7 +15,6 @@
 #    endif
 #endif
 
-#include <assert.h>
 #include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -29,7 +28,7 @@
 #    endif
 #endif
 
-#define SPIN 10
+#define SPIN 1000
 
 /*
  * Define a macro that can be used for diagnostic output from
@@ -104,6 +103,7 @@ void* counter_thread(void* arg)
 
 #ifdef PTHREAD_MUTEX_RECURSIVE
 #    warning "recursive mutex supported"
+#endif
         if (recursive) {
             printf("recursive usage:\n");
             status = pthread_mutex_lock(&mutex);
@@ -111,7 +111,6 @@ void* counter_thread(void* arg)
                 err_abort(status, "Lock mutex");
             }
         }
-#endif
 
         status = pthread_mutex_lock(&mutex);
         if (status != 0) {
@@ -130,7 +129,6 @@ void* counter_thread(void* arg)
             err_abort(status, "Unlock mutex");
         }
 
-#ifdef PTHREAD_MUTEX_RECURSIVE
         if (recursive) {
             status = pthread_mutex_unlock(&mutex);
             if (status != 0) {
@@ -140,9 +138,8 @@ void* counter_thread(void* arg)
                 }
             }
         }
-#endif
 
-        usleep(10000);
+        usleep(SPIN);
     }
 
     printf("Counter Thread finished, counter is now %ld\n", counter / SPIN);
@@ -164,7 +161,7 @@ void* monitor_thread(void* arg)
      * seconds.
      */
     while (time(NULL) < end_time) {
-        usleep(10000);
+        usleep(SPIN);
         status = pthread_mutex_trylock(&mutex);
         if (status != EBUSY) {
             if (status != 0) {
@@ -180,8 +177,6 @@ void* monitor_thread(void* arg)
         }
     }
     printf("Monitor thread missed update %d times.\n", misses);
-    assert(!misses);
-
     return NULL;
 }
 

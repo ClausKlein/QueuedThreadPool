@@ -134,9 +134,10 @@ Synchronized::Synchronized()
 
 #ifdef PTHREAD_MUTEX_ERRORCHECK
 #    warning "PTHREAD_MUTEX_ERRORCHECK set"
+#endif
+
     ERR_CHK_WITHOUT_EXCEPTIONS(
         pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK));
-#endif
 
     memset(&monitor, 0, sizeof(monitor));
     ERR_CHK_WITHOUT_EXCEPTIONS(pthread_mutex_init(&monitor, &attr));
@@ -806,7 +807,6 @@ QueuedThreadPool::QueuedThreadPool(size_t size, size_t stack_size)
 QueuedThreadPool::~QueuedThreadPool()
 {
     stop();
-    go = false;
 
 #ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     thread.join();
