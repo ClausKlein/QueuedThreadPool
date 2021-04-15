@@ -67,11 +67,12 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #endif
 
 /*
- * Define a macro that can be used for diagnostic output from examples. When
- * compiled -DDEBUG, it results in writing with the specified argument to
- * std::cout. When DEBUG is not defined, it expands to nothing.
+ * Define a macro that can be used for diagnostic output from examples.
+ * When compiled -DTRACE_VERBOSE, it results in writing with the
+ * specified argument to std::cout. When DEBUG is not defined, it expands
+ * to nothing.
  */
-#ifdef DEBUG
+#ifdef TRACE_VERBOSE
 #    define DTRACE(arg) \
         std::cout << BOOST_CURRENT_FUNCTION << ": " arg << std::endl
 #else

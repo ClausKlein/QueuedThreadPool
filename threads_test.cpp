@@ -591,7 +591,6 @@ public:
 #endif
 };
 
-#ifndef USE_AGENTPP_CK
 BOOST_AUTO_TEST_CASE(ThreadTaskThrow_test)
 {
     Stopwatch sw;
@@ -602,7 +601,6 @@ BOOST_AUTO_TEST_CASE(ThreadTaskThrow_test)
     }
     BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
 }
-#endif
 
 BOOST_AUTO_TEST_CASE(ThreadLivetime_test)
 {

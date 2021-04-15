@@ -375,7 +375,13 @@ void* thread_starter(void* t)
     pthread_setname_np(pthread_self(), AGENTX_DEFAULT_THREAD_NAME);
 #endif
 
-    thread->get_runnable()->run();
+    try {
+        thread->get_runnable()->run();
+    } catch (std::exception& ex) {
+        std::cerr << "\n Exception " << ex.what() << std::endl;
+    } catch (...) {
+        // OK; ignored CK
+    }
 
     LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
     LOG("Thread: ended (tid)");
@@ -459,9 +465,6 @@ void Thread::start()
 
 #if defined(__INTEGRITY)
         pthread_attr_setthreadname(&attr, AGENTX_DEFAULT_THREAD_NAME);
-#elif defined(__APPLE__)
-        // NOTE: must be set from within the thread (can't specify thread ID)
-        // XXX pthread_setname_np(AGENTX_DEFAULT_THREAD_NAME);
 #endif
 
         pthread_attr_setstacksize(&attr, stackSize);
@@ -562,10 +565,11 @@ TaskManager::TaskManager(ThreadPool* tp, size_t stackSize)
 
 TaskManager::~TaskManager()
 {
-    lock();
-    go = false;
-    notify();
-    unlock();
+    {
+        Lock l(*this);
+        go = false;
+        notify();
+    }
 
     thread.join();
     LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
@@ -578,17 +582,23 @@ void TaskManager::run()
     Lock l(*this);
     while (go) {
         if (task) {
-            task->run(); // NOTE: executes the task
+            try {
+                task->run(); // NOTE: executes the task
+            } catch (std::exception& ex) {
+                std::cerr << "\n Exception " << ex.what() << std::endl;
+            } catch (...) {
+                // OK; ignored CK
+            }
             delete task;
             task = NULL;
 
-            unlock(); // TODO: prevent deadlock! CK
+            // unlock(); // FIXME: prevent deadlock! CK
             //==============================
             // NOTE: may direct call set_task()
             // via QueuedThreadPool::run() => QueuedThreadPool::assign()
             threadPool->idle_notification();
             //==============================
-            lock();
+            // lock();
         } else {
             wait(); // NOTE: idle, wait until notify signal CK
         }
@@ -623,8 +633,13 @@ bool TaskManager::set_task(Runnable* t)
 void ThreadPool::execute(Runnable* t)
 {
     Lock l(*this);
+
+    if (taskList.empty()) {
+        delete t;
+        return;
+    }
+
     TaskManager* tm = NULL;
-    // TODO: only while not stopped! CK
     while (!tm) {
         for (std::vector<TaskManager*>::iterator cur = taskList.begin();
              cur != taskList.end(); ++cur) {
@@ -650,9 +665,15 @@ void ThreadPool::execute(Runnable* t)
     }
 }
 
+// NOTE: asserted to be called with lock! CK
 void ThreadPool::idle_notification()
 {
-    Lock l(*this);
+    // FIXME: needed? CK Lock l(*this);
+
+    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
+    LOG("notify");
+    LOG_END;
+
     notify();
 }
 
@@ -714,9 +735,11 @@ ThreadPool::~ThreadPool()
 {
     terminate();
 
+    // TODO refactor to EmptyTaskList();
     for (size_t i = 0; i < taskList.size(); i++) {
-        delete taskList[i];
+        delete taskList[i]; // implizit Thread::join()
     }
+    taskList.clear();
 }
 
 /*--------------------- class QueuedThreadPool --------------------------*/
@@ -763,7 +786,7 @@ QueuedThreadPool::~QueuedThreadPool()
 }
 
 // NOTE: asserted to be called with lock! CK
-bool QueuedThreadPool::assign(Runnable* t, bool withQueuing)
+bool QueuedThreadPool::assign(Runnable* t, bool /* withQueuing */)
 {
     TaskManager* tm = NULL;
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
@@ -784,6 +807,7 @@ bool QueuedThreadPool::assign(Runnable* t, bool withQueuing)
         tm = NULL;
     }
 
+#if 0
     // NOTE: no idle thread found, push to queue if allowed! CK
     if (!tm && withQueuing) {
         LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
@@ -796,25 +820,25 @@ bool QueuedThreadPool::assign(Runnable* t, bool withQueuing)
 
         return true;
     }
+#endif
 
     return false;
 }
 
 void QueuedThreadPool::execute(Runnable* t)
 {
-        Lock l(thread);
+    Lock l(thread);
 
-        if (is_stopped()) {
-            delete t;
-            return;
-        }
+    if (is_stopped()) {
+        delete t;
+        return;
+    }
 
-        LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-        LOG("queue.push");
-        LOG_END;
-        queue.push(t);
-        thread.notify();
-  
+    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
+    LOG("queue.push");
+    LOG_END;
+    queue.push(t);
+    thread.notify();
 }
 
 void QueuedThreadPool::run()
@@ -844,18 +868,17 @@ void QueuedThreadPool::run()
     }
 }
 
+// NOTE: asserted to be called with lock! CK
 void QueuedThreadPool::idle_notification()
 {
-
-    Lock l(thread);
+    // FIXME: needed? CK Lock l(thread);
 
     LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
     LOG("notify");
     LOG_END;
-
     thread.notify();
 
-    ThreadPool::idle_notification();
+    // FIXME: needed? CK ThreadPool::idle_notification();
 }
 
 bool QueuedThreadPool::is_idle()
