@@ -25,10 +25,7 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #include "possix/threadpool.hpp"
 
 #include <errno.h>
-
-#ifndef NO_LOGGING
-#    include <string.h>
-#endif
+#include <string.h> // memset()
 
 #ifdef _WIN32
 #    include <assert.h>
@@ -36,6 +33,8 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #else
 #    include <sys/time.h> // gettimeofday()
 #endif
+
+#include <stdexcept>    // std::runtime_error()
 
 namespace AgentppCK
 {
