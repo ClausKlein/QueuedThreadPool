@@ -113,6 +113,7 @@ clean: $(BUILD_DIR)
 
 distclean:
 	rm -rf $(BUILD_DIR) .configure-$(BUILD_TYPE) .buildfiles.lst compile_commands.json *~ .*~ tags
+	rm -rf generated/*
 	find . -name '*~' -delete
 
 

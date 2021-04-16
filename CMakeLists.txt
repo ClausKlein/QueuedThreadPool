@@ -16,6 +16,8 @@ project(AgentPro LANGUAGES CXX C)
 
 message(STATUS "Configuring on/for ${CMAKE_SYSTEM_NAME}")
 
+include(cmake/CodeCoverage.cmake)
+
 ## require a C++ standard
 if(NOT DEFINED CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 98)
@@ -38,7 +40,7 @@ if(NOT CMAKE_BUILD_TYPE)
       Debug
       CACHE
         STRING
-        "supported values are: None Debug Release RelWithDebInfo MinSizeRel."
+        "supported values are: None Debug Release RelWithDebInfo MinSizeRel Lcov."
   )
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
@@ -178,14 +180,10 @@ if(USE_BOOST OR BUILD_TESTING)
         # #SW stopwatch_reporter_example.cpp
         # #SW test_atomic_counter.cpp
         # #SW test_shared_mutex.cpp
-        daytime_client
-        default_executor
-        make_future
-        serial_executor
-        strict_lock
-        synchronized_person
-        thread_tss_test
-        volatile
+        ###NO! daytime_client
+        ###NO! make_future
+        default_executor serial_executor strict_lock synchronized_person
+        thread_tss_test volatile
     )
 
     foreach(program ${NOINST_PROGRAMS})
@@ -268,7 +266,7 @@ if(USE_BOOST OR BUILD_TESTING)
   add_test(NAME threads_test_possix COMMAND threads_test_possix
                                             --log_level=success
   )
-  if(NOT USE_ThreadSanitizer)
+  if(NOT USE_ThreadSanitizer AND NOT CMAKE_BUILD_TYPE STREQUAL Lcov)
     add_test(NAME threads_test_possix-random
              COMMAND threads_test_possix --log_level=success --random
     )
@@ -281,4 +279,12 @@ if(USE_BOOST OR BUILD_TESTING)
                      --run_test=QueuedThreadPoolLoad_test -25
     )
   endif()
+
+  set(COVERAGE_EXCLUDES '/Applications/*' '/usr/*' '*/include/boost/*'
+                        '${CURRENT_SOURCE_DIR}/include/boost/*'
+  )
+  setup_target_for_coverage(
+    NAME lcov # New target name
+    EXECUTABLE ctest DEPENDENCIES all # build this targets first
+  )
 endif()

@@ -34,7 +34,7 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #    include <sys/time.h> // gettimeofday()
 #endif
 
-#include <stdexcept>    // std::runtime_error()
+#include <stdexcept> // std::runtime_error()
 
 namespace AgentppCK
 {

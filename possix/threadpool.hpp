@@ -74,7 +74,7 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
  * specified argument to std::cerr. When DEBUG is not defined, it expands
  * to nothing.
  */
-#if  defined(TRACE_VERBOSE) && !defined(NDEBUG)
+#if defined(TRACE_VERBOSE) && !defined(NDEBUG)
 #    define DTRACE(arg) \
         std::cerr << BOOST_CURRENT_FUNCTION << ": " arg << std::endl
 #else
