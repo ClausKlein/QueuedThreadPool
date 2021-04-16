@@ -378,7 +378,7 @@ void* thread_starter(void* t)
     try {
         thread->get_runnable()->run();
     } catch (std::exception& ex) {
-        std::cerr << "\n Exception " << ex.what() << std::endl;
+        DTRACE("Exception: " << ex.what());
     } catch (...) {
         // OK; ignored CK
     }
@@ -585,20 +585,17 @@ void TaskManager::run()
             try {
                 task->run(); // NOTE: executes the task
             } catch (std::exception& ex) {
-                std::cerr << "\n Exception " << ex.what() << std::endl;
+                DTRACE("Exception: " << ex.what());
             } catch (...) {
                 // OK; ignored CK
             }
             delete task;
             task = NULL;
-
-            // unlock(); // FIXME: prevent deadlock! CK
             //==============================
             // NOTE: may direct call set_task()
             // via QueuedThreadPool::run() => QueuedThreadPool::assign()
             threadPool->idle_notification();
             //==============================
-            // lock();
         } else {
             wait(); // NOTE: idle, wait until notify signal CK
         }
@@ -608,6 +605,12 @@ void TaskManager::run()
         task = NULL;
         DTRACE("task deleted after stop()");
     }
+}
+
+bool TaskManager::is_idle()
+{
+    Lock l(*this);
+    return (!task && thread.is_alive());
 }
 
 bool TaskManager::set_task(Runnable* t)

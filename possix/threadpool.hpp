@@ -25,9 +25,10 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #ifndef agent_pp_threadpool_hpp_
 #define agent_pp_threadpool_hpp_
 
+#define NO_LOGGING
+
 #ifdef __INTEGRITY
 #    include <integrity.h>
-#    define NO_LOGGING
 #endif
 
 #ifdef _WIN32
@@ -63,7 +64,6 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #    define LOG_BEGIN(x, y)
 #    define LOG(x)
 #    define LOG_END
-#    define NO_LOGGING 1
 #endif
 
 /*
@@ -74,7 +74,7 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
  */
 #ifdef TRACE_VERBOSE
 #    define DTRACE(arg) \
-        std::cout << BOOST_CURRENT_FUNCTION << ": " arg << std::endl
+        std::cerr << BOOST_CURRENT_FUNCTION << ": " arg << std::endl
 #else
 #    define DTRACE(arg)
 #endif
@@ -693,11 +693,7 @@ public:
      *   TRUE if the thread managed by this TaskManager does
      *   not currently execute any task; FALSE otherwise.
      */
-    bool is_idle()
-    {
-        // TODO: Lock(*this);
-        return (!task && thread.is_alive());
-    }
+    bool is_idle();
 
     /**
      * Set the next task for execution. This will block until

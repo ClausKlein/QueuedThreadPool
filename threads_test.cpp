@@ -50,7 +50,7 @@ using namespace Agentpp;
 
 const ms max_diff(BOOST_THREAD_TEST_TIME_MS);
 
-typedef size_t test_counter_t;
+typedef boost::atomic<size_t> test_counter_t;
 typedef boost::lockfree::queue<size_t, boost::lockfree::capacity<20> >
     result_queue_t;
 
@@ -87,7 +87,9 @@ public:
         Thread::sleep((rand() % 3) * delay); // ms
 
         scoped_lock l(lock);
-        BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << " called with: " << text);
+        // WARNING: ThreadSanitizer: data race
+        // BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << " called with: " <<
+        // text);
         size_t hash = boost::hash_value(text);
         result.push(hash);
         ++run_cnt;
@@ -118,7 +120,7 @@ protected:
 private:
     const std::string text;
     result_queue_t& result;
-    unsigned delay;
+    const unsigned delay;
 };
 
 TestTask::lockable_type
@@ -579,7 +581,8 @@ public:
     BadTask() {};
     void run() BOOST_OVERRIDE
     {
-        std::cout << "Hello world!" << std::endl;
+        // ThreadSanitizer: data race: std::cout << "Hello world!" <<
+        // std::endl;
         throw std::runtime_error("Fatal Error, can't continue!");
     };
 

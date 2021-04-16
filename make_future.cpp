@@ -8,10 +8,13 @@
 
 #if !defined BOOST_NO_CXX11_DECLTYPE
 #    define BOOST_RESULT_OF_USE_DECLTYPE
+#else
+#    define BOOST_THREAD_VERSION 3
 #endif
 
-// TODO: BOOST_THREAD_VERSION should be 4! CK
-#define BOOST_THREAD_VERSION 3
+#ifndef BOOST_THREAD_VERSION
+#    warning "BOOST_THREAD_VERSION should be 4!" CK
+#endif
 
 #include <boost/thread/future.hpp>
 
