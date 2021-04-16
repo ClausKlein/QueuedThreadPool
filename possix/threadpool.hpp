@@ -25,7 +25,9 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #ifndef agent_pp_threadpool_hpp_
 #define agent_pp_threadpool_hpp_
 
+// NOTE: do not change! CK
 #define NO_LOGGING
+#define AGENTPP_USE_IMPLIZIT_START
 
 #ifdef __INTEGRITY
 #    include <integrity.h>
@@ -37,7 +39,10 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #    include <unistd.h> // _POSIX_MONOTONIC_CLOCK _POSIX_TIMEOUTS _POSIX_TIMERS _POSIX_THREADS ...
 #endif
 
-#include <iostream>
+#if !defined(NO_LOGGING) || defined(TRACE_VERBOSE)
+#    include <iostream>
+#endif
+
 #include <list>
 #include <pthread.h>
 #include <queue>
@@ -46,9 +51,6 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 
 #include <boost/current_function.hpp>
 #include <boost/noncopyable.hpp>
-
-// NOTE: do not change! CK
-#define AGENTPP_USE_IMPLIZIT_START
 
 #define AGENTPP_DEFAULT_STACKSIZE 0x10000UL
 #define AGENTPP_OPAQUE_PTHREAD_T void*
@@ -69,10 +71,10 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 /*
  * Define a macro that can be used for diagnostic output from examples.
  * When compiled -DTRACE_VERBOSE, it results in writing with the
- * specified argument to std::cout. When DEBUG is not defined, it expands
+ * specified argument to std::cerr. When DEBUG is not defined, it expands
  * to nothing.
  */
-#ifdef TRACE_VERBOSE
+#if  defined(TRACE_VERBOSE) && !defined(NDEBUG)
 #    define DTRACE(arg) \
         std::cerr << BOOST_CURRENT_FUNCTION << ": " arg << std::endl
 #else

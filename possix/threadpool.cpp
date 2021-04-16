@@ -25,8 +25,10 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #include "possix/threadpool.hpp"
 
 #include <errno.h>
-#include <stdio.h>
-#include <string.h>
+
+#ifndef NO_LOGGING
+#    include <string.h>
+#endif
 
 #ifdef _WIN32
 #    include <assert.h>

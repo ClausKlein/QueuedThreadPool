@@ -38,8 +38,7 @@ if(NOT CMAKE_BUILD_TYPE)
       Debug
       CACHE
         STRING
-        "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
-        FORCE
+        "supported values are: None Debug Release RelWithDebInfo MinSizeRel."
   )
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
@@ -160,27 +159,25 @@ if(USE_BOOST OR BUILD_TESTING)
 
   if(BUILD_TESTING AND NOT USE_ThreadSanitizer)
     # additional single file examples from boost/thread and boost/asio
-    set(noinst_PROGRAMS
+    set(NOINST_PROGRAMS
         # #C++14 async_future
         # #C++14 ba_externallly_locked
         # #C++14 bank_account
+        # #C++14 chrono_io_ex1
         # #C++14 executor
-        # #C++14 lockfree_spsc_queue
+        # #C++14 multi_thread_pass
         # #C++14 parallel_quick_sort
-        # #C++14 perf_condition_variable
-        # #C++14 perf_shared_mutex
         # #C++14 shared_monitor
-        # #C++14 shared_mutex
         # #C++14 shared_ptr
-        # #C++14 thread_pool
-        # #C++14 trylock_test
         # #FIXME async_server
         # #FIXME user_scheduler
-        # chrono_io_ex1
-        # multi_thread_pass
-        # stopwatch_reporter_example
-        # test_atomic_counter
-        # test_shared_mutex
+        # #SW lockfree_spsc_queue.cpp
+        # #SW perf_condition_variable.cpp
+        # #SW perf_shared_mutex.cpp
+        # #SW shared_mutex.cpp
+        # #SW stopwatch_reporter_example.cpp
+        # #SW test_atomic_counter.cpp
+        # #SW test_shared_mutex.cpp
         daytime_client
         default_executor
         make_future
@@ -191,7 +188,7 @@ if(USE_BOOST OR BUILD_TESTING)
         volatile
     )
 
-    foreach(program ${noinst_PROGRAMS})
+    foreach(program ${NOINST_PROGRAMS})
       add_executable(${program} ${program}.cpp)
       set_target_properties(${program} PROPERTIES CXX_STANDARD 98)
       target_link_libraries(${program} ${Boost_LIBRARIES} Threads::Threads)
@@ -252,9 +249,9 @@ if(USE_BOOST OR BUILD_TESTING)
 
   add_library(threadpool possix/threadpool.cpp possix/threadpool.hpp)
   set_target_properties(threadpool PROPERTIES CXX_STANDARD 98)
-  # if(NOT DISABLE_LOGGING)
+  if(NOT DISABLE_LOGGING)
     target_compile_definitions(threadpool PRIVATE TRACE_VERBOSE)
-  # endif()
+  endif()
   target_include_directories(threadpool PUBLIC .)
   target_link_libraries(threadpool PUBLIC Boost::chrono Boost::thread)
   if(USE_ThreadSanitizer)
@@ -267,10 +264,6 @@ if(USE_BOOST OR BUILD_TESTING)
   target_link_libraries(
     threads_test_possix threadpool Boost::unit_test_framework
   )
-  # if(USE_ThreadSanitizer)
-  #   target_compile_options(threads_test_possix PRIVATE -fsanitize=thread -O1)
-  #   target_link_options(threads_test_possix PRIVATE -fsanitize=thread -O1)
-  # endif()
   target_compile_definitions(threads_test_possix PRIVATE USE_AGENTPP_CK)
   add_test(NAME threads_test_possix COMMAND threads_test_possix
                                             --log_level=success
