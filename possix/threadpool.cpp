@@ -74,9 +74,9 @@ Synchronized::Synchronized()
     pthread_mutexattr_t attr;
     ERR_CHK_WITHOUT_EXCEPTIONS(pthread_mutexattr_init(&attr));
 
-#ifdef PTHREAD_MUTEX_ERRORCHECK
-#    warning "PTHREAD_MUTEX_ERRORCHECK set"
-#endif
+    //#ifdef PTHREAD_MUTEX_ERRORCHECK
+    //#    warning "PTHREAD_MUTEX_ERRORCHECK set"
+    //#endif
 
     ERR_CHK_WITHOUT_EXCEPTIONS(
         pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK));
@@ -91,41 +91,70 @@ Synchronized::Synchronized()
 
 Synchronized::~Synchronized()
 {
-    int error = pthread_cond_destroy(&cond);
-    if (error) {
-        LOG_BEGIN(loggerModuleName, ERROR_LOG | 2);
-        LOG("Synchronized cond_destroy failed with (error)(ptr)");
-        LOG(error);
-        LOG((void*)this);
-        LOG_END;
-    }
-    error = pthread_mutex_destroy(&monitor);
+    // NOTE: give other waiting threads a time window
+    // to return from the wait on our condition_variable
+    int errors = 0;
+    int error  = pthread_mutex_destroy(&monitor);
 
 #ifdef NO_FAST_MUTEXES
-#    error "NO_FAST_MUTEXES set"
-    //###FIXME### check this! CK
+#    warning "NO_FAST_MUTEXES set"
     if (error == EBUSY) {
+        ++errors;
         // wait for other threads ...
         if (EBUSY == pthread_mutex_trylock(&monitor)) {
-            // TODO: another thread owns the mutex, let's wait ... forever? CK
-            pthread_mutex_lock(&monitor);
-        }
-        do {
-            (void)pthread_mutex_unlock(&monitor);
-            error = pthread_mutex_destroy(&monitor);
-            if (error) {
-                throw std::runtime_error("pthread_mutex_destroy: failed");
+            notify_all();
+            // another thread owns the mutex, let's wait.
+            Thread::sleep(10);
+
+#    if defined(_POSIX_TIMEOUTS) && _POSIX_TIMEOUTS > 0
+            if (lock(10)) // NOTE: but not forever! CK
+#    else
+            error = pthread_mutex_lock(&monitor);
+            if (!error)
+#    endif
+            {
+                (void)pthread_mutex_unlock(&monitor);
+                do {
+                    Thread::sleep(10);
+                    error = pthread_mutex_destroy(&monitor);
+                    if (++errors > 11) {
+                        break; // prevent possible endless loop! CK
+                    }
+                } while (EBUSY == error);
+            } else {
+                ++errors;
             }
-        } while (EBUSY == error); // FIXME: possible endless loop! CK
+        }
     }
 #endif
 
     if (error) {
+        ++errors;
         LOG_BEGIN(loggerModuleName, ERROR_LOG | 2);
         LOG("Synchronized mutex_destroy failed with (error)(ptr)");
-        LOG(error);
+        LOG(strerror(error));
         LOG((void*)this);
         LOG_END;
+#ifdef NO_FAST_MUTEXES
+        // FIXME: this abort ...
+        throw std::runtime_error("pthread_mutex_destroy: failed");
+#endif
+    }
+
+    error = pthread_cond_destroy(&cond);
+    if (error) {
+        ++errors;
+        LOG_BEGIN(loggerModuleName, ERROR_LOG | 2);
+        LOG("Synchronized cond_destroy failed with (error)(ptr)");
+        LOG(strerror(error));
+        LOG((void*)this);
+        LOG_END;
+#ifdef NO_FAST_MUTEXES
+        error = pthread_cond_destroy(&cond);
+        if (!error) { // FIXME: this abort ...
+            throw std::runtime_error("pthread_cond_destroy: failed");
+        }
+#endif
     }
 }
 
@@ -280,7 +309,7 @@ bool Synchronized::lock(unsigned long timeout)
 #        warning "gettimeofday() used"
     struct timeval tv;
     gettimeofday(&tv, 0);
-    ts.tv_sec  = tv.tv_sec + (time_t)timeout / 1000;
+    ts.tv_sec = tv.tv_sec + (time_t)timeout / 1000;
     int millis = tv.tv_usec / 1000 + (timeout % 1000);
     if (millis >= 1000) {
         ts.tv_sec += 1;

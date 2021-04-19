@@ -48,8 +48,6 @@ using namespace Agentpp;
 #    endif
 #endif
 
-const ms max_diff(BOOST_THREAD_TEST_TIME_MS);
-
 typedef boost::atomic<size_t> test_counter_t;
 typedef boost::lockfree::queue<size_t, boost::lockfree::capacity<20> >
     result_queue_t;
@@ -529,7 +527,7 @@ BOOST_AUTO_TEST_CASE(SyncTrylock_test)
     {
         Lock l(sync);
 
-#if !defined(USE_AGENTPP_CK)
+#ifndef USE_AGENTPP_CK
         BOOST_TEST(sync.trylock() == Synchronized::OWNED);
 #else
         BOOST_TEST(sync.trylock() == Synchronized::BUSY);
@@ -560,7 +558,7 @@ BOOST_AUTO_TEST_CASE(SyncWait_test)
         Lock l(sync);
         Stopwatch sw;
 
-#if !defined(USE_AGENTPP_CK)
+#ifndef USE_AGENTPP_CK
         BOOST_TEST(!sync.wait_for(BOOST_THREAD_TEST_TIME_MS),
             "no timeout occurred on wait!");
 #else
@@ -577,12 +575,20 @@ BOOST_AUTO_TEST_CASE(SyncWait_test)
 }
 
 class BadTask : public Runnable {
+    Synchronized& sync;
+
 public:
-    BadTask() {};
+    BadTask(Synchronized& _sync)
+        : sync(_sync) {};
     void run() BOOST_OVERRIDE
     {
-        // ThreadSanitizer: data race: std::cout << "Hello world!" <<
-        // std::endl;
+        Lock l(sync);
+
+        // ThreadSanitizer: data race:
+        BOOST_TEST_MESSAGE(
+            BOOST_CURRENT_FUNCTION << ": Hello world! I'am waiting ...");
+        BOOST_TEST(sync.wait(333));
+
         throw std::runtime_error("Fatal Error, can't continue!");
     };
 
@@ -598,8 +604,14 @@ BOOST_AUTO_TEST_CASE(ThreadTaskThrow_test)
 {
     Stopwatch sw;
     {
-        Thread thread(new BadTask());
+        Synchronized* sync = new Synchronized();
+
+        Thread thread(new BadTask(*sync));
         thread.start();
+
+        sync->notify_all();
+        delete sync; // try to delete used mutex ...
+
         BOOST_TEST(thread.is_alive());
     }
     BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
@@ -710,6 +722,7 @@ struct wait_data {
 };
 
 #ifndef USE_AGENTPP_CK
+const ms max_diff(BOOST_THREAD_TEST_TIME_MS);
 typedef Synchronized mutex_type;
 
 void lock_mutexes_slowly(

@@ -110,12 +110,12 @@ endif()
 # ----------------------------------------------------------------------
 
 option(WARN_PEDANTIC "Compile with security and all extra warnings" ON)
-if(CMAKE_COMPILER_IS_GNUCXX)
-  add_definitions(-Wall -Wextra)
-  if(WARN_PEDANTIC)
-    message("WARN_PEDANTIC: -Wall -Wextra -Wpedantic!")
-    add_definitions(-Wpedantic -Wno-unused-parameter -Wno-tautological-compare)
-  endif()
+if(WARN_PEDANTIC)
+  include(cmake/WarningsAsErrors.cmake)
+  add_compile_options(-Wno-unused-parameter -Wno-tautological-compare)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  add_compile_options(-Wall -Wextra)
+  add_compile_options(-Wno-unused-parameter -Wno-tautological-compare)
 endif()
 
 option(USE_ThreadSanitizer "Compile with tool that detects data races" OFF)
