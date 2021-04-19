@@ -91,20 +91,17 @@ Synchronized::Synchronized()
 
 Synchronized::~Synchronized()
 {
-    // NOTE: give other waiting threads a time window
-    // to return from the wait on our condition_variable
+    int error = 0;
     int errors = 0;
-    int error  = pthread_mutex_destroy(&monitor);
 
 #ifdef NO_FAST_MUTEXES
-#    warning "NO_FAST_MUTEXES set"
-    if (error == EBUSY) {
-        ++errors;
-        // wait for other threads ...
-        if (EBUSY == pthread_mutex_trylock(&monitor)) {
+    do {
+        // first try to get the lock
+        error = pthread_mutex_trylock(&monitor);
+        if (!error) {
             notify_all();
-            // another thread owns the mutex, let's wait.
-            Thread::sleep(10);
+            (void)pthread_mutex_unlock(&monitor);
+            // if another thread waits for signal with mutex, let's wait.
 
 #    if defined(_POSIX_TIMEOUTS) && _POSIX_TIMEOUTS > 0
             if (lock(10)) // NOTE: but not forever! CK
@@ -114,18 +111,19 @@ Synchronized::~Synchronized()
 #    endif
             {
                 (void)pthread_mutex_unlock(&monitor);
-                do {
-                    Thread::sleep(10);
-                    error = pthread_mutex_destroy(&monitor);
+                error = pthread_mutex_destroy(&monitor);
+                if (error) {
                     if (++errors > 11) {
-                        break; // prevent possible endless loop! CK
+                        break;
                     }
-                } while (EBUSY == error);
-            } else {
-                ++errors;
+                }
             }
+        } else {
+            ++errors;
         }
-    }
+    } while (EBUSY == error);
+#else
+    error  = pthread_mutex_destroy(&monitor);
 #endif
 
     if (error) {

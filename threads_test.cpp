@@ -576,18 +576,26 @@ BOOST_AUTO_TEST_CASE(SyncWait_test)
 
 class BadTask : public Runnable {
     Synchronized& sync;
+    bool done{false};
 
 public:
     BadTask(Synchronized& _sync)
         : sync(_sync) {};
+    void signal() {
+        done = true;
+    }
     void run() BOOST_OVERRIDE
     {
-        Lock l(sync);
+        Lock l(sync); // wait for the scoped lock
 
         // ThreadSanitizer: data race:
         BOOST_TEST_MESSAGE(
             BOOST_CURRENT_FUNCTION << ": Hello world! I'am waiting ...");
-        BOOST_TEST(sync.wait(333));
+
+        while(!done) {
+            sync.wait(); // wait for the signal ..
+        }
+        Thread::sleep(rand() % 13);
 
         throw std::runtime_error("Fatal Error, can't continue!");
     };
@@ -605,12 +613,27 @@ BOOST_AUTO_TEST_CASE(ThreadTaskThrow_test)
     Stopwatch sw;
     {
         Synchronized* sync = new Synchronized();
+        auto* task = new BadTask(*sync);
 
-        Thread thread(new BadTask(*sync));
-        thread.start();
+        Thread thread(task);
+        thread.start(); // first the task waits for the lock
+        Thread::sleep(99);
 
+#if defined(_POSIX_TIMEOUTS) && _POSIX_TIMEOUTS > 0
+        BOOST_TEST(sync->lock(11));
+#else
+        BOOST_TEST(sync->lock());
+#endif
+
+        task->signal(); // ... and than for the signal
         sync->notify_all();
-        delete sync; // try to delete used mutex ...
+        sync->unlock();
+
+#ifdef NO_FAST_MUTEXES
+        //FIXME BOOST_TEST(sync->lock());
+        //FIXME BOOST_TEST(sync->unlock());
+        delete sync; // try to delete locked mutex ...
+#endif
 
         BOOST_TEST(thread.is_alive());
     }
