@@ -25,8 +25,7 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #include "possix/threadpool.hpp"
 
 #include <errno.h>
-#include <stdio.h>
-#include <string.h>
+#include <string.h> // memset()
 
 #ifdef _WIN32
 #    include <assert.h>
@@ -35,70 +34,13 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #    include <sys/time.h> // gettimeofday()
 #endif
 
+#include <stdexcept> // std::runtime_error()
+
 namespace AgentppCK
 {
 
 #ifndef NO_LOGGING
 static const char* loggerModuleName = "agent++.threads";
-#endif
-
-// NOTE: not used by CK
-#if 0
-Synchronized ThreadManager::global_lock;
-
-/**
- * Default constructor
- */
-ThreadManager::ThreadManager()
-{
-}
-
-/**
- * Destructor
- */
-ThreadManager::~ThreadManager()
-{
-#    ifndef NO_FAST_MUTEXES
-#        warning "NO_FAST_MUTEXES not set"
-    //###FIXME### check this! CK
-    //TODO: what should this help? CK
-    if (trylock() == LOCKED) {
-        unlock();
-    }
-#    endif
-}
-
-/**
- * Start synchronized execution.
- */
-void ThreadManager::start_synch()
-{
-    lock();
-}
-
-/**
- * End synchronized execution.
- */
-void ThreadManager::end_synch()
-{
-    unlock();
-}
-
-/**
- * Start global synchronized execution.
- */
-void ThreadManager::start_global_synch()
-{
-    global_lock.lock();
-}
-
-/**
- * End global synchronized execution.
- */
-void ThreadManager::end_global_synch()
-{
-    global_lock.unlock();
-}
 #endif
 
 /*--------------------- class Synchronized -------------------------*/
@@ -132,9 +74,9 @@ Synchronized::Synchronized()
     pthread_mutexattr_t attr;
     ERR_CHK_WITHOUT_EXCEPTIONS(pthread_mutexattr_init(&attr));
 
-#ifdef PTHREAD_MUTEX_ERRORCHECK
-#    warning "PTHREAD_MUTEX_ERRORCHECK set"
-#endif
+    //#ifdef PTHREAD_MUTEX_ERRORCHECK
+    //#    warning "PTHREAD_MUTEX_ERRORCHECK set"
+    //#endif
 
     ERR_CHK_WITHOUT_EXCEPTIONS(
         pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK));
@@ -149,41 +91,69 @@ Synchronized::Synchronized()
 
 Synchronized::~Synchronized()
 {
-    int error = pthread_cond_destroy(&cond);
-    if (error) {
-        LOG_BEGIN(loggerModuleName, ERROR_LOG | 2);
-        LOG("Synchronized cond_destroy failed with (error)(ptr)");
-        LOG(error);
-        LOG((void*)this);
-        LOG_END;
-    }
-    error = pthread_mutex_destroy(&monitor);
+    int error  = 0;
+    int errors = 0;
 
 #ifdef NO_FAST_MUTEXES
-#    error "NO_FAST_MUTEXES set"
-    //###FIXME### check this! CK
-    if (error == EBUSY) {
-        // wait for other threads ...
-        if (EBUSY == pthread_mutex_trylock(&monitor)) {
-            // TODO: another thread owns the mutex, let's wait ... forever? CK
-            pthread_mutex_lock(&monitor);
-        }
-        do {
+    do {
+        // first try to get the lock
+        error = pthread_mutex_trylock(&monitor);
+        if (!error) {
+            notify_all();
             (void)pthread_mutex_unlock(&monitor);
-            error = pthread_mutex_destroy(&monitor);
-            if (error) {
-                throw std::runtime_error("pthread_mutex_destroy: failed");
+            // if another thread waits for signal with mutex, let's wait.
+
+#    if defined(_POSIX_TIMEOUTS) && _POSIX_TIMEOUTS > 0
+            if (lock(10)) // NOTE: but not forever! CK
+#    else
+            error = pthread_mutex_lock(&monitor);
+            if (!error)
+#    endif
+            {
+                (void)pthread_mutex_unlock(&monitor);
+                error = pthread_mutex_destroy(&monitor);
+                if (error) {
+                    ++errors;
+                    Thread::sleep(errors * 2);
+                }
             }
-        } while (EBUSY == error); // FIXME: possible endless loop! CK
-    }
+        } else {
+            ++errors;
+            Thread::sleep(errors * 2);
+        }
+        if (errors > 11) {
+            break;
+        }
+    } while (EBUSY == error);
+#else
+    error = pthread_mutex_destroy(&monitor);
 #endif
 
     if (error) {
+        ++errors;
         LOG_BEGIN(loggerModuleName, ERROR_LOG | 2);
         LOG("Synchronized mutex_destroy failed with (error)(ptr)");
-        LOG(error);
+        LOG(strerror(error));
         LOG((void*)this);
         LOG_END;
+#ifdef NO_FAST_MUTEXES
+        // FIXME: this abort ...
+        throw std::runtime_error("pthread_mutex_destroy: failed");
+#endif
+    }
+
+    error = pthread_cond_destroy(&cond);
+    if (error) {
+        ++errors;
+        LOG_BEGIN(loggerModuleName, ERROR_LOG | 2);
+        LOG("Synchronized cond_destroy failed with (error)(ptr)");
+        LOG(strerror(error));
+        LOG((void*)this);
+        LOG_END;
+#ifdef NO_FAST_MUTEXES
+        // FIXME: this abort ...
+        throw std::runtime_error("pthread_cond_destroy: failed");
+#endif
     }
 }
 
@@ -338,7 +308,7 @@ bool Synchronized::lock(unsigned long timeout)
 #        warning "gettimeofday() used"
     struct timeval tv;
     gettimeofday(&tv, 0);
-    ts.tv_sec  = tv.tv_sec + (time_t)timeout / 1000;
+    ts.tv_sec = tv.tv_sec + (time_t)timeout / 1000;
     int millis = tv.tv_usec / 1000 + (timeout % 1000);
     if (millis >= 1000) {
         ts.tv_sec += 1;
@@ -434,7 +404,13 @@ void* thread_starter(void* t)
     pthread_setname_np(pthread_self(), AGENTX_DEFAULT_THREAD_NAME);
 #endif
 
-    thread->get_runnable()->run();
+    try {
+        thread->get_runnable()->run();
+    } catch (std::exception& ex) {
+        DTRACE("Exception: " << ex.what());
+    } catch (...) {
+        // OK; ignored CK
+    }
 
     LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
     LOG("Thread: ended (tid)");
@@ -518,9 +494,6 @@ void Thread::start()
 
 #if defined(__INTEGRITY)
         pthread_attr_setthreadname(&attr, AGENTX_DEFAULT_THREAD_NAME);
-#elif defined(__APPLE__)
-        // NOTE: must be set from within the thread (can't specify thread ID)
-        // XXX pthread_setname_np(AGENTX_DEFAULT_THREAD_NAME);
 #endif
 
         pthread_attr_setstacksize(&attr, stackSize);
@@ -621,10 +594,11 @@ TaskManager::TaskManager(ThreadPool* tp, size_t stackSize)
 
 TaskManager::~TaskManager()
 {
-    lock();
-    go = false;
-    notify();
-    unlock();
+    {
+        Lock l(*this);
+        go = false;
+        notify();
+    }
 
     thread.join();
     LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
@@ -637,17 +611,20 @@ void TaskManager::run()
     Lock l(*this);
     while (go) {
         if (task) {
-            task->run(); // NOTE: executes the task
+            try {
+                task->run(); // NOTE: executes the task
+            } catch (std::exception& ex) {
+                DTRACE("Exception: " << ex.what());
+            } catch (...) {
+                // OK; ignored CK
+            }
             delete task;
             task = NULL;
-
-            unlock(); // TODO: prevent deadlock! CK
             //==============================
             // NOTE: may direct call set_task()
             // via QueuedThreadPool::run() => QueuedThreadPool::assign()
             threadPool->idle_notification();
             //==============================
-            lock();
         } else {
             wait(); // NOTE: idle, wait until notify signal CK
         }
@@ -657,6 +634,12 @@ void TaskManager::run()
         task = NULL;
         DTRACE("task deleted after stop()");
     }
+}
+
+bool TaskManager::is_idle()
+{
+    Lock l(*this);
+    return (!task && thread.is_alive());
 }
 
 bool TaskManager::set_task(Runnable* t)
@@ -682,8 +665,13 @@ bool TaskManager::set_task(Runnable* t)
 void ThreadPool::execute(Runnable* t)
 {
     Lock l(*this);
+
+    if (taskList.empty()) {
+        delete t;
+        return;
+    }
+
     TaskManager* tm = NULL;
-    // TODO: only while not stopped! CK
     while (!tm) {
         for (std::vector<TaskManager*>::iterator cur = taskList.begin();
              cur != taskList.end(); ++cur) {
@@ -709,9 +697,15 @@ void ThreadPool::execute(Runnable* t)
     }
 }
 
+// NOTE: asserted to be called with lock! CK
 void ThreadPool::idle_notification()
 {
-    Lock l(*this);
+    // FIXME: needed? CK Lock l(*this);
+
+    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
+    LOG("notify");
+    LOG_END;
+
     notify();
 }
 
@@ -773,67 +767,58 @@ ThreadPool::~ThreadPool()
 {
     terminate();
 
+    // TODO refactor to EmptyTaskList();
     for (size_t i = 0; i < taskList.size(); i++) {
-        delete taskList[i];
+        delete taskList[i]; // implizit Thread::join()
     }
+    taskList.clear();
 }
 
 /*--------------------- class QueuedThreadPool --------------------------*/
 
 QueuedThreadPool::QueuedThreadPool(size_t size)
     : ThreadPool(size)
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     , thread(this)
-#endif
     , go(true)
 {
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     thread.start();
-#endif
 }
 
 QueuedThreadPool::QueuedThreadPool(size_t size, size_t stack_size)
     : ThreadPool(size, stack_size)
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     , thread(this)
-#endif
     , go(true)
 {
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     thread.start();
-#endif
+}
+
+void QueuedThreadPool::EmptyQueue()
+{
+    Lock l(thread);
+    while (!queue.empty()) {
+        Runnable* t = queue.front();
+        queue.pop();
+        if (t) {
+            delete t;
+            DTRACE("queue entry (task) deleted");
+        }
+    }
 }
 
 QueuedThreadPool::~QueuedThreadPool()
 {
     stop();
 
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     thread.join();
     DTRACE("thread joined");
-#endif
 
-    {
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
-        Lock l(thread);
-#else
-        Lock l(*this);
-#endif
-        while (!queue.empty()) {
-            Runnable* t = queue.front();
-            queue.pop();
-            if (t) {
-                delete t;
-                DTRACE("queue entry (task) deleted");
-            }
-        }
-    }
+    EmptyQueue();
 
     ThreadPool::terminate();
 }
 
 // NOTE: asserted to be called with lock! CK
-bool QueuedThreadPool::assign(Runnable* t, bool withQueuing)
+bool QueuedThreadPool::assign(Runnable* t, bool /* withQueuing */)
 {
     TaskManager* tm = NULL;
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
@@ -854,6 +839,7 @@ bool QueuedThreadPool::assign(Runnable* t, bool withQueuing)
         tm = NULL;
     }
 
+#if 0
     // NOTE: no idle thread found, push to queue if allowed! CK
     if (!tm && withQueuing) {
         LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
@@ -861,60 +847,35 @@ bool QueuedThreadPool::assign(Runnable* t, bool withQueuing)
         LOG_END;
         queue.push(t);
 
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
         DTRACE("busy! task queued; Thread::notify()");
         thread.notify();
-#endif
 
         return true;
     }
+#endif
 
     return false;
 }
 
 void QueuedThreadPool::execute(Runnable* t)
 {
+    Lock l(thread);
 
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
-    {
-        Lock l(thread);
-
-        if (is_stopped()) {
-            delete t;
-            return;
-        }
-
-        LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-        LOG("queue.push");
-        LOG_END;
-        queue.push(t);
-        thread.notify();
+    if (is_stopped()) {
+        delete t;
+        return;
     }
-#else  // AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
-    {
-        Lock l(*this);
 
-        if (is_stopped()) {
-            delete t;
-            return;
-        }
-
-        if (queue.empty()) {
-            assign(t);
-        } else {
-            queue.push(t);
-        }
-    }
-#endif // AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
+    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
+    LOG("queue.push");
+    LOG_END;
+    queue.push(t);
+    thread.notify();
 }
 
 void QueuedThreadPool::run()
 {
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     Lock l(thread);
-#else
-    Lock l(*this);
-#endif
 
     while (go) {
         if (!queue.empty()) {
@@ -925,11 +886,6 @@ void QueuedThreadPool::run()
             if (t) {
                 if (assign(t, false)) { // NOTE: without queuing! CK
                     queue.pop();        // OK, now we pop this entry
-
-#ifndef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
-                    return;
-#endif
-
                 } else {
                     DTRACE("busy! Thread::sleep()");
                     // NOTE: wait some ms to prevent notify() loops while busy!
@@ -939,71 +895,46 @@ void QueuedThreadPool::run()
             }
         }
 
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
         // NOTE: for idle_notification ... CK
         thread.wait(1234); // ms
-#else
-        return;
-#endif
     }
 }
 
+// NOTE: asserted to be called with lock! CK
 void QueuedThreadPool::idle_notification()
 {
-
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
-    Lock l(thread);
+    // FIXME: needed? CK Lock l(thread);
 
     LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
     LOG("notify");
     LOG_END;
-
     thread.notify();
 
-    ThreadPool::idle_notification();
-#else
-    // TODO: the additional thread may be prevented by call run() here? CK
-    run();
-#endif
+    // FIXME: needed? CK ThreadPool::idle_notification();
 }
 
 bool QueuedThreadPool::is_idle()
 {
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     Lock l(thread);
     bool result = thread.is_alive() && queue.empty() && ThreadPool::is_idle();
-#else
-    Lock l(*this);
-    bool result = queue.empty() && ThreadPool::is_idle();
-#endif
 
     return result;
 }
 
 bool QueuedThreadPool::is_busy()
 {
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     Lock l(thread);
     bool result =
         !thread.is_alive() || !queue.empty() || ThreadPool::is_busy();
-#else
-    Lock l(*this);
-    bool result = !queue.empty() || ThreadPool::is_busy();
-#endif
 
     return result;
 }
 
 void QueuedThreadPool::stop()
 {
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     Lock l(thread);
     go = false;
     thread.notify();
-#else
-    Lock l(*this);
-    go = false;
-#endif
 }
 
 } // namespace AgentppCK

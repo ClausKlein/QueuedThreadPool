@@ -25,9 +25,13 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #ifndef agent_pp_threadpool_hpp_
 #define agent_pp_threadpool_hpp_
 
+// NOTE: do not change! CK
+#define NO_FAST_MUTEXES
+#define NO_LOGGING
+#define AGENTPP_USE_IMPLIZIT_START
+
 #ifdef __INTEGRITY
 #    include <integrity.h>
-#    define NO_LOGGING
 #endif
 
 #ifdef _WIN32
@@ -36,7 +40,10 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #    include <unistd.h> // _POSIX_MONOTONIC_CLOCK _POSIX_TIMEOUTS _POSIX_TIMERS _POSIX_THREADS ...
 #endif
 
-#include <iostream>
+#if !defined(NO_LOGGING) || defined(TRACE_VERBOSE)
+#    include <iostream>
+#endif
+
 #include <list>
 #include <pthread.h>
 #include <queue>
@@ -45,10 +52,6 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 
 #include <boost/current_function.hpp>
 #include <boost/noncopyable.hpp>
-
-// NOTE: do not change! CK
-#define AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
-#define AGENTPP_USE_IMPLIZIT_START
 
 #define AGENTPP_DEFAULT_STACKSIZE 0x10000UL
 #define AGENTPP_OPAQUE_PTHREAD_T void*
@@ -64,17 +67,17 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #    define LOG_BEGIN(x, y)
 #    define LOG(x)
 #    define LOG_END
-#    define NO_LOGGING 1
 #endif
 
 /*
- * Define a macro that can be used for diagnostic output from examples. When
- * compiled -DDEBUG, it results in writing with the specified argument to
- * std::cout. When DEBUG is not defined, it expands to nothing.
+ * Define a macro that can be used for diagnostic output from examples.
+ * When compiled -DTRACE_VERBOSE, it results in writing with the
+ * specified argument to std::cerr. When DEBUG is not defined, it expands
+ * to nothing.
  */
-#ifdef DEBUG
+#if defined(TRACE_VERBOSE) && !defined(NDEBUG)
 #    define DTRACE(arg) \
-        std::cout << BOOST_CURRENT_FUNCTION << ": " arg << std::endl
+        std::cerr << BOOST_CURRENT_FUNCTION << ": " arg << std::endl
 #else
 #    define DTRACE(arg)
 #endif
@@ -433,9 +436,10 @@ public:
         Lock l(*this);
         list.remove(t);
     }
-    size_t size() { 
+    size_t size()
+    {
         Lock l(*this);
-        return list.size(); 
+        return list.size();
     }
 
     Thread* last()
@@ -560,9 +564,7 @@ public:
  */
 class AGENTPP_DECL QueuedThreadPool : public ThreadPool, public Runnable {
 
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
     Thread thread;
-#endif
 
     std::queue<Runnable*> queue;
     volatile bool go;
@@ -608,11 +610,7 @@ public:
      */
     size_t queue_length()
     {
-#ifdef AGENTPP_QUEUED_TRHEAD_POOL_USE_QUEUE_THREAD
         Lock l(thread);
-#else
-        Lock l(*this);
-#endif
         return queue.size();
     }
 
@@ -660,6 +658,8 @@ private:
      * @note asserted to be called with lock! CK
      **/
     bool is_stopped() { return !go; }
+
+    void EmptyQueue();
 };
 
 /**
@@ -696,11 +696,7 @@ public:
      *   TRUE if the thread managed by this TaskManager does
      *   not currently execute any task; FALSE otherwise.
      */
-    bool is_idle()
-    {
-        // TODO: Lock(*this);
-        return (!task && thread.is_alive());
-    }
+    bool is_idle();
 
     /**
      * Set the next task for execution. This will block until
@@ -744,53 +740,6 @@ private:
     }
     void run() BOOST_OVERRIDE;
 };
-
-// NOTE: not used by CK
-#if 0
-/**
- * The ThreadManager class provides functionality to control the
- * execution of threads.
- *
- * @author Frank Fock
- * @version 3.5.3
- */
-class AGENTPP_DECL ThreadManager: public Synchronized
-{
-
-public:
-
-    /**
-     * Default constructor
-     */
-    ThreadManager();
-
-    /**
-     * Destructor
-     */
-    virtual ~ThreadManager();
-
-    /**
-     * Start synchronized execution.
-     */
-    void    start_synch();
-    /**
-     * End synchronized execution.
-     */
-    void    end_synch();
-
-    /**
-     * Start global synchronized execution.
-     */
-    static  void    start_global_synch();
-    /**
-     * End global synchronized execution.
-     */
-    static  void    end_global_synch();
-
-private:
-    static Synchronized global_lock;
-};
-#endif
 
 } // namespace AgentppCK
 

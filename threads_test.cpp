@@ -48,9 +48,7 @@ using namespace Agentpp;
 #    endif
 #endif
 
-const ms max_diff(BOOST_THREAD_TEST_TIME_MS);
-
-typedef size_t test_counter_t;
+typedef boost::atomic<size_t> test_counter_t;
 typedef boost::lockfree::queue<size_t, boost::lockfree::capacity<20> >
     result_queue_t;
 
@@ -87,7 +85,9 @@ public:
         Thread::sleep((rand() % 3) * delay); // ms
 
         scoped_lock l(lock);
-        BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << " called with: " << text);
+        // WARNING: ThreadSanitizer: data race
+        // BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << " called with: " <<
+        // text);
         size_t hash = boost::hash_value(text);
         result.push(hash);
         ++run_cnt;
@@ -118,7 +118,7 @@ protected:
 private:
     const std::string text;
     result_queue_t& result;
-    unsigned delay;
+    const unsigned delay;
 };
 
 TestTask::lockable_type
@@ -527,7 +527,7 @@ BOOST_AUTO_TEST_CASE(SyncTrylock_test)
     {
         Lock l(sync);
 
-#if !defined(USE_AGENTPP_CK)
+#ifndef USE_AGENTPP_CK
         BOOST_TEST(sync.trylock() == Synchronized::OWNED);
 #else
         BOOST_TEST(sync.trylock() == Synchronized::BUSY);
@@ -558,7 +558,7 @@ BOOST_AUTO_TEST_CASE(SyncWait_test)
         Lock l(sync);
         Stopwatch sw;
 
-#if !defined(USE_AGENTPP_CK)
+#ifndef USE_AGENTPP_CK
         BOOST_TEST(!sync.wait_for(BOOST_THREAD_TEST_TIME_MS),
             "no timeout occurred on wait!");
 #else
@@ -575,11 +575,33 @@ BOOST_AUTO_TEST_CASE(SyncWait_test)
 }
 
 class BadTask : public Runnable {
+    Synchronized& sync;
+    bool done { false };
+
 public:
-    BadTask() {};
+    BadTask(Synchronized& _sync)
+        : sync(_sync) {};
+
+    void signal()
+    {
+        Lock l(sync); // wait for the scoped lock
+        done = true;
+        sync.notify_all();
+    }
+
     void run() BOOST_OVERRIDE
     {
-        std::cout << "Hello world!" << std::endl;
+        Lock l(sync); // wait for the scoped lock
+
+        // ThreadSanitizer: data race:
+        BOOST_TEST_MESSAGE(
+            BOOST_CURRENT_FUNCTION << ": Hello world! I'am waiting ...");
+
+        while (!done) {
+            sync.wait(); // wait for the signal ..
+        }
+        Thread::sleep(rand() % 13);
+
         throw std::runtime_error("Fatal Error, can't continue!");
     };
 
@@ -591,18 +613,41 @@ public:
 #endif
 };
 
-#ifndef USE_AGENTPP_CK
 BOOST_AUTO_TEST_CASE(ThreadTaskThrow_test)
 {
     Stopwatch sw;
     {
-        Thread thread(new BadTask());
-        thread.start();
+        Synchronized* sync = new Synchronized();
+        auto* task         = new BadTask(*sync);
+
+        Thread thread(task);
+
+#if defined(_POSIX_TIMEOUTS) && _POSIX_TIMEOUTS > 0
+        BOOST_TEST(sync->lock(11));
+#else
+        BOOST_TEST(sync->lock());
+#endif
+
+        thread.start(); // first the task will wait for the lock
+        Thread::sleep(BOOST_THREAD_TEST_TIME_MS);
+        sync->unlock();
+
+        task->signal(); // ... and than the task wait for the signal
+
+#ifdef NO_FAST_MUTEXES
+        Thread::sleep(rand() % 11);
+        delete sync; // try to delete locked mutex ...
+#endif
+
+        Thread::sleep(BOOST_THREAD_TEST_TIME_MS);
         BOOST_TEST(thread.is_alive());
+
+#ifndef NO_FAST_MUTEXES
+        delete sync;
+#endif
     }
     BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
 }
-#endif
 
 BOOST_AUTO_TEST_CASE(ThreadLivetime_test)
 {
@@ -709,6 +754,7 @@ struct wait_data {
 };
 
 #ifndef USE_AGENTPP_CK
+const ms max_diff(BOOST_THREAD_TEST_TIME_MS);
 typedef Synchronized mutex_type;
 
 void lock_mutexes_slowly(

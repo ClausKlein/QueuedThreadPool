@@ -101,9 +101,9 @@ void* counter_thread(void* arg)
      */
     while (time(NULL) < end_time) {
 
-#ifdef PTHREAD_MUTEX_RECURSIVE
-#    warning "recursive mutex supported"
-#endif
+        //#ifdef PTHREAD_MUTEX_RECURSIVE
+        //#    warning "recursive mutex supported"
+        //#endif
         if (recursive) {
             printf("recursive usage:\n");
             status = pthread_mutex_lock(&mutex);
