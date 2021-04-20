@@ -30,9 +30,7 @@ boost::shared_ptr is now part of the C++11 Standard, as std::shared_ptr.
 #include <boost/shared_ptr.hpp>
 // #include <boost/move/unique_ptr.hpp>
 
-
 void foo(boost::shared_ptr<int> i) { (*i)++; }
-
 
 int main()
 {

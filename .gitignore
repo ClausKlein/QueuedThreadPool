@@ -24,11 +24,12 @@ trylock_test
 user_scheduler
 volatile
 
+generated/
+include
 build/
-html/
-doc/
 gcov-summary.txt
 coverage.info
+compile_commands.json
 *.html
 *.gcda
 *.gcno
@@ -36,4 +37,4 @@ coverage.info
 *.exe
 *.o
 *.d
-
+.configure

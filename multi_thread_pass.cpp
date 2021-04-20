@@ -11,7 +11,7 @@
 #include <boost/config.hpp>
 
 #if !defined BOOST_NO_CXX11_DECLTYPE
-#define BOOST_RESULT_OF_USE_DECLTYPE
+#    define BOOST_RESULT_OF_USE_DECLTYPE
 #endif
 
 #define BOOST_THREAD_VERSION 4
@@ -29,7 +29,7 @@ template <typename ValueType> struct call_push {
     call_push(boost::sync_queue<ValueType>* q, boost::barrier* go)
         : q_(q)
         , go_(go)
-    {}
+    { }
     typedef void result_type;
     void operator()()
     {
@@ -45,7 +45,7 @@ template <typename ValueType> struct call_pull {
     call_pull(boost::sync_queue<ValueType>* q, boost::barrier* go)
         : q_(q)
         , go_(go)
-    {}
+    { }
     typedef ValueType result_type;
     ValueType operator()()
     {
@@ -61,7 +61,7 @@ template <typename ValueType> struct call_wait_pull {
     call_wait_pull(boost::sync_queue<ValueType>* q, boost::barrier* go)
         : q_(q)
         , go_(go)
-    {}
+    { }
     typedef boost::queue_op_status result_type;
     boost::queue_op_status operator()(ValueType& v)
     {
@@ -212,7 +212,7 @@ void test_concurrent_pull_on_queue()
                     return q.pull();
                 }
 #else
-#warning BOOST_NO_CXX11_LAMBDAS
+#    warning BOOST_NO_CXX11_LAMBDAS
                 call_pull<ValueType>(&q, &go)
 #endif
             );

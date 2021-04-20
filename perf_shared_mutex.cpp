@@ -19,12 +19,15 @@
 #include <iostream>
 
 #ifdef DEBUG
-#define VERBOSE
+#    define VERBOSE
 #endif
 
 using namespace boost;
 
-shared_mutex mtx;
+shared_mutex
+    mtx; // warning: initialization of 'mut' with static storage duration may
+         // throw an exception that cannot be caught [cert-err58-cpp]
+
 const int cycles = 1000;
 
 void shared()

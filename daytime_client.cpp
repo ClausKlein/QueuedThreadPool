@@ -7,7 +7,9 @@
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
-#define ASIO_NO_DEPRECATED
+
+#define BOOST_ASIO_NO_DEPRECATED
+#include <boost/config.hpp>
 
 #include <boost/array.hpp>
 #include <boost/asio.hpp>
@@ -16,13 +18,12 @@
 
 using boost::asio::ip::tcp;
 
-
 int main(int argc, char* argv[])
 {
     try {
         if (argc != 2) {
             std::cerr << "Usage: client <host>" << std::endl;
-            return 0;   //NOTE: OK for ctest! CK
+            return 0; // NOTE: OK for ctest! CK
         }
 
         boost::asio::io_context io_context;
@@ -35,7 +36,7 @@ int main(int argc, char* argv[])
         boost::asio::connect(socket, endpoints);
 
         for (;;) {
-            boost::array<char, 128> buf;
+            boost::array<char, 128> buf = { 0 };
             boost::system::error_code error;
 
             size_t len = socket.read_some(boost::asio::buffer(buf), error);

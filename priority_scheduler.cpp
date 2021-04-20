@@ -1,12 +1,12 @@
 #if defined(__cplusplus) && (__cplusplus >= 201103L)
-#define BOOST_THREAD_VERSION 4
-#define BOOST_THREAD_PROVIDES_EXECUTORS
+#    define BOOST_THREAD_VERSION 4
+#    define BOOST_THREAD_PROVIDES_EXECUTORS
 #endif
 
 #include <asio/dispatch.hpp>
 #include <asio/execution_context.hpp>
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
@@ -17,7 +17,6 @@
 
 using asio::dispatch;
 using asio::execution_context;
-
 
 class priority_scheduler : public execution_context {
 public:
@@ -177,16 +176,14 @@ private:
     bool stopped_;
 };
 
-
 class Print {
     int i_;
 
 public:
     Print(int i)
-        : i_(i){};
+        : i_(i) {};
     void operator()() { std::cout << i_ << std::endl; }
 };
-
 
 int main()
 {

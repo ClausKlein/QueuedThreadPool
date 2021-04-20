@@ -7,12 +7,10 @@
 #define BOOST_THREAD_PROVIDES_SHARED_MUTEX_UPWARDS_CONVERSIONS
 #define BOOST_THREAD_PROVIDES_EXPLICIT_LOCK_CONVERSION
 #define BOOST_THREAD_PROVIDES_GENERIC_SHARED_MUTEX_ON_WIN
-#define BOOST_CHRONO_VERSION 2
+
+#include "simple_stopwatch.hpp"
 
 #include <boost/assert.hpp>
-#include <boost/chrono/chrono_io.hpp>
-#include <boost/chrono/stopwatches/reporters/stopwatch_reporter.hpp>
-#include <boost/chrono/stopwatches/strict_stopwatch.hpp>
 #include <boost/thread/lock_algorithms.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/shared_mutex.hpp>
@@ -20,7 +18,6 @@
 
 #include <iostream>
 #include <vector>
-
 
 enum { reading, writing };
 int state = reading;
@@ -47,7 +44,7 @@ boost::recursive_mutex& cout_mut()
     return m;
 }
 
-void print() {}
+void print() { }
 
 template <class A0, class... Args>
 void print(const A0& a0, const Args&... args)
@@ -66,11 +63,12 @@ void print(const A0&, const A1& a1, const A2&)
 }
 #endif
 
-
 namespace S
 {
 
-boost::shared_mutex mut;
+boost::shared_mutex
+    mut; // warning: initialization of 'mut' with static storage duration
+         // may throw an exception that cannot be caught [cert-err58-cpp]
 
 void reader()
 {
@@ -197,8 +195,7 @@ void test_shared_mutex()
     }
     std::cout << __FILE__ << "[" << __LINE__ << "]" << std::endl;
 }
-} // S
-
+} // namespace S
 
 namespace U
 {
@@ -595,8 +592,7 @@ void test_upgrade_mutex()
     }
     std::cout << __FILE__ << "[" << __LINE__ << "]" << std::endl;
 }
-} // U
-
+} // namespace U
 
 namespace Assignment
 {
@@ -654,7 +650,7 @@ public:
     }
 };
 
-} // Assignment
+} // namespace Assignment
 
 static void temp()
 {
@@ -664,7 +660,6 @@ static void temp()
     shared_lock<upgrade_mutex> sl;
     sl = BOOST_THREAD_MAKE_RV_REF(shared_lock<upgrade_mutex>(boost::move(ul)));
 }
-
 
 int main()
 {

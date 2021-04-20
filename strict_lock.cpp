@@ -13,7 +13,6 @@
 #include <boost/thread/strict_lock.hpp>
 #include <iostream>
 
-
 BOOST_STATIC_ASSERT(
     boost::is_strict_lock<boost::strict_lock<boost::mutex> >::value);
 BOOST_CONCEPT_ASSERT((boost::BasicLockable<boost::mutex>));

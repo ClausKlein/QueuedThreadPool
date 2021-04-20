@@ -7,17 +7,19 @@
 #include <boost/config.hpp>
 
 #if !defined BOOST_NO_CXX11_DECLTYPE
-#define BOOST_RESULT_OF_USE_DECLTYPE
+#    define BOOST_RESULT_OF_USE_DECLTYPE
+#else
+#    define BOOST_THREAD_VERSION 3
 #endif
 
-// TODO: BOOST_THREAD_VERSION should be 4! CK
-#define BOOST_THREAD_VERSION 3
+#ifndef BOOST_THREAD_VERSION
+#    warning "BOOST_THREAD_VERSION should be 4!" CK
+#endif
 
 #include <boost/thread/future.hpp>
 
 #include <exception>
 #include <iostream>
-
 
 // FIXME: why? CK
 namespace boost
@@ -26,8 +28,7 @@ template <typename T> exception_ptr make_exception_ptr(T v)
 {
     return copy_exception(v);
 }
-}
-
+} // namespace boost
 
 int f1() { return 5; }
 
@@ -37,7 +38,7 @@ int& f1r()
     return i;
 }
 
-void p() {}
+void p() { }
 
 #if defined BOOST_THREAD_USES_MOVE
 boost::future<void> void_compute()
@@ -52,14 +53,14 @@ boost::future<int> compute(int x)
     if (x == 0)
         return boost::make_ready_future(0);
 
-#ifdef BOOST_NO_CXX11_RVALUE_REFERENCES
-#warning BOOST_NO_CXX11_RVALUE_REFERENCES
+#    ifdef BOOST_NO_CXX11_RVALUE_REFERENCES
+#        warning BOOST_NO_CXX11_RVALUE_REFERENCES
     if (x < 0)
         return boost::make_exceptional_future<int>(std::logic_error("Error"));
-#else
+#    else
     if (x < 0)
         return boost::make_exceptional(std::logic_error("Error"));
-#endif
+#    endif
 
     // boost::future<int> f1 = boost::async([]() { return x+1; });
     boost::future<int> f1 = boost::async(boost::launch::async, f1);
@@ -93,14 +94,14 @@ boost::shared_future<int> shared_compute(int x)
     if (x == 0)
         return boost::make_ready_future(0).share();
 
-#ifdef BOOST_NO_CXX11_RVALUE_REFERENCES
+#    ifdef BOOST_NO_CXX11_RVALUE_REFERENCES
     if (x < 0)
         return boost::make_exceptional_future<int>(std::logic_error("Error"))
             .share();
-#else
+#    else
     if (x < 0)
         return boost::make_exceptional(std::logic_error("Error"));
-#endif
+#    endif
 
     // boost::future<int> f1 = boost::async([]() { return x+1; });
     boost::shared_future<int> f1 =
@@ -108,7 +109,6 @@ boost::shared_future<int> shared_compute(int x)
     return f1;
 }
 #endif
-
 
 int main()
 {

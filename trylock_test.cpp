@@ -21,16 +21,17 @@
 #include <iostream>
 
 #ifdef DEBUG
-#define VERBOSE
+#    define VERBOSE
 #endif
 
 using namespace boost;
 
-mutex mtx;
+mutex mtx; // warning: initialization of 'mutex' with static storage duration
+           // may throw an exception that cannot be caught [cert-err58-cpp]
+
 int counter      = 0;
 const int cycles = 1000;
 const int worker = 2;
-
 
 void monitor()
 {
@@ -49,7 +50,6 @@ void monitor()
     } while (true);
 }
 
-
 void unique()
 {
     int cycle(0);
@@ -58,7 +58,6 @@ void unique()
         ++counter;
     }
 }
-
 
 int main()
 {

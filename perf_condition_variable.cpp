@@ -52,10 +52,9 @@ template <class Types> struct SharedData : Types {
         , counter()
         , semaphore(consumers) // Initialize to the number of consumers. (*)
         , producer_time()
-    {}
+    { }
 };
 ////////////////////////////////////////////////////////////////////////////////////////////////
-
 
 template <class S> void producer_thread(S* shared_data)
 {
@@ -107,17 +106,17 @@ Stopwatch::rep benchmark_ping_pong(unsigned consumer_count)
     auto best_producer_time = std::numeric_limits<Stopwatch::rep>::max
     BOOST_PREVENT_MACRO_SUBSTITUTION();
 
-    std::vector<std::thread> consumers{ consumer_count };
+    std::vector<std::thread> consumers { consumer_count };
 
     // Run the benchmark 10 times and report the best time.
     for (int times = 10; times--;) {
-        S shared_data{ 1000, consumer_count };
+        S shared_data { 1000, consumer_count };
 
         // Start the consumers.
         for (unsigned i = 0; i < consumer_count; ++i)
-            consumers[i] = std::thread{ consumer_thread<S>, &shared_data };
+            consumers[i] = std::thread { consumer_thread<S>, &shared_data };
         // Start the producer and wait till it finishes.
-        std::thread{ producer_thread<S>, &shared_data }.join();
+        std::thread { producer_thread<S>, &shared_data }.join();
         // Wait till consumers finish.
         for (unsigned i = 0; i < consumer_count; ++i)
             consumers[i].join();

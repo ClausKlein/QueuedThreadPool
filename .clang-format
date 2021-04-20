@@ -6,11 +6,15 @@ BasedOnStyle:  WebKit
 #< ColumnLimit: 0
 ColumnLimit: 79
 # ---
-#< AllowShortFunctionsOnASingleLine: All
+### see BinPack... too
+AllowAllArgumentsOnNextLine: true
+AllowAllConstructorInitializersOnNextLine: true
+AllowShortBlocksOnASingleLine: true
+AllowShortFunctionsOnASingleLine: All
 #XXX AllowShortFunctionsOnASingleLine: Inline
 # ---
-#< SortIncludes:    true
-#< SortUsingDeclarations: true
+SortIncludes:    true
+SortUsingDeclarations: true
 #XXX SortIncludes:    false
 #XXX SortUsingDeclarations: false
 # ---
@@ -31,19 +35,20 @@ BraceWrapping:
   SplitEmptyRecord: true
   SplitEmptyNamespace: true
 
+FixNamespaceComments: true
 #TODO: The preprocessor directive indenting style to use.
-# IndentPPDirectives: AfterHash
+IndentPPDirectives: AfterHash
 # ---
 BinPackArguments: true
 BinPackParameters: true
 BreakBeforeBinaryOperators: NonAssignment
-# DerivePointerAlignment: false
+DerivePointerAlignment: false
 # PointerAlignment: Right
 AlignEscapedNewlines: DontAlign
 AlignAfterOpenBracket: DontAlign
 AlignConsecutiveAssignments: true
 AlignTrailingComments: true
 ContinuationIndentWidth: 4
-MaxEmptyLinesToKeep: 2
+MaxEmptyLinesToKeep: 1
 Standard: Cpp03
 ...

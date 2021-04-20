@@ -6,7 +6,7 @@
 
 #include <boost/config.hpp>
 #if !defined BOOST_NO_CXX11_DECLTYPE
-#define BOOST_RESULT_OF_USE_DECLTYPE
+#    define BOOST_RESULT_OF_USE_DECLTYPE
 #endif
 
 #define BOOST_THREAD_VERSION 4
@@ -30,7 +30,6 @@
 #include <boost/thread/future.hpp>
 
 #include <iostream>
-
 
 #if defined BOOST_THREAD_PROVIDES_FUTURE_CONTINUATION \
     && !defined BOOST_NO_CXX11_RVALUE_REFERENCES
@@ -84,7 +83,6 @@ void submit_some(boost::executor& tp)
         tp.submit(&p1);
     }
 }
-
 
 void at_th_entry(boost::basic_thread_pool&)
 {
@@ -250,7 +248,6 @@ int test_executor_adaptor()
 
     return 0;
 }
-
 
 int main()
 {

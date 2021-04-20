@@ -30,25 +30,57 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #define agent_pp_threadpool_hpp_
 
 #ifdef __INTEGRITY
-#include <integrity.h>
-#include <time.h>
+#    include <integrity.h>
+#    include <time.h>
+#endif
+
+#ifdef POSIX_THREADS
+#    include <pthread.h>
 #endif
 
 #include <list>
+#include <memory>
 #include <queue>
 #include <vector>
 
-#define BOOST_THREAD_QUEUE_DEPRECATE_OLD
-#define BOOST_THREAD_VERSION 4
+#define BOOST_SYSTEM_NO_DEPRECATED
+#define BOOST_THREAD_USES_CHRONO
+// XXX #define BOOST_THREAD_QUEUE_DEPRECATE_OLD
+#define BOOST_THREAD_PROVIDES_EXECUTORS
+#define BOOST_THREAD_VERSION 5
 #define BOOST_CHRONO_VERSION 2
+#define BOOST_CHRONO_DONT_PROVIDE_HYBRID_ERROR_HANDLING 1
 
 #include <boost/atomic.hpp>
 #include <boost/core/noncopyable.hpp>
 #include <boost/function.hpp>
 #include <boost/thread/condition_variable.hpp>
+#include <boost/thread/executors/basic_thread_pool.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread_only.hpp>
+
+#if 0
+#    include <boost/smart_ptr/enable_shared_from_this.hpp>
+#    include <boost/smart_ptr/make_shared.hpp>
+
+namespace own {
+template<typename T>
+using unique_ptr = std::unique_ptr<T>;
+
+template<typename T>
+using make_unique = std::make_unique<T>;
+
+template<typename T>
+using shared_ptr = std::shared_ptr<T>;
+
+template<typename T>
+using make_shared = std::make_shared<T>;
+
+template<typename T>
+using enable_shared_from_this = std::enable_shared_from_this<T>;
+}
+#endif
 
 // Do NOT change! CK
 #undef AGENTPP_QUEUED_THREAD_POOL_USE_ASSIGN
@@ -57,9 +89,9 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 
 // This may be changed CK
 #ifdef _DEBUG
-#define DEBUG 1
-#undef NDEBUG
-#define AGENTPP_DEBUG
+#    define DEBUG 1
+#    undef NDEBUG
+#    define AGENTPP_DEBUG
 #endif
 
 // ONLY for DEMO: be carefully! CK
@@ -71,15 +103,15 @@ clang-format -i -style=file threadpool.{cpp,hpp}
 #define AGENTX_DEFAULT_THREAD_NAME "ThreadPool::Thread"
 
 #ifndef AGENTPP_OPAQUE_PTHREAD_T
-#define AGENTPP_OPAQUE_PTHREAD_T void*
+#    define AGENTPP_OPAQUE_PTHREAD_T void*
 #endif
 
 #ifndef AGENTPP_DECL
-#define AGENTPP_DECL
+#    define AGENTPP_DECL
 #endif
 
 #ifndef BOOST_OVERRIDE
-#define BOOST_OVERRIDE
+#    define BOOST_OVERRIDE
 #endif
 
 namespace Agentpp
@@ -92,6 +124,19 @@ typedef boost::chrono::seconds sec;
 typedef boost::chrono::milliseconds ms;
 typedef boost::chrono::microseconds us;
 typedef boost::chrono::nanoseconds ns;
+
+// NOTE: this prevents prevent slicing too! CK
+class ClonableBase {
+public:
+    ClonableBase()          = default;
+    virtual ~ClonableBase() = default;
+    // TODO virtual std::unique_ptr<ClonableBase> clone() const = 0;
+
+    ClonableBase(const ClonableBase&) = delete;
+    ClonableBase& operator=(const ClonableBase&) = delete;
+    ClonableBase(ClonableBase&&)                 = delete;
+    ClonableBase& operator=(ClonableBase&&) = delete;
+};
 
 /**
  * The Runnable interface should be implemented by any class whose
@@ -115,12 +160,15 @@ typedef boost::chrono::nanoseconds ns;
  * @author Frank Fock
  * @version 3.5
  */
-class AGENTPP_DECL Runnable {
+class AGENTPP_DECL Runnable : public ClonableBase {
 
 public:
-    Runnable() {}
-    virtual ~Runnable() {}
+    Runnable()
+        : ClonableBase()
+    { }
+    ~Runnable() BOOST_OVERRIDE { }
 
+    virtual std::unique_ptr<Runnable> clone() const = 0;
     /**
      * When an object implementing interface Runnable is used to
      * create a thread, starting the thread causes the object's run
@@ -164,12 +212,13 @@ public:
      *
      * @param timeout
      *    timeout in milliseconds.
-     * @param
-     *    return TRUE if timeout occurred, FALSE otherwise.
+     * @return
+     *    false if the predicate pred still evaluates to false after the
+     * rel_time timeout expired, otherwise true.
      *
      * @note asserted to be called with lock! CK
      */
-    bool wait(unsigned long timeout);
+    bool wait_for(unsigned long timeout);
 
     /**
      * Wakes up a single thread that is waiting on this
@@ -251,7 +300,8 @@ protected:
 
     inline bool is_locked() const { return !(boost::thread::id() == tid_); }
 
-    inline void wait_until_condition(scoped_lock& lk, boost::function<bool()> predicate)
+    inline void wait_until_condition(
+        scoped_lock& lk, boost::function<bool()> predicate)
     {
         while (!predicate()) {
             //=================================
@@ -262,7 +312,8 @@ protected:
         }
     }
 
-    inline void wait_for_signal_if_needed(scoped_lock& lk, volatile bool& signal)
+    inline void wait_for_signal_if_needed(
+        scoped_lock& lk, volatile bool& signal)
     {
         while (!signal) {
             //=================================
@@ -272,7 +323,6 @@ protected:
             //=================================
         }
     }
-
 };
 
 /**
@@ -318,9 +368,9 @@ public:
     inline void wait(long timeout)
     {
         if (timeout < 0) {
-            sync.wait();
+            (void)sync.wait();
         } else {
-            sync.wait(timeout);
+            (void)sync.wait_for(timeout);
         }
     }
 
@@ -382,7 +432,7 @@ public:
      * Destroy thread. If thread is running or has been finished but
      * not joined yet, then join it.
      */
-    virtual ~Thread();
+    ~Thread() BOOST_OVERRIDE;
 
     /**
      * Causes the currently executing thread to sleep (temporarily
@@ -412,7 +462,7 @@ public:
      *
      * Subclasses of Thread should override this method.
      */
-    virtual void run() BOOST_OVERRIDE;
+    void run() BOOST_OVERRIDE;
 
     /**
      * Get the Runnable object used for thread execution.
@@ -422,7 +472,7 @@ public:
      *    when created through the default constructor or the
      *    Runnable object given at creation time.
      */
-    Runnable* get_runnable();
+    Runnable* get_runnable() const;
 
     /**
      * Waits for this thread to die.
@@ -455,11 +505,14 @@ public:
     /**
      * Clone this thread. This method must not be called on
      * running threads.
+     * see too:
+     * http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines
+     * #c21-if-you-define-or-delete-any-default-operation-define-or-delete-them-all
      */
-    Thread* clone()
+    std::unique_ptr<Runnable> clone() const BOOST_OVERRIDE
     {
         BOOST_ASSERT(status != RUNNING);
-        return new Thread(get_runnable());
+        return std::unique_ptr<Runnable>(get_runnable());
     }
 
 private:
@@ -475,7 +528,7 @@ private:
     boost::thread tid;
 #endif
 
-    //XXX static ThreadList threadList;
+    // XXX static ThreadList threadList;
 };
 
 #if 0
@@ -522,10 +575,12 @@ class TaskManager;
  * @author Frank Fock
  * @version 3.5.19
  */
-class AGENTPP_DECL ThreadPool : public Synchronized {
+class AGENTPP_DECL ThreadPool
+    : public Synchronized,
+      public std::enable_shared_from_this<ThreadPool> {
 
 protected:
-    std::vector<TaskManager*> taskList;
+    std::vector<std::unique_ptr<TaskManager> > taskList;
     size_t stackSize;
 
 public:
@@ -553,7 +608,7 @@ public:
     /**
      * Destructor will wait for termination of all threads.
      */
-    virtual ~ThreadPool();
+    ~ThreadPool() BOOST_OVERRIDE;
 
     /**
      * Execute a task. The task will be deleted after call of
@@ -585,7 +640,7 @@ public:
      * @return
      *    the number of threads in the pool.
      */
-    inline size_t size() const { return taskList.size(); }
+    virtual size_t size() const { return taskList.size(); }
 
     /**
      * Get the stack size.
@@ -606,7 +661,7 @@ public:
      * destroyed. This call blocks until all threads are stopped
      * (SYNCHRONIZED).
      */
-    void terminate();
+    virtual void terminate();
 };
 
 /**
@@ -624,7 +679,8 @@ public:
  */
 class AGENTPP_DECL QueuedThreadPool : public ThreadPool, public Thread {
 
-    std::queue<Runnable*> queue;
+    // XXX std::queue<Runnable*> queue;
+    size_t _size;
     volatile bool go;
 
 public:
@@ -652,13 +708,13 @@ public:
     /**
      * Destructor will wait for termination of all threads.
      */
-    virtual ~QueuedThreadPool();
+    ~QueuedThreadPool() BOOST_OVERRIDE;
 
     /**
      * Execute a task. The task will be deleted after call of
      * its run() method.
      */
-    virtual void execute(Runnable*) BOOST_OVERRIDE;
+    void execute(Runnable*) BOOST_OVERRIDE;
 
     /**
      * Gets the current number of queued tasks (SYNCHRONIZED).
@@ -671,12 +727,12 @@ public:
     /**
      * Runs the queue processing loop (SYNCHRONIZED).
      */
-    virtual void run() BOOST_OVERRIDE;
+    // XXX virtual void run() BOOST_OVERRIDE;
 
     /**
      * Notifies the thread pool about an idle thread (SYNCHRONIZED).
      */
-    virtual void idle_notification() BOOST_OVERRIDE;
+    void idle_notification() BOOST_OVERRIDE;
 
     /**
      * Check whether QueuedThreadPool is idle or not (SYNCHRONIZED).
@@ -685,7 +741,7 @@ public:
      *    TRUE if non of the threads in the pool is currently
      *    executing any task and the queue is emtpy().
      */
-    virtual bool is_idle() BOOST_OVERRIDE;
+    bool is_idle() BOOST_OVERRIDE;
 
     /**
      * Check whether the ThreadPool is busy (i.e., all threads are
@@ -695,7 +751,11 @@ public:
      *    TRUE if non of the threads in the pool is currently
      *    idle (not executing any task).
      */
-    virtual bool is_busy() BOOST_OVERRIDE;
+    bool is_busy() BOOST_OVERRIDE;
+
+    size_t size() const BOOST_OVERRIDE { return _size; }
+
+    void terminate() BOOST_OVERRIDE;
 
 protected:
     /**
@@ -703,15 +763,17 @@ protected:
      *
      * @note: the run() returns and the thread terminates too!
      */
-    virtual void stop() BOOST_OVERRIDE;
+    virtual void stop();
 
-    inline bool has_task() { return (!go || !queue.empty()); }
+    // XXX inline bool has_task() { return (!go || !queue.empty()); }
 
 private:
     /**
      * @note asserted to be called with lock! CK
      **/
-    bool assign(Runnable* task, bool withQueuing = true);
+    // XXX bool assign(Runnable* task, bool withQueuing = true);
+
+    std::unique_ptr<boost::basic_thread_pool> ea;
 };
 
 /**
@@ -732,12 +794,13 @@ public:
      * @param stack_size
      *    the stack size for the managed thread.
      */
-    TaskManager(ThreadPool*, size_t stack_size = AGENTPP_DEFAULT_STACKSIZE);
+    // TODO TaskManager(std::shared_ptr<ThreadPool> tp,
+    TaskManager(ThreadPool* tp, size_t stack_size = AGENTPP_DEFAULT_STACKSIZE);
 
     /**
      * Destructor will wait for thread to terminate.
      */
-    virtual ~TaskManager();
+    ~TaskManager() BOOST_OVERRIDE;
 
     /**
      * Check whether this thread is idle or not.
@@ -752,12 +815,12 @@ public:
     /**
      * Start thread execution.
      */
-    virtual void start() BOOST_OVERRIDE { thread.start(); }
+    virtual void start() { thread.start(); }
 
     /**
      * Stop thread execution after having finished current task.
      */
-    virtual void stop() BOOST_OVERRIDE { go = false; }
+    virtual void stop() { go = false; }
 
     /**
      * Set the next task for execution. This will block until
@@ -774,24 +837,34 @@ public:
 
     /**
      * Clone this TaskManager.
+     * see too:
+     * http://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines
+     * #c21-if-you-define-or-delete-any-default-operation-define-or-delete-them-all
+     * and
+     * https://clang.llvm.org/extra/clang-tidy/checks/cppcoreguidelines-owning-memory.html
      */
-    TaskManager* clone()
+    std::unique_ptr<Runnable> clone() const BOOST_OVERRIDE
     {
-        return new TaskManager(
+        return std::make_unique<TaskManager>( // FIXME: prevent memoryleek! CK
+                                              // std::make_shared<ThreadPool>
             new ThreadPool(threadPool->size(), threadPool->get_stack_size()));
+        // warning: initializing non-owner argument of type
+        // 'Agentpp::ThreadPool *&&' with a newly created 'gsl::owner<>'
+        // [cppcoreguidelines-owning-memory]
     }
 
 protected:
     /**
      * Runs the task (SYNCHRONIZED).
      */
-    virtual void run() BOOST_OVERRIDE;
+    void run() BOOST_OVERRIDE;
 
     inline bool has_task() { return (!go || task); }
 
     Thread thread;
+    // TODO std::shared_ptr<ThreadPool> threadPool;
     ThreadPool* threadPool;
-    Runnable* task;
+    Runnable* task; // TODO: should be a std::unique_ptr<Runnable>
     volatile bool go;
 };
 

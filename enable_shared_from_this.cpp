@@ -12,7 +12,6 @@
 
 using namespace boost;
 
-
 struct Good : enable_shared_from_this<Good> // note: public inheritance
 {
     shared_ptr<Good> getptr() { return shared_from_this(); }
@@ -22,7 +21,6 @@ struct Bad {
     shared_ptr<Bad> getptr() { return shared_ptr<Bad>(this); }
     ~Bad() { std::cout << "Bad::~Bad() called\n"; }
 };
-
 
 int main()
 {

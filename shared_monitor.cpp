@@ -16,7 +16,6 @@
 #include <iostream>
 #include <vector>
 
-
 #define EXCLUSIVE 1
 #define SHARED 2
 
@@ -29,7 +28,7 @@ class A {
 #elif MODE == SHARED
     typedef boost::shared_mutex mutex_type;
 #else
-#error MODE not set
+#    error MODE not set
 #endif
 
     typedef std::vector<double> C;
@@ -39,7 +38,7 @@ class A {
 public:
     A()
         : data_(10000000)
-    {}
+    { }
     A(const A& a);
     A& operator=(const A& a);
 
@@ -54,7 +53,7 @@ A::A(const A& a)
 #elif MODE == SHARED
     boost::shared_lock<mutex_type> lk(a.mut_);
 #else
-#error MODE not set
+#    error MODE not set
 #endif
 
     data_ = a.data_;
@@ -70,7 +69,7 @@ A& A::operator=(const A& a)
 #elif MODE == SHARED
         boost::shared_lock<mutex_type> lk2(a.mut_, boost::defer_lock);
 #else
-#error MODE not set
+#    error MODE not set
 #endif
 
         boost::lock(lk1, lk2);
@@ -91,7 +90,7 @@ void A::compute(const A& x, const A& y)
     boost::shared_lock<mutex_type> lk2(x.mut_, boost::defer_lock);
     boost::shared_lock<mutex_type> lk3(y.mut_, boost::defer_lock);
 #else
-#error MODE not set
+#    error MODE not set
 #endif
 
     boost::lock(lk1, lk2, lk3);
@@ -102,6 +101,8 @@ void A::compute(const A& x, const A& y)
     }
 }
 
+// warning: initialization of 'spsc_queue' with static storage duration may
+// throw an exception that cannot be caught [cert-err58-cpp]
 A a1;
 A a2;
 

@@ -1,3 +1,7 @@
+
+#define BOOST_ASIO_NO_DEPRECATED
+#include <boost/config.hpp>
+
 #include <boost/asio/post.hpp>
 #include <boost/asio/thread_pool.hpp>
 #include <boost/asio/use_future.hpp>
@@ -13,7 +17,7 @@ using boost::asio::use_future;
 
 class bank_account {
     int balance_ = 0;
-    mutable thread_pool pool_{ 1 };
+    mutable thread_pool pool_ { 1 };
 
 public:
     void deposit(int amount)
@@ -26,8 +30,7 @@ public:
         post(pool_, use_future([=] {
             if (balance_ >= amount)
                 balance_ -= amount;
-        }))
-            .get();
+        })).get();
     }
 
     int balance() const
@@ -35,7 +38,6 @@ public:
         return post(pool_, use_future([=] { return balance_; })).get();
     }
 };
-
 
 int main()
 {

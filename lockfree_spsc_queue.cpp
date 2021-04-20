@@ -1,4 +1,4 @@
-#define BOOST_THREAD_VERSION 4
+#define BOOST_THREAD_VERSION 5
 #include "simple_stopwatch.hpp"
 
 #include <boost/assert.hpp>
@@ -8,7 +8,6 @@
 
 #include <iostream>
 
-
 const size_t iterations = 10000000;
 
 typedef int data_type;
@@ -17,11 +16,12 @@ int producer_count(0);
 int consumer_count(0);
 
 boost::lockfree::spsc_queue<data_type, boost::lockfree::capacity<1024> >
-    spsc_queue;
+    spsc_queue; // warning: initialization of 'spsc_queue' with static storage
+                // duration may throw an exception that cannot be caught
+                // [cert-err58-cpp]
 boost::atomic<bool> done(false);
 
 using namespace boost::chrono;
-
 
 void producer(void)
 {
@@ -38,7 +38,6 @@ void producer(void)
               << duration_fmt(duration_style::symbol) << timer.elapsed()
               << std::endl;
 }
-
 
 void consumer(void)
 {
@@ -61,14 +60,17 @@ void consumer(void)
               << std::endl;
 }
 
-
 int main(int, char**)
 {
 
     std::cout << "boost::lockfree::queue is ";
+
+#if defined(__cplusplus) && (__cplusplus < 201103L) && !defined(__LINUX__)
     if (!spsc_queue.is_lock_free()) {
         std::cout << "not ";
     }
+#endif
+
     std::cout << "lockfree" << std::endl;
 
     {

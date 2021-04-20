@@ -43,7 +43,6 @@ private:
 };
 typedef boost::synchronized_value<Person> Person_ts;
 
-
 // class SafeMemberPerson {
 // public:
 //  SafeMemberPerson(unsigned int age) :
@@ -73,7 +72,7 @@ class SafeMemberPerson {
 public:
     SafeMemberPerson(unsigned int age)
         : member(Member(age))
-    {}
+    { }
     std::string GetName() const { return member->name; }
     void SetName(const std::string& newName) { member->name = newName; }
 
@@ -81,19 +80,18 @@ private:
     struct Member {
         Member(unsigned int age)
             : age(age)
-        {}
+        { }
         std::string name;
         unsigned int age;
     };
     boost::synchronized_value<Member> member;
 };
 
-
 class Person2 {
 public:
     Person2(unsigned int age)
         : age_(age)
-    {}
+    { }
     std::string GetName() const { return name_; }
     void SetName(const std::string& newName) { name_ = newName; }
     unsigned int GetAge() const { return age_; }
@@ -139,7 +137,7 @@ class HelperPerson {
 public:
     HelperPerson(unsigned int age)
         : member(age)
-    {}
+    { }
     std::string GetName() const
     {
 #if !defined BOOST_NO_CXX11_AUTO_DECLARATIONS
@@ -155,7 +153,7 @@ public:
 #if !defined BOOST_NO_CXX11_AUTO_DECLARATIONS
         auto memberSync = member.synchronize();
 #else
-        boost::strict_lock_ptr<Member> memberSync = member.synchronize();
+        boost::strict_lock_ptr<Member> memberSync       = member.synchronize();
 #endif
         Invariant(memberSync);
         memberSync->name = newName;
@@ -165,7 +163,7 @@ private:
     struct Member {
         Member(unsigned int age)
             : age(age)
-        {}
+        { }
         std::string name;
         unsigned int age;
     };
@@ -181,7 +179,7 @@ class Person3 {
 public:
     Person3(unsigned int age)
         : age_(age)
-    {}
+    { }
     std::string GetName() const
     {
         Invariant();

@@ -100,14 +100,14 @@ int main()
     //>>>>> process_real_cpu_clock::now() = 1541101204120000000 nanoseconds
     // since process start-up
 
-#if BOOST_PLAT_WINDOWS_DESKTOP
+#    if BOOST_PLAT_WINDOWS_DESKTOP
     cout << "\nprocess_user_cpu_clock::now() = "
          << process_user_cpu_clock::now() << '\n';
     cout << "\nprocess_system_cpu_clock::now() = "
          << process_system_cpu_clock::now() << '\n';
     cout << "\nprocess_cpu_clock::now() = " << process_cpu_clock::now()
          << '\n';
-#endif
+#    endif
 
 #endif
 

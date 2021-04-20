@@ -24,7 +24,6 @@ thread safety.
 
 using namespace boost;
 
-
 template <typename T> class LockingPtr {
 public:
     // Constructors/destructors
@@ -49,7 +48,6 @@ private:
     LockingPtr& operator=(const LockingPtr&);
 };
 
-
 /***
 Notice the use of overloading.
 
@@ -60,7 +58,7 @@ The user must be careful about defining the shared Widget objects as volatile.
  ***/
 class Widget {
 public:
-    Widget(){};
+    Widget() {};
     void Operation() const volatile;
     // ...
 
@@ -79,7 +77,6 @@ private:
     mutable mutex mtx_;
 };
 
-
 /***
 When implementing a volatile member function, the first operation is usually
 to lock this with a LockingPtr. Then the work is done by using the non-
@@ -92,7 +89,6 @@ void Widget::Operation() const volatile
 
     lpThis->Operation(); // invokes the non-volatile function
 }
-
 
 int main()
 {
