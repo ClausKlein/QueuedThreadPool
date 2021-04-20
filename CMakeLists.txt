@@ -266,6 +266,10 @@ if(USE_BOOST OR BUILD_TESTING)
   add_test(NAME threads_test_possix COMMAND threads_test_possix
                                             --log_level=success
   )
+  add_test(NAME threads_test_possix-throw
+           COMMAND threads_test_possix --log_level=success
+                   --run_test=ThreadTaskThrow_test -25
+  )
   if(NOT USE_ThreadSanitizer AND NOT CMAKE_BUILD_TYPE STREQUAL Lcov)
     add_test(NAME threads_test_possix-random
              COMMAND threads_test_possix --log_level=success --random

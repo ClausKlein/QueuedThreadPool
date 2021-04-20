@@ -91,7 +91,7 @@ Synchronized::Synchronized()
 
 Synchronized::~Synchronized()
 {
-    int error = 0;
+    int error  = 0;
     int errors = 0;
 
 #ifdef NO_FAST_MUTEXES
@@ -113,17 +113,20 @@ Synchronized::~Synchronized()
                 (void)pthread_mutex_unlock(&monitor);
                 error = pthread_mutex_destroy(&monitor);
                 if (error) {
-                    if (++errors > 11) {
-                        break;
-                    }
+                    ++errors;
+                    Thread::sleep(errors * 2);
                 }
             }
         } else {
             ++errors;
+            Thread::sleep(errors * 2);
+        }
+        if (errors > 11) {
+            break;
         }
     } while (EBUSY == error);
 #else
-    error  = pthread_mutex_destroy(&monitor);
+    error = pthread_mutex_destroy(&monitor);
 #endif
 
     if (error) {
@@ -148,10 +151,8 @@ Synchronized::~Synchronized()
         LOG((void*)this);
         LOG_END;
 #ifdef NO_FAST_MUTEXES
-        error = pthread_cond_destroy(&cond);
-        if (!error) { // FIXME: this abort ...
-            throw std::runtime_error("pthread_cond_destroy: failed");
-        }
+        // FIXME: this abort ...
+        throw std::runtime_error("pthread_cond_destroy: failed");
 #endif
     }
 }

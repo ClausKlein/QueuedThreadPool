@@ -576,14 +576,19 @@ BOOST_AUTO_TEST_CASE(SyncWait_test)
 
 class BadTask : public Runnable {
     Synchronized& sync;
-    bool done{false};
+    bool done { false };
 
 public:
     BadTask(Synchronized& _sync)
         : sync(_sync) {};
-    void signal() {
+
+    void signal()
+    {
+        Lock l(sync); // wait for the scoped lock
         done = true;
+        sync.notify_all();
     }
+
     void run() BOOST_OVERRIDE
     {
         Lock l(sync); // wait for the scoped lock
@@ -592,7 +597,7 @@ public:
         BOOST_TEST_MESSAGE(
             BOOST_CURRENT_FUNCTION << ": Hello world! I'am waiting ...");
 
-        while(!done) {
+        while (!done) {
             sync.wait(); // wait for the signal ..
         }
         Thread::sleep(rand() % 13);
@@ -613,11 +618,9 @@ BOOST_AUTO_TEST_CASE(ThreadTaskThrow_test)
     Stopwatch sw;
     {
         Synchronized* sync = new Synchronized();
-        auto* task = new BadTask(*sync);
+        auto* task         = new BadTask(*sync);
 
         Thread thread(task);
-        thread.start(); // first the task waits for the lock
-        Thread::sleep(99);
 
 #if defined(_POSIX_TIMEOUTS) && _POSIX_TIMEOUTS > 0
         BOOST_TEST(sync->lock(11));
@@ -625,17 +628,23 @@ BOOST_AUTO_TEST_CASE(ThreadTaskThrow_test)
         BOOST_TEST(sync->lock());
 #endif
 
-        task->signal(); // ... and than for the signal
-        sync->notify_all();
+        thread.start(); // first the task will wait for the lock
+        Thread::sleep(BOOST_THREAD_TEST_TIME_MS);
         sync->unlock();
 
+        task->signal(); // ... and than the task wait for the signal
+
 #ifdef NO_FAST_MUTEXES
-        //FIXME BOOST_TEST(sync->lock());
-        //FIXME BOOST_TEST(sync->unlock());
+        Thread::sleep(rand() % 11);
         delete sync; // try to delete locked mutex ...
 #endif
 
+        Thread::sleep(BOOST_THREAD_TEST_TIME_MS);
         BOOST_TEST(thread.is_alive());
+
+#ifndef NO_FAST_MUTEXES
+        delete sync;
+#endif
     }
     BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
 }
