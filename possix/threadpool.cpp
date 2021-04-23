@@ -28,7 +28,6 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #include <string.h> // memset()
 
 #ifdef _WIN32
-#    include <assert.h>
 #    include <windows.h> // Sleep()
 #else
 #    include <sys/time.h> // gettimeofday()
@@ -193,7 +192,7 @@ bool Synchronized::wait(unsigned long timeout)
     bool timeoutOccurred = false;
 
 #if defined(_WIN32)
-    assert("not implemented function called!");
+    throw std::runtime_error("not implemented function called!");
     return timeoutOccurred;
 #else
     struct timespec ts;
@@ -692,7 +691,7 @@ void ThreadPool::execute(Runnable* t)
         }
         if (!tm) {
             DTRACE("busy! Synchronized::wait()");
-            wait(1234); // NOTE: for idle_notification ... CK
+            wait(); // NOTE: for idle_notification ... CK
         }               // ms
     }
 }
@@ -896,7 +895,8 @@ void QueuedThreadPool::run()
         }
 
         // NOTE: for idle_notification ... CK
-        thread.wait(1234); // ms
+        DTRACE("idle! Synchronized::wait()");
+        thread.wait();
     }
 }
 

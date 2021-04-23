@@ -22,20 +22,24 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
   _##
   _##########################################################################*/
 
-#ifndef agent_pp_threadpool_hpp_
-#define agent_pp_threadpool_hpp_
+#ifndef agent_pp__ck_threadpool_hpp_
+#define agent_pp__ck_threadpool_hpp_
 
 // NOTE: do not change! CK
-#define NO_FAST_MUTEXES
+#ifndef _WIN32
+#    define NO_FAST_MUTEXES
+#endif
 #define NO_LOGGING
 #define AGENTPP_USE_IMPLIZIT_START
 
 #ifdef __INTEGRITY
+#    define BOOST_OVERRIDE
 #    include <integrity.h>
 #endif
 
 #ifdef _WIN32
-#    define HAVE_STRUCT_TIMESPEC
+#    define HAVE_STRUCT_TIMESPE
+#    define BOOST_OVERRIDE override
 #else
 #    include <unistd.h> // _POSIX_MONOTONIC_CLOCK _POSIX_TIMEOUTS _POSIX_TIMERS _POSIX_THREADS ...
 #endif
@@ -50,6 +54,7 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #include <time.h>
 #include <vector>
 
+#include <boost/config.hpp>
 #include <boost/current_function.hpp>
 #include <boost/noncopyable.hpp>
 
