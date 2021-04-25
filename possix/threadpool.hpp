@@ -22,8 +22,8 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
   _##
   _##########################################################################*/
 
-#ifndef agent_pp__ck_threadpool_hpp_
-#define agent_pp__ck_threadpool_hpp_
+#ifndef agent_pp_ck_threadpool_hpp_
+#define agent_pp_ck_threadpool_hpp_
 
 // NOTE: do not change! CK
 #ifndef _WIN32
@@ -48,10 +48,10 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #    include <iostream>
 #endif
 
+#include <ctime>
 #include <list>
 #include <pthread.h>
 #include <queue>
-#include <time.h>
 #include <vector>
 
 #include <boost/config.hpp>
@@ -468,8 +468,9 @@ class TaskManager;
  * @version 3.5.19
  */
 class AGENTPP_DECL ThreadPool : public Synchronized {
-
+private:
     size_t stackSize;
+    void EmptyTaskList();
 
 protected:
     std::vector<TaskManager*> taskList;
@@ -505,7 +506,7 @@ public:
      * Execute a task. The task will be deleted after call of
      * its run() method.
      */
-    virtual void execute(Runnable*);
+    virtual void execute(Runnable* task);
 
     /**
      * Check whether the ThreadPool is idle or not.
@@ -551,7 +552,7 @@ public:
      * task execution. The ThreadPool cannot be used thereafter and should
      * be destroyed. This call blocks until all threads are stopped.
      */
-    void terminate();
+    virtual void terminate();
 };
 
 /**
@@ -605,7 +606,7 @@ public:
      * Execute a task. The task will be deleted after call of
      * its run() method.
      */
-    void execute(Runnable*) BOOST_OVERRIDE;
+    void execute(Runnable* task) BOOST_OVERRIDE;
 
     /**
      * Gets the current number of queued tasks.
@@ -620,28 +621,29 @@ public:
     }
 
     /**
-     * Check whether QueuedThreadPool is idle or not.
+     * Check whether QueuedThreadPool is idle
      *
      * @return
-     *    TRUE if non of the threads in the pool is currently
-     *    executing any task and the queue is emtpy().
+     *    TRUE if non of the threads in the pool are currently
+     *    executing a task and the queue is emtpy().
      */
     bool is_idle() BOOST_OVERRIDE;
 
     /**
      * Check whether the ThreadPool is busy
-     * (i.e., (!queue.empty() || ThreadPool::is_busy())
      *
      * @return
-     *    TRUE if all of the threads in the pool is currently
-     *    executing any task or the queue is not empty.
+     *    TRUE if all of the threads in the pool are currently
+     *    executing a task and the queue is not empty.
      */
     bool is_busy() BOOST_OVERRIDE;
 
     /**
-     * Stop queue processing.
+     * Terminate the QueuedThreadPool.
+     *
+     * This call blocks until all threads are stopped.
      */
-    void stop();
+    void terminate() BOOST_OVERRIDE;
 
     /**
      * Notifies the thread pool about an idle thread.
@@ -657,7 +659,7 @@ private:
     /**
      * @note asserted to be called with lock! CK
      **/
-    bool assign(Runnable* task, bool withQueuing = true);
+    bool assign(Runnable* task);
 
     /**
      * @note asserted to be called with lock! CK

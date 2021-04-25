@@ -40,7 +40,7 @@ if(NOT CMAKE_BUILD_TYPE)
       Debug
       CACHE
         STRING
-        "supported values are: None Debug Release RelWithDebInfo MinSizeRel Lcov."
+        "supported values are: None Debug Release RelWithDebInfo MinSizeRel Coverage."
   )
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
@@ -270,7 +270,7 @@ if(USE_BOOST OR BUILD_TESTING)
            COMMAND threads_test_possix --log_level=success
                    --run_test=ThreadTaskThrow_test -25
   )
-  if(NOT USE_ThreadSanitizer AND NOT CMAKE_BUILD_TYPE STREQUAL Lcov)
+  if(NOT USE_ThreadSanitizer AND NOT ${CMAKE_BUILD_TYPE} STREQUAL Coverage)
     add_test(NAME threads_test_possix-random
              COMMAND threads_test_possix --log_level=success --random
     )

@@ -20,7 +20,7 @@ PROJECT_NAME:=$(shell basename $(CURDIR))
 checkAllHeader?='$(CURDIR)/.*'
 
 # NOTE: there are many errors with boost::test, doctest, catch test framework! CK
-CHECKS:='-*,misc-*,-misc-unused-*,-misc-no-recursion,modernize-use-override,performance-*,portability-*,-readability-*'
+CHECKS:='-*,cert-*,hicpp-*,-hicpp-use-*,misc-*,-misc-unused-*,-misc-no-recursion,modernize-use-override,performance-*,portability-*,-readability-*'
 CHECKS?='-cppcoreguidelines-avoid-c-arrays,-modernize-avoid-c-arrays'
 CHECKS?='-*,cppcoreguidelines-*,-cppcoreguidelines-pro-*,-cppcoreguidelines-avoid-c-arrays'
 CHECKS?='-*,portability-*,readability-*'
@@ -29,15 +29,15 @@ CHECKS?='-*,misc-*,boost-*,cert-*,misc-unused-parameters'
 ifeq ($(BUILD_TYPE),Coverage)
     ThreadSanitizer:=0
 else
-    ThreadSanitizer?=1
+   ThreadSanitizer?=1
 endif
 
 # prevent hard config of find_package(asio 1.14.1 CONFIG CMAKE_FIND_ROOT_PATH_BOTH)
 ifeq (${ThreadSanitizer},1)
-    #XXX CC:=/usr/local/opt/llvm/bin/clang
-    #XXX CXX:=/usr/local/opt/llvm/bin/clang++
-    CC:=clang
-    CXX:=clang++
+    CC:=/usr/local/opt/llvm/bin/clang
+    CXX:=/usr/local/opt/llvm/bin/clang++
+    # FIXME CC:=clang
+    # FIXME CXX:=clang++
 
     CMAKE_INSTALL_PREFIX?=/usr/local
     export CMAKE_INSTALL_PREFIX

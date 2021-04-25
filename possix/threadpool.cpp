@@ -24,8 +24,8 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 
 #include "possix/threadpool.hpp"
 
-#include <errno.h>
-#include <string.h> // memset()
+#include <cerrno>
+#include <cstring> // memset()
 
 #ifdef _WIN32
 #    include <windows.h> // Sleep()
@@ -85,7 +85,7 @@ Synchronized::Synchronized()
     ERR_CHK_WITHOUT_EXCEPTIONS(pthread_mutexattr_destroy(&attr));
 
     memset(&cond, 0, sizeof(cond));
-    ERR_CHK_WITHOUT_EXCEPTIONS(pthread_cond_init(&cond, 0));
+    ERR_CHK_WITHOUT_EXCEPTIONS(pthread_cond_init(&cond, NULL));
 }
 
 Synchronized::~Synchronized()
@@ -136,7 +136,7 @@ Synchronized::~Synchronized()
         LOG((void*)this);
         LOG_END;
 #ifdef NO_FAST_MUTEXES
-        // FIXME: this abort ...
+        // NOTE: this abort ...
         throw std::runtime_error("pthread_mutex_destroy: failed");
 #endif
     }
@@ -150,7 +150,7 @@ Synchronized::~Synchronized()
         LOG((void*)this);
         LOG_END;
 #ifdef NO_FAST_MUTEXES
-        // FIXME: this abort ...
+        // NOTE: this abort ...
         throw std::runtime_error("pthread_cond_destroy: failed");
 #endif
     }
@@ -207,7 +207,7 @@ bool Synchronized::wait(unsigned long timeout)
     ts.tv_nsec = (millis % 1000) * 1000000;
 #    else
     struct timeval tv;
-    gettimeofday(&tv, 0);
+    gettimeofday(&tv, NULL);
     ts.tv_sec  = tv.tv_sec + (time_t)timeout / 1000;
     int millis = tv.tv_usec / 1000 + (timeout % 1000);
     if (millis >= 1000) {
@@ -417,7 +417,7 @@ void* thread_starter(void* t)
     LOG_END;
 
     Thread::threadList.remove(thread);
-    // TODO: ThreadSanitizer: data race thread->status = Thread::FINISHED;
+    // NO! ThreadSanitizer: data race thread->status = Thread::FINISHED;
 
     return t;
 }
@@ -443,33 +443,30 @@ void Thread::run()
     LOG_END;
 }
 
-Thread::~Thread()
-{
-    if (status != IDLE) {
-        join();
-        DTRACE("Thread joined");
-    }
-}
+Thread::~Thread() { join(); }
 
 Runnable* Thread::get_runnable() { return runnable; }
 
 void Thread::join()
 {
-    if (status != IDLE) {
+    if (status == RUNNING) {
         void* retstat;
         int err = pthread_join(tid, &retstat);
         if (err) {
+            status = FINISHED;
             LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
             LOG("Thread: join failed (error)");
             LOG(strerror(err));
             LOG_END;
+        } else {
+            status = IDLE;
+            LOG_BEGIN(loggerModuleName, DEBUG_LOG | 4);
+            LOG("Thread: joined thread successfully (tid)");
+            LOG((AGENTPP_OPAQUE_PTHREAD_T)tid);
+            LOG_END;
         }
-        status = IDLE;
-        LOG_BEGIN(loggerModuleName, DEBUG_LOG | 4);
-        LOG("Thread: joined thread successfully (tid)");
-        LOG((AGENTPP_OPAQUE_PTHREAD_T)tid);
-        LOG_END;
     } else {
+        status = IDLE;
         LOG_BEGIN(loggerModuleName, WARNING_LOG | 1);
         LOG("Thread: thread not running (tid)");
         LOG((AGENTPP_OPAQUE_PTHREAD_T)tid);
@@ -550,12 +547,16 @@ void Thread::nsleep(time_t secs, long nanos)
     struct timespec interval, remainder;
     interval.tv_sec  = s;
     interval.tv_nsec = n;
-    if (nanosleep(&interval, &remainder) == -1) {
+    while (nanosleep(&interval, &remainder) == -1) {
         if (errno == EINTR) {
             LOG_BEGIN(loggerModuleName, EVENT_LOG | 3);
-            LOG("Thread: sleep interrupted");
+            LOG("Thread: nsleep interrupted");
             LOG_END;
+            interval = remainder;
+            continue;
         }
+
+        break;
     }
 #    else
     struct timeval interval;
@@ -568,7 +569,7 @@ void Thread::nsleep(time_t secs, long nanos)
     if (select(0, &writefds, &readfds, &exceptfds, &interval) == -1) {
         if (errno == EINTR) {
             LOG_BEGIN(loggerModuleName, EVENT_LOG | 3);
-            LOG("Thread: sleep interrupted");
+            LOG("Thread: nsleep interrupted");
             LOG_END;
         }
     }
@@ -665,13 +666,13 @@ void ThreadPool::execute(Runnable* t)
 {
     Lock l(*this);
 
-    if (taskList.empty()) {
-        delete t;
-        return;
-    }
-
     TaskManager* tm = NULL;
     while (!tm) {
+        if (taskList.empty()) {
+            delete t;
+            return;
+        }
+
         for (std::vector<TaskManager*>::iterator cur = taskList.begin();
              cur != taskList.end(); ++cur) {
             tm = *cur;
@@ -682,9 +683,6 @@ void ThreadPool::execute(Runnable* t)
 
                 if (tm->set_task(t)) {
                     return; // done
-                } else {
-                    // task could not be assigned
-                    tm = NULL;
                 }
             }
             tm = NULL;
@@ -692,15 +690,13 @@ void ThreadPool::execute(Runnable* t)
         if (!tm) {
             DTRACE("busy! Synchronized::wait()");
             wait(); // NOTE: for idle_notification ... CK
-        }               // ms
+        }
     }
 }
 
-// NOTE: asserted to be called with lock! CK
+/// NOTE: asserted to be called with lock! CK
 void ThreadPool::idle_notification()
 {
-    // FIXME: needed? CK Lock l(*this);
-
     LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
     LOG("notify");
     LOG_END;
@@ -713,6 +709,11 @@ void ThreadPool::idle_notification()
 bool ThreadPool::is_idle()
 {
     Lock l(*this);
+
+    if (taskList.empty()) {
+        return false;
+    }
+
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
          cur != taskList.end(); ++cur) {
         if (!(*cur)->is_idle()) {
@@ -726,7 +727,15 @@ bool ThreadPool::is_idle()
 /// task.
 bool ThreadPool::is_busy()
 {
+#if 0
+    // NOTE: this not the same! CK return !ThreadPool::is_idle();
+#else
     Lock l(*this);
+
+    if (taskList.empty()) {
+        return true;
+    }
+
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
          cur != taskList.end(); ++cur) {
         if ((*cur)->is_idle()) {
@@ -734,15 +743,27 @@ bool ThreadPool::is_busy()
         }
     }
     return true; // NOTE: all threads are busy
+#endif
+}
+
+void ThreadPool::EmptyTaskList()
+{
+    for (size_t i = 0; i < taskList.size(); i++) {
+        delete taskList[i]; // implizit Thread::join()
+    }
+    taskList.clear();
 }
 
 void ThreadPool::terminate()
 {
     Lock l(*this);
+
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
          cur != taskList.end(); ++cur) {
         (*cur)->stop();
     }
+    EmptyTaskList();
+
     notify(); // see execute()
 }
 
@@ -764,13 +785,9 @@ ThreadPool::ThreadPool(size_t size, size_t stack_size)
 
 ThreadPool::~ThreadPool()
 {
-    terminate();
+    ThreadPool::terminate();
 
-    // TODO refactor to EmptyTaskList();
-    for (size_t i = 0; i < taskList.size(); i++) {
-        delete taskList[i]; // implizit Thread::join()
-    }
-    taskList.clear();
+    EmptyTaskList();
 }
 
 /*--------------------- class QueuedThreadPool --------------------------*/
@@ -806,7 +823,7 @@ void QueuedThreadPool::EmptyQueue()
 
 QueuedThreadPool::~QueuedThreadPool()
 {
-    stop();
+    terminate();
 
     thread.join();
     DTRACE("thread joined");
@@ -816,8 +833,8 @@ QueuedThreadPool::~QueuedThreadPool()
     ThreadPool::terminate();
 }
 
-// NOTE: asserted to be called with lock! CK
-bool QueuedThreadPool::assign(Runnable* t, bool /* withQueuing */)
+/// NOTE: asserted to be called with lock! CK
+bool QueuedThreadPool::assign(Runnable* t)
 {
     TaskManager* tm = NULL;
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
@@ -831,27 +848,10 @@ bool QueuedThreadPool::assign(Runnable* t, bool /* withQueuing */)
             if (tm->set_task(t)) {
                 DTRACE("task manager found");
                 return true; // OK
-            } else {
-                tm = NULL;
             }
         }
         tm = NULL;
     }
-
-#if 0
-    // NOTE: no idle thread found, push to queue if allowed! CK
-    if (!tm && withQueuing) {
-        LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-        LOG("queue.push");
-        LOG_END;
-        queue.push(t);
-
-        DTRACE("busy! task queued; Thread::notify()");
-        thread.notify();
-
-        return true;
-    }
-#endif
 
     return false;
 }
@@ -883,34 +883,23 @@ void QueuedThreadPool::run()
             LOG_END;
             Runnable* t = queue.front();
             if (t) {
-                if (assign(t, false)) { // NOTE: without queuing! CK
-                    queue.pop();        // OK, now we pop this entry
-                } else {
-                    DTRACE("busy! Thread::sleep()");
-                    // NOTE: wait some ms to prevent notify() loops while busy!
-                    // CK
-                    Thread::sleep(rand() % 113); // ms
+                if (assign(t)) {
+                    queue.pop(); // OK, now we pop this entry
                 }
             }
         }
-
-        // NOTE: for idle_notification ... CK
         DTRACE("idle! Synchronized::wait()");
-        thread.wait();
+        thread.wait(); // NOTE: for idle_notification ... CK
     }
 }
 
-// NOTE: asserted to be called with lock! CK
+/// NOTE: asserted to be called with lock! CK
 void QueuedThreadPool::idle_notification()
 {
-    // FIXME: needed? CK Lock l(thread);
-
     LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
     LOG("notify");
     LOG_END;
     thread.notify();
-
-    // FIXME: needed? CK ThreadPool::idle_notification();
 }
 
 bool QueuedThreadPool::is_idle()
@@ -925,16 +914,18 @@ bool QueuedThreadPool::is_busy()
 {
     Lock l(thread);
     bool result =
-        !thread.is_alive() || !queue.empty() || ThreadPool::is_busy();
+        !thread.is_alive() || !(queue.empty() && ThreadPool::is_idle());
 
     return result;
 }
 
-void QueuedThreadPool::stop()
+void QueuedThreadPool::terminate()
 {
     Lock l(thread);
     go = false;
     thread.notify();
+
+    ThreadPool::terminate();
 }
 
 } // namespace AgentppCK

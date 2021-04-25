@@ -7,7 +7,7 @@
 #define BOOST_CHRONO_VERSION 2
 #define BOOST_CHRONO_DONT_PROVIDE_HYBRID_ERROR_HANDLING 1
 
-#include <time.h>
+#include <ctime>
 
 #include <boost/chrono/chrono_io.hpp>
 
