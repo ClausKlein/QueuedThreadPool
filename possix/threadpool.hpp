@@ -328,7 +328,7 @@ public:
      * @param runnable
      *    a Runnable subclass.
      */
-    explicit Thread(Runnable* r);
+    explicit Thread(Runnable& r);
 
     /**
      * Destroy thread. If thread is running or has been finished but
@@ -408,11 +408,11 @@ public:
      * Clone this thread. This method must not be called on
      * running threads.
      */
-    Thread* clone() { return new Thread(get_runnable()); }
+    Thread* clone() { return new Thread(); }
 
 private:
-    Runnable* runnable;
     ThreadStatus status;
+    Runnable& runnable;
     size_t stackSize;
     pthread_t tid;
     static ThreadList threadList;
@@ -541,6 +541,7 @@ public:
      *   the stack size of each thread in this thread pool.
      */
     size_t get_stack_size() const { return stackSize; }
+    size_t stack_size() const { return stackSize; }
 
     /**
      * Notifies the thread pool about an idle thread (synchronized).
@@ -581,7 +582,7 @@ public:
      *
      * @param size
      *    the number of threads started for performing tasks.
-     *    The default value is 4 threads.
+     *    The default value is 1 threads.
      */
     explicit QueuedThreadPool(size_t size = 1);
 

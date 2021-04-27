@@ -29,7 +29,7 @@ CHECKS?='-*,misc-*,boost-*,cert-*,misc-unused-parameters'
 ifeq ($(BUILD_TYPE),Coverage)
     ThreadSanitizer:=0
 else
-   ThreadSanitizer?=0
+   #TODO ThreadSanitizer?=1
 endif
 
 # prevent hard config of find_package(asio 1.14.1 CONFIG CMAKE_FIND_ROOT_PATH_BOTH)
@@ -58,7 +58,7 @@ GENERATOR?=Ninja
 ##################################################
 
 
-BUILD_DIR:=../.build-$(PROJECT_NAME)-${CROSS_COMPILE}$(BUILD_TYPE)
+BUILD_DIR:=../build-$(PROJECT_NAME)-${CROSS_COMPILE}$(BUILD_TYPE)
 ifeq ($(BUILD_TYPE),Coverage)
     USE_LOCV=ON
     ifeq (NO${CROSS_COMPILE},NO)

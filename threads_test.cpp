@@ -11,9 +11,13 @@ using namespace Agentpp;
 #elif USE_AGENTPP_CK
 #    include "possix/threadpool.hpp" // ThreadPool, QueuedThreadPool
 #    define TEST_INDEPENDENTLY
+#    define USE_BUSY_TEST
+#    define TEST_USAGE_AFTER_TERMINATE
 using namespace AgentppCK;
 #else
 #    include "threadpool.hpp" // ThreadPool, QueuedThreadPool
+#    define USE_WAIT_FOR
+#    define USE_BUSY_TEST
 using namespace Agentpp;
 #endif
 
@@ -21,12 +25,12 @@ using namespace Agentpp;
 
 #ifndef _WIN32
 // -----------------------------------------
-#define BOOST_TEST_MODULE Threads
-#define BOOST_TEST_NO_MAIN
-#include <boost/test/included/unit_test.hpp>
+#    define BOOST_TEST_MODULE Threads
+#    define BOOST_TEST_NO_MAIN
+#    include <boost/test/included/unit_test.hpp>
 // -----------------------------------------
 #else
-#include <boost/test/auto_unit_test.hpp>
+#    include <boost/test/auto_unit_test.hpp>
 #endif
 
 #include <boost/atomic.hpp>
@@ -50,9 +54,6 @@ using namespace Agentpp;
 #        define BOOST_THREAD_TEST_TIME_MS 250
 #    endif
 #endif
-
-#define USE_BUSY_TEST
-#define TEST_USAGE_AFTER_TERMINATE
 
 typedef boost::atomic<size_t> test_counter_t;
 typedef boost::lockfree::queue<size_t, boost::lockfree::capacity<20> >
@@ -79,7 +80,7 @@ public:
         --counter;
     }
 
-#ifndef USE_AGENTPP_CK
+#ifdef USE_UNIQUE_PTR
     std::unique_ptr<Runnable> clone() const BOOST_OVERRIDE
     {
         return std::make_unique<TestTask>(text, result, delay);
@@ -150,14 +151,15 @@ void push_task(ThreadPool* tp)
     completion_latch.count_down();
 }
 
+#ifndef USE_AGENTPP
 BOOST_AUTO_TEST_CASE(ThreadPoolInterface_test)
 {
     result_queue_t result;
     ThreadPool emptyThreadPool(0);
 
-#ifdef USE_BUSY_TEST
+#    ifdef USE_BUSY_TEST
     BOOST_TEST(emptyThreadPool.is_busy());
-#endif
+#    endif
 
     BOOST_TEST(!emptyThreadPool.is_idle());
 
@@ -169,6 +171,7 @@ BOOST_AUTO_TEST_CASE(ThreadPoolInterface_test)
     TestTask::reset_counter();
     emptyThreadPool.terminate();
 }
+#endif
 
 BOOST_AUTO_TEST_CASE(ThreadPool_busy_test)
 {
@@ -180,7 +183,7 @@ BOOST_AUTO_TEST_CASE(ThreadPool_busy_test)
 
         BOOST_TEST_MESSAGE("threadPool.size: " << threadPool.size());
         BOOST_TEST(threadPool.size() == threadCount);
-        BOOST_TEST(threadPool.get_stack_size() == stacksize);
+        BOOST_TEST(threadPool.stack_size() == stacksize);
         BOOST_TEST(threadPool.is_idle());
 
         // call execute parallel from different task!
@@ -226,7 +229,7 @@ BOOST_AUTO_TEST_CASE(ThreadPool_test)
 
         BOOST_TEST_MESSAGE("threadPool.size: " << threadPool.size());
         BOOST_TEST(threadPool.size() == 4UL);
-        BOOST_TEST(threadPool.get_stack_size() == AGENTPP_DEFAULT_STACKSIZE);
+        BOOST_TEST(threadPool.stack_size() == AGENTPP_DEFAULT_STACKSIZE);
         BOOST_TEST(threadPool.is_idle());
 
 #ifdef USE_BUSY_TEST
@@ -282,7 +285,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_busy_test)
 
         BOOST_TEST_MESSAGE("threadPool.size: " << threadPool.size());
         BOOST_TEST(threadPool.size() == threadCount);
-        BOOST_TEST(threadPool.get_stack_size() == stacksize);
+        BOOST_TEST(threadPool.stack_size() == stacksize);
         BOOST_TEST(threadPool.is_idle());
 
         // call execute parallel from different task!
@@ -334,8 +337,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
             "queuedThreadPool.size: " << queuedThreadPool.size());
         BOOST_TEST(queuedThreadPool.size() == 1UL);
 
-        BOOST_TEST(
-            queuedThreadPool.get_stack_size() == AGENTPP_DEFAULT_STACKSIZE);
+        BOOST_TEST(queuedThreadPool.stack_size() == AGENTPP_DEFAULT_STACKSIZE);
         BOOST_TEST(queuedThreadPool.is_idle());
 
         queuedThreadPool.execute(new TestTask("1 Hi again.", result, 10));
@@ -435,6 +437,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolLoad_test)
     TestTask::reset_counter();
 }
 
+#ifndef USE_AGENTPP
 BOOST_AUTO_TEST_CASE(QueuedThreadPoolInterface_test)
 {
     result_queue_t result;
@@ -443,7 +446,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolInterface_test)
             0UL, 0x20000); // NOTE: without any worker thread! CK
         BOOST_TEST(emptyThreadPool.size() == 0UL);
 
-#if defined(USE_AGENTPP)
+#    if defined(USE_AGENTPP)
         BOOST_TEST(emptyThreadPool.is_idle());
         // NOTE: NO! XXX CK emptyThreadPool.terminate();
         // NOTE: NO! XXX CK BOOST_TEST(!emptyThreadPool.is_idle());
@@ -451,20 +454,20 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolInterface_test)
         // TODO: not clear! CK
         emptyThreadPool.set_stack_size(
             0x20000); // NOTE: this change the queue thread only! CK
-        BOOST_TEST(emptyThreadPool.get_stack_size() == 0x20000);
-#endif
+        BOOST_TEST(emptyThreadPool.stack_size() == 0x20000);
+#    endif
 
         BOOST_TEST_MESSAGE("emptyThreadPool.size: " << emptyThreadPool.size());
         emptyThreadPool.execute(new TestTask("I want to run!", result));
 
-#ifdef USE_BUSY_TEST
+#    ifdef USE_BUSY_TEST
         BOOST_TEST(emptyThreadPool.is_busy());
-#endif
+#    endif
 
-#if !defined(AGENTPP_USE_IMPLIZIT_START)
+#    if !defined(AGENTPP_USE_IMPLIZIT_START)
         emptyThreadPool.start();
         emptyThreadPool.execute(new TestTask("after Starting ...", result));
-#endif
+#    endif
 
         // NOTE: NO! XXX CK BOOST_TEST(!emptyThreadPool.is_idle());
 
@@ -488,6 +491,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolInterface_test)
     BOOST_TEST(TestTask::run_count() == 0UL, "NO task has to be executed!");
     TestTask::reset_counter();
 }
+#endif
 
 BOOST_AUTO_TEST_CASE(QueuedThreadPoolIndependency_test)
 {
@@ -637,13 +641,13 @@ BOOST_AUTO_TEST_CASE(SyncWait_test)
         Lock l(sync);
         Stopwatch sw;
 
-#ifndef USE_AGENTPP_CK
+#    ifdef USE_WAIT_FOR
         BOOST_TEST(!sync.wait_for(BOOST_THREAD_TEST_TIME_MS),
             "no timeout occurred on wait!");
-#else
+#    else
         BOOST_TEST(sync.wait(BOOST_THREAD_TEST_TIME_MS),
             "no timeout occurred on wait!");
-#endif // !defined(USE_AGENTPP_CK)
+#    endif // !defined(USE_WAIT_FOR)
 
         ns d = sw.elapsed();
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
@@ -657,7 +661,7 @@ BOOST_AUTO_TEST_CASE(SyncWait_test)
 class BadTask : public Runnable {
 private:
     Synchronized& sync;
-    boost::atomic<bool> done{ false };
+    boost::atomic<bool> done { false };
 
 public:
     BadTask(Synchronized& _sync)
@@ -688,7 +692,7 @@ public:
         throw std::runtime_error("Fatal Error, can't continue!");
     };
 
-#ifndef USE_AGENTPP_CK
+#ifdef USE_UNIQUE_PTR
     std::unique_ptr<Runnable> clone() const BOOST_OVERRIDE
     {
         return std::make_unique<BadTask>();
@@ -701,10 +705,10 @@ BOOST_AUTO_TEST_CASE(ThreadTaskThrow_test)
     Stopwatch sw;
     {
         Synchronized* sync = new Synchronized();
-        BadTask task(*sync);    // TODO: may be a shared_ptr<Runnable>! CK
+        BadTask task(*sync); // TODO: may be a shared_ptr<Runnable>! CK
 
         start_latch.reset(1);
-        Thread thread(&task);
+        Thread thread(task);
 
 #if defined(_POSIX_TIMEOUTS) && _POSIX_TIMEOUTS > 0
         BOOST_TEST(sync->lock(11));
@@ -800,13 +804,14 @@ BOOST_AUTO_TEST_CASE(ThreadSleep_test)
 #endif
 }
 
+#ifdef USE_WAIT_FOR
 struct wait_data {
 
-#ifndef TEST_INDEPENDENTLY
+#    ifndef TEST_INDEPENDENTLY
     typedef Synchronized lockable_type;
-#else
+#    else
     typedef boost::mutex lockable_type;
-#endif
+#    endif
 
     typedef boost::unique_lock<lockable_type> scoped_lock;
 
@@ -824,13 +829,13 @@ struct wait_data {
     void wait()
     {
         scoped_lock l(mtx);
-#ifndef TEST_INDEPENDENTLY
+#    ifndef TEST_INDEPENDENTLY
         mtx.wait();
-#else
+#    else
         while (!predicate()) {
             cond.wait(l);
         }
-#endif
+#    endif
     }
 
     // Returns: false if the call is returning because the time specified by
@@ -838,31 +843,30 @@ struct wait_data {
     template <typename Duration> bool timed_wait(Duration d)
     {
         scoped_lock l(mtx);
-#ifndef TEST_INDEPENDENTLY
+#    ifndef TEST_INDEPENDENTLY
         return mtx.wait_for(ms(d).count());
-#else
+#    else
         while (!predicate()) {
             if (cond.wait_for(l, d) == boost::cv_status::timeout) {
                 return false;
             }
         }
         return true; // OK
-#endif
+#    endif
     }
 
     void signal()
     {
         scoped_lock l(mtx);
-#ifndef TEST_INDEPENDENTLY
+#    ifndef TEST_INDEPENDENTLY
         mtx.notify_all();
-#else
+#    else
         flag = true;
         cond.notify_all();
-#endif
+#    endif
     }
 };
 
-#ifndef USE_AGENTPP_CK
 const ms max_diff(BOOST_THREAD_TEST_TIME_MS);
 typedef Synchronized mutex_type;
 

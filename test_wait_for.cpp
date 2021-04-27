@@ -27,8 +27,8 @@ void handler(int signal)
     }
 }
 
-volatile bool flag = {false};
-bool predicate() {return flag == true;}
+volatile bool flag = { false };
+bool predicate() { return flag == true; }
 
 int main(int /*argc*/, char* /*argv*/[])
 {
@@ -41,7 +41,7 @@ int main(int /*argc*/, char* /*argv*/[])
     {
         StopwatchReporter sw;
 
-        if(cv.wait_for(lock, chrono::seconds(2), &predicate)) {
+        if (cv.wait_for(lock, chrono::seconds(2), &predicate)) {
             std::cerr << "ERROR: timeout expected after 2s!" << std::endl;
             return EXIT_FAILURE;
         }

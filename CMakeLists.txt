@@ -182,8 +182,13 @@ if(USE_BOOST OR BUILD_TESTING)
         # #SW test_shared_mutex.cpp
         ###NO! daytime_client
         ###NO! make_future
-        default_executor serial_executor strict_lock synchronized_person
-        thread_tss_test volatile test_wait_for
+        default_executor
+        serial_executor
+        strict_lock
+        synchronized_person
+        thread_tss_test
+        volatile
+        test_wait_for
     )
 
     foreach(program ${NOINST_PROGRAMS})
@@ -228,22 +233,37 @@ if(USE_BOOST OR BUILD_TESTING)
   endif()
   add_test(NAME test_trylock COMMAND test_trylock)
 
-  # add_executable(threads_test threads_test.cpp threadpool.cpp threadpool.hpp)
-  # set_target_properties(threads_test PROPERTIES CXX_STANDARD 17)
-  # target_link_libraries(
-  #   threads_test Boost::unit_test_framework Boost::chrono Boost::thread
-  # )
-  # add_test(NAME threads_test COMMAND threads_test --log_level=success)
-  # add_test(NAME threads_test-random COMMAND threads_test --log_level=success
-  #                                           --random
-  # )
-  # add_test(NAME threads_test-thread COMMAND threads_test --log_level=success
-  #                                           --run_test=ThreadPool_test -25
-  # )
-  # add_test(NAME threads_test-queue
-  #          COMMAND threads_test --log_level=success
-  #                  --run_test=QueuedThreadPoolLoad_test -25
-  # )
+  # TODO add_executable(threads_test threads_test.cpp threadpool.cpp threadpool.hpp)
+  if(NOT ${CMAKE_BUILD_TYPE} STREQUAL Coverage)
+    find_library(LIB_SNMP_PP snmp++_static)
+    find_library(LIB_AGENT_PP agent++_static)
+    if(NOT LIB_AGENT_PP-NOTFOUND)
+      add_executable(threads_test threads_test.cpp)
+      target_compile_definitions(threads_test PRIVATE USE_AGENTPP)
+      set_target_properties(threads_test PROPERTIES CXX_STANDARD 14)
+      target_link_libraries(
+        threads_test Boost::unit_test_framework Boost::chrono Boost::thread
+        ${LIB_AGENT_PP} # MAYBE: ${LIB_SNMP_PP}
+      )
+      add_test(NAME threads_test COMMAND threads_test --log_level=success)
+      if(USE_ThreadSanitizer)
+        target_compile_options(threads_test PRIVATE -fsanitize=thread -O1)
+        target_link_options(threads_test PRIVATE -fsanitize=thread -O1)
+      else()
+        add_test(NAME threads_test-random COMMAND threads_test
+                                                  --log_level=success --random
+        )
+        add_test(NAME threads_test-thread
+                 COMMAND threads_test --log_level=success
+                         --run_test=ThreadPool_test -25
+        )
+        add_test(NAME threads_test-queue
+                 COMMAND threads_test --log_level=success
+                         --run_test=QueuedThreadPoolLoad_test -25
+        )
+      endif()
+    endif()
+  endif()
 
   add_library(threadpool possix/threadpool.cpp possix/threadpool.hpp)
   set_target_properties(threadpool PROPERTIES CXX_STANDARD 98)

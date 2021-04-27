@@ -424,17 +424,15 @@ void* thread_starter(void* t)
 
 Thread::Thread()
     : status(IDLE)
+    , runnable(*this)
     , stackSize(AGENTPP_DEFAULT_STACKSIZE) // XXX , tid(0)
-{
-    runnable = (Runnable*)this;
-}
+{ }
 
-Thread::Thread(Runnable* r)
+Thread::Thread(Runnable& r)
     : status(IDLE)
+    , runnable(r)
     , stackSize(AGENTPP_DEFAULT_STACKSIZE) // XXX , tid(0)
-{
-    runnable = r;
-}
+{ }
 
 void Thread::run()
 {
@@ -445,7 +443,7 @@ void Thread::run()
 
 Thread::~Thread() { join(); }
 
-Runnable* Thread::get_runnable() { return runnable; }
+Runnable* Thread::get_runnable() { return &runnable; }
 
 void Thread::join()
 {
@@ -580,7 +578,7 @@ void Thread::nsleep(time_t secs, long nanos)
 /*--------------------- class TaskManager --------------------------*/
 
 TaskManager::TaskManager(ThreadPool* tp, size_t stackSize)
-    : thread(this)
+    : thread(*this)
 {
     threadPool = tp;
     task       = NULL;
@@ -794,7 +792,7 @@ ThreadPool::~ThreadPool()
 
 QueuedThreadPool::QueuedThreadPool(size_t size)
     : ThreadPool(size)
-    , thread(this)
+    , thread(*this)
     , go(true)
 {
     thread.start();
@@ -802,7 +800,7 @@ QueuedThreadPool::QueuedThreadPool(size_t size)
 
 QueuedThreadPool::QueuedThreadPool(size_t size, size_t stack_size)
     : ThreadPool(size, stack_size)
-    , thread(this)
+    , thread(*this)
     , go(true)
 {
     thread.start();
