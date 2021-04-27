@@ -99,7 +99,7 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
 option(BUILD_TESTING "build other tests too" ON)
 
 # ----------------------------------------------------------------------
-option(USE_ASIO "use the standalon asio lib too" ON)
+option(USE_ASIO "use the standalon asio lib too" OFF)
 set(ASIO_ROOT
     $ENV{ASIO_ROOT}
     CACHE PATH "path to install dir"
@@ -183,7 +183,7 @@ if(USE_BOOST OR BUILD_TESTING)
         ###NO! daytime_client
         ###NO! make_future
         default_executor serial_executor strict_lock synchronized_person
-        thread_tss_test volatile
+        thread_tss_test volatile test_wait_for
     )
 
     foreach(program ${NOINST_PROGRAMS})
