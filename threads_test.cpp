@@ -19,11 +19,15 @@ using namespace Agentpp;
 
 #include "simple_stopwatch.hpp"
 
+#ifndef _WIN32
 // -----------------------------------------
 #define BOOST_TEST_MODULE Threads
 #define BOOST_TEST_NO_MAIN
 #include <boost/test/included/unit_test.hpp>
 // -----------------------------------------
+#else
+#include <boost/test/auto_unit_test.hpp>
+#endif
 
 #include <boost/atomic.hpp>
 #include <boost/functional/hash.hpp>
@@ -625,6 +629,7 @@ BOOST_AUTO_TEST_CASE(SyncDeadlock_test)
     BOOST_TEST(sync.unlock());
 }
 
+#ifndef _WIN32
 BOOST_AUTO_TEST_CASE(SyncWait_test)
 {
     Synchronized sync;
@@ -647,6 +652,7 @@ BOOST_AUTO_TEST_CASE(SyncWait_test)
         // [74892559 nanoseconds < 75 milliseconds]
     }
 }
+#endif
 
 class BadTask : public Runnable {
 private:
@@ -744,6 +750,7 @@ BOOST_AUTO_TEST_CASE(ThreadLivetime_test)
     BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
 }
 
+#ifndef _WIN32
 void handler(int signal)
 {
     switch (signal) {
@@ -751,17 +758,23 @@ void handler(int signal)
         break;
     }
 }
+#endif
 
 BOOST_AUTO_TEST_CASE(ThreadNanoSleep_test)
 {
+#ifndef _WIN32
     signal(SIGALRM, &handler);
     alarm(1); // s
+#endif
+
     {
         Stopwatch sw;
         Thread::sleep(1234, 999); // ms + ns
         ns d = sw.elapsed();
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
+#ifndef _WIN32
         BOOST_TEST(d >= (ms(1234) + ns(999)));
+#endif
     }
 
     {
@@ -769,7 +782,9 @@ BOOST_AUTO_TEST_CASE(ThreadNanoSleep_test)
         Thread::sleep(BOOST_THREAD_TEST_TIME_MS, 999999); // ms + ns
         ns d = sw.elapsed();
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
+#ifndef _WIN32
         BOOST_TEST(d >= (ms(BOOST_THREAD_TEST_TIME_MS) + ns(999999)));
+#endif
     }
 }
 
@@ -780,7 +795,9 @@ BOOST_AUTO_TEST_CASE(ThreadSleep_test)
     ns d = sw.elapsed();
     BOOST_TEST_MESSAGE(
         BOOST_CURRENT_FUNCTION << sw.elapsed()); // i.e.: 168410479 nanoseconds
+#ifndef _WIN32
     BOOST_TEST(d >= ns(BOOST_THREAD_TEST_TIME_MS));
+#endif
 }
 
 struct wait_data {
@@ -1034,6 +1051,7 @@ BOOST_AUTO_TEST_CASE(SyncDelete_while_used_test)
 }
 #endif // !defined(USE_AGENTPP_CK)
 
+#ifndef _WIN32
 int main(int argc, char* argv[])
 {
     // prototype for user's unit test init function
@@ -1075,3 +1093,4 @@ int main(int argc, char* argv[])
 
     return error;
 }
+#endif
