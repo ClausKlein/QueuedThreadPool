@@ -597,9 +597,15 @@ BOOST_AUTO_TEST_CASE(Synchronized_test)
     {
         BOOST_TEST(sync.lock());
         BOOST_TEST(sync.unlock());
+
+#ifndef __linux__ // ThreadSanitizer: unlock of an unlocked mutex (or by a wrong thread)
         BOOST_TEST(!sync.unlock(), "second unlock() returns OK");
+#endif
     }
+
+#ifndef __linux__ // ThreadSanitizer: unlock of an unlocked mutex (or by a wrong thread)
     BOOST_TEST(!sync.unlock(), "unlock() without previous lock() returns OK");
+#endif
 }
 
 BOOST_AUTO_TEST_CASE(SyncTrylock_test)
@@ -610,13 +616,16 @@ BOOST_AUTO_TEST_CASE(SyncTrylock_test)
     {
         Lock l(sync);
 
-#ifndef USE_AGENTPP_CK
-        BOOST_TEST(sync.trylock() == Synchronized::OWNED);
-#else
+#if defined(USE_AGENTPP_CK) || defined(USE_AGENTPP)
         BOOST_TEST(sync.trylock() == Synchronized::BUSY);
-#endif // !defined(USE_AGENTPP_CK)
+#else
+        BOOST_TEST(sync.trylock() == Synchronized::OWNED);
+#endif
     }
+
+#ifndef __linux__ // ThreadSanitizer: unlock of an unlocked mutex (or by a wrong thread)
     BOOST_TEST(!sync.unlock(), "second unlock() returns OK");
+#endif
 }
 
 BOOST_AUTO_TEST_CASE(SyncDeadlock_test)
@@ -690,6 +699,8 @@ public:
         Thread::sleep(rand() % 13);
 
         throw std::runtime_error("Fatal Error, can't continue!");
+        // WARNING: ThreadSanitizer: use of an invalid mutex (e.g. uninitialized or destroyed)
+        // WARNING: ThreadSanitizer: unlock of an unlocked mutex (or by a wrong thread)
     };
 
 #ifdef USE_UNIQUE_PTR
@@ -704,8 +715,9 @@ BOOST_AUTO_TEST_CASE(ThreadTaskThrow_test)
 {
     Stopwatch sw;
     {
+        // TODO: should be a shared_ptr<Runnable>! CK
         Synchronized* sync = new Synchronized();
-        BadTask task(*sync); // TODO: may be a shared_ptr<Runnable>! CK
+        BadTask task(*sync);
 
         start_latch.reset(1);
         Thread thread(task);
@@ -724,15 +736,14 @@ BOOST_AUTO_TEST_CASE(ThreadTaskThrow_test)
 
         task.signal(); // ... and than the task wait for the signal
 
-#ifdef NO_FAST_MUTEXES
-        Thread::sleep(rand() % 11);
+#ifndef __linux__
         delete sync; // try to delete locked mutex ...
 #endif
 
         Thread::sleep(BOOST_THREAD_TEST_TIME_MS);
         BOOST_TEST(thread.is_alive());
 
-#ifndef NO_FAST_MUTEXES
+#ifdef __linux__
         delete sync;
 #endif
     }

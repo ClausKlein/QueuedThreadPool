@@ -96,10 +96,9 @@ endif()
 set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
 
-option(BUILD_TESTING "build other tests too" ON)
 
 # ----------------------------------------------------------------------
-option(USE_ASIO "use the standalon asio lib too" OFF)
+option(USE_ASIO "Test the standalon asio lib too" OFF)
 set(ASIO_ROOT
     $ENV{ASIO_ROOT}
     CACHE PATH "path to install dir"
@@ -118,8 +117,6 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   add_compile_options(-Wno-unused-parameter -Wno-tautological-compare)
 endif()
 
-option(USE_ThreadSanitizer "Compile with tool that detects data races" OFF)
-
 option(DISABLE_LOGGING "if you do not want any logging output " ON)
 if(DISABLE_LOGGING)
   set(WITH_LOGGING
@@ -130,7 +127,7 @@ if(DISABLE_LOGGING)
 else()
   set(WITH_LOGGING
       ON
-      CACHE BOOL "Use logging" FORCE
+      CACHE BOOL "Enable logging" FORCE
   )
   add_definitions(-DDEFAULT_LOG_PROFILE -DDEBUG)
 endif()
@@ -156,9 +153,11 @@ endif()
 
 find_package(Threads REQUIRED)
 
+option(BUILD_TESTING "build other tests too" ON)
 if(USE_BOOST OR BUILD_TESTING)
   enable_testing()
 
+  option(USE_ThreadSanitizer "Compile with tool that detects data races" OFF)
   if(BUILD_TESTING AND NOT USE_ThreadSanitizer)
     # additional single file examples from boost/thread and boost/asio
     set(NOINST_PROGRAMS
@@ -212,20 +211,24 @@ if(USE_BOOST OR BUILD_TESTING)
     endif()
   endif()
 
+  # ----------------------------------------------------------------------
   # additional tests from me (CK)
+  # ----------------------------------------------------------------------
   add_executable(test_mutexattr test_mutexattr.c)
   set_target_properties(test_mutexattr PROPERTIES CXX_STANDARD 99)
   target_link_libraries(test_mutexattr Threads::Threads)
   if(USE_ThreadSanitizer)
     target_compile_options(test_mutexattr PRIVATE -fsanitize=thread -O1)
     target_link_options(test_mutexattr PRIVATE -fsanitize=thread -O1)
+  else()
+    add_test(NAME test_mutexattr-errorcheck COMMAND test_mutexattr 1)
   endif()
   add_test(NAME test_mutexattr COMMAND test_mutexattr)
   add_test(NAME test_mutexattr-recursive COMMAND test_mutexattr -1)
-  add_test(NAME test_mutexattr-errorcheck COMMAND test_mutexattr 1)
 
+  # ----------------------------------------------------------------------
   add_executable(test_trylock trylock_test.cpp)
-  set_target_properties(test_trylock PROPERTIES CXX_STANDARD 17)
+  set_target_properties(test_trylock PROPERTIES CXX_STANDARD 98)
   target_link_libraries(test_trylock Boost::chrono Boost::thread)
   if(USE_ThreadSanitizer)
     target_compile_options(test_trylock PRIVATE -fsanitize=thread -O1)
@@ -233,11 +236,15 @@ if(USE_BOOST OR BUILD_TESTING)
   endif()
   add_test(NAME test_trylock COMMAND test_trylock)
 
+  # ----------------------------------------------------------------------
   # TODO add_executable(threads_test threads_test.cpp threadpool.cpp threadpool.hpp)
-  if(NOT ${CMAKE_BUILD_TYPE} STREQUAL Coverage)
-    find_library(LIB_SNMP_PP snmp++_static)
+  # ----------------------------------------------------------------------
+  option(USE_AGENT_PP "Test the agent++ lib too" OFF)
+  if(USE_AGENT_PP AND NOT ${CMAKE_BUILD_TYPE} STREQUAL Coverage)
     find_library(LIB_AGENT_PP agent++_static)
-    if(NOT LIB_AGENT_PP-NOTFOUND)
+    if(NOT ${LIB_AGENT_PP} STREQUAL LIB_AGENT_PP-NOTFOUND)
+      message(STATUS "LIB_AGENT_PP: ${LIB_AGENT_PP}")
+      # MAYBE: find_library(LIB_SNMP_PP snmp++_static)
       add_executable(threads_test threads_test.cpp)
       target_compile_definitions(threads_test PRIVATE USE_AGENTPP)
       set_target_properties(threads_test PROPERTIES CXX_STANDARD 14)
@@ -264,6 +271,7 @@ if(USE_BOOST OR BUILD_TESTING)
       endif()
     endif()
   endif()
+  # ----------------------------------------------------------------------
 
   add_library(threadpool possix/threadpool.cpp possix/threadpool.hpp)
   set_target_properties(threadpool PROPERTIES CXX_STANDARD 98)
@@ -277,6 +285,7 @@ if(USE_BOOST OR BUILD_TESTING)
     target_link_options(threadpool PUBLIC -fsanitize=thread -O1)
   endif()
 
+  # ----------------------------------------------------------------------
   add_executable(threads_test_possix threads_test.cpp)
   set_target_properties(threads_test_possix PROPERTIES CXX_STANDARD 17)
   target_link_libraries(
