@@ -107,7 +107,7 @@ Synchronized::~Synchronized()
 #    if defined(_POSIX_TIMEOUTS) && _POSIX_TIMEOUTS > 0
             if (lock(10)) // NOTE: but not forever! CK
 #    else
-            error = pthread_mutex_lock(&monitor);
+            error = pthread_mutex_lock(&monitor); // NOTE: FOREVER! CK
             if (!error)
 #    endif
             {

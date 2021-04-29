@@ -673,12 +673,12 @@ BOOST_AUTO_TEST_CASE(SyncWait_test)
 
 class BadTask : public Runnable {
 private:
-    Synchronized& sync;
+    Synchronized sync;
     boost::atomic<bool> stopped { false };
 
 public:
-    BadTask(Synchronized& _sync)
-        : sync(_sync) {};
+    BadTask()
+        : sync() {};
 
     void stop()
     {
@@ -701,14 +701,10 @@ public:
             throw std::runtime_error("Fatal Error, can't continue!");
         }
 
-        while (stopped) {
+        while (!stopped) {
             sync.wait();                 // wait for the stop signal ..
             Thread::sleep(rand() % 113); // NOLINT
         }
-
-        // WARNING: ThreadSanitizer: use of an invalid mutex (e.g.
-        // uninitialized or destroyed) WARNING: ThreadSanitizer: unlock of an
-        // unlocked mutex (or by a wrong thread)
     };
 
 #ifdef USE_UNIQUE_PTR
@@ -726,30 +722,15 @@ BOOST_AUTO_TEST_CASE(ThreadTaskThrow_test)
 {
     Stopwatch sw;
     {
-        // TODO: should be a shared_ptr<Runnable>! CK
-        Synchronized* sync = new Synchronized();
-        BadTask task(*sync);
-
-        start_latch.reset(1);
+        BadTask task;
         Thread thread(task);
 
-#    if defined(_POSIX_TIMEOUTS) && _POSIX_TIMEOUTS > 0
-        BOOST_TEST(sync->lock(11));
-#    else
-        BOOST_TEST(sync->lock());
-#    endif
-
+        start_latch.reset(1);
         thread.start(); // first the task will wait for the lock
-        sync->unlock();
-
         start_latch.count_down();
         boost::this_thread::yield();
 
         // NO! task.stop(); // ... and than the task will throw now! CK
-
-#    ifndef __linux__
-        BOOST_CHECK_NO_THROW(delete sync); // try to delete locked mutex ...
-#    endif
 
         BOOST_TEST(thread.is_alive());
     }
@@ -757,10 +738,9 @@ BOOST_AUTO_TEST_CASE(ThreadTaskThrow_test)
 }
 #endif
 
-BOOST_AUTO_TEST_CASE(SynchonizeInterface_test)
+BOOST_AUTO_TEST_CASE(ThreadTaskJoin_test)
 {
-    Synchronized* sync = new Synchronized();
-    BadTask task(*sync);
+    BadTask task;
     Thread thread(task);
     task.stop(); // NOTE: befor start, so the task will not throw! ck
 
@@ -768,10 +748,6 @@ BOOST_AUTO_TEST_CASE(SynchonizeInterface_test)
     thread.start();
     start_latch.count_down();
     boost::this_thread::yield();
-
-    BOOST_CHECK_NO_THROW(delete sync); // try to delete used mutex ...
-    // FIXME! deadlock
-    // NOTE: at this point, the Thread.join() waits forever! CK
 }
 
 BOOST_AUTO_TEST_CASE(ThreadLivetime_test)

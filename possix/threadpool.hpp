@@ -26,9 +26,8 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #define agent_pp_ck_threadpool_hpp_
 
 // NOTE: do not change! CK
-#ifndef _WIN32
-#    define NO_FAST_MUTEXES
-#endif
+#define NO_FAST_MUTEXES
+#define TRACE_VERBOSE
 #define NO_LOGGING
 #define AGENTPP_USE_IMPLIZIT_START
 
