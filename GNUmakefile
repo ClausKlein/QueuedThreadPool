@@ -20,12 +20,13 @@ PROJECT_NAME:=$(shell basename $(CURDIR))
 checkAllHeader?='$(CURDIR)/.*'
 
 # NOTE: there are many errors with boost::test, doctest, catch test framework! CK
-CHECKS:='-*,cert-*,hicpp-*,-hicpp-use-*,misc-*,-misc-unused-*,-misc-no-recursion,modernize-use-override,performance-*,portability-*,-readability-*'
+CHECKS:='-*,cert-*,hicpp-*,-hicpp-use-*,-hicpp-special-*,-hicpp-no-array-decay,-hicpp-vararg,misc-*,-misc-unused-*,-misc-no-recursion,modernize-use-override,performance-*,portability-*,readability-*,-readability-implicit-*,-readability-magic-* '
 CHECKS?='-cppcoreguidelines-avoid-c-arrays,-modernize-avoid-c-arrays'
 CHECKS?='-*,cppcoreguidelines-*,-cppcoreguidelines-pro-*,-cppcoreguidelines-avoid-c-arrays'
 CHECKS?='-*,portability-*,readability-*'
 CHECKS?='-*,misc-*,boost-*,cert-*,misc-unused-parameters'
 
+ThreadSanitizer?=0
 ifeq ($(BUILD_TYPE),Coverage)
     ThreadSanitizer:=0
 else
@@ -33,7 +34,7 @@ else
 endif
 
 # prevent hard config of find_package(asio 1.14.1 CONFIG CMAKE_FIND_ROOT_PATH_BOTH)
-ifeq (${ThreadSanitizer},1)
+ifeq (${ThreadSanitizer},0)
     #FIXME CC:=/usr/local/opt/llvm/bin/clang
     #FIXME CXX:=/usr/local/opt/llvm/bin/clang++
     CC:=clang

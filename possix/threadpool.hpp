@@ -225,7 +225,7 @@ private:
 #endif
 
 #ifndef _WIN32
-    int cond_timed_wait(const timespec*);
+    int cond_timed_wait(const timespec* ts);
 #endif
 
     pthread_cond_t cond;
@@ -314,13 +314,13 @@ class AGENTPP_DECL Thread : public Synchronized, public Runnable {
     enum ThreadStatus { IDLE, RUNNING, FINISHED };
 
     friend class Synchronized;
-    friend void* thread_starter(void*);
+    friend void* thread_starter(void* t);
 
 public:
     /**
      * Create a new thread.
      */
-    Thread();
+    explicit Thread(size_t stack_size = AGENTPP_DEFAULT_STACKSIZE);
 
     /**
      * Create a new thread which will execute the given Runnable.
@@ -391,7 +391,7 @@ public:
      * Before calling the start method this method can be used
      * to change the stack size of the thread.
      *
-     * @param stackSize
+     * @param s
      *    the thread's stack size in bytes.
      */
     void set_stack_size(size_t s) { stackSize = s; }
@@ -408,7 +408,7 @@ public:
      * Clone this thread. This method must not be called on
      * running threads.
      */
-    Thread* clone() { return new Thread(); }
+    Thread* clone() const { return new Thread(stackSize); }
 
 private:
     ThreadStatus status;
@@ -492,10 +492,10 @@ public:
      * @param size
      *    the number of threads started for performing tasks.
      *    The default value is 4 threads.
-     * @param stackSize
+     * @param stack_size
      *    the stack size for each thread.
      */
-    ThreadPool(size_t size, size_t stackSize);
+    ThreadPool(size_t size, size_t stack_size);
 
     /**
      * Destructor will wait for termination of all threads.
@@ -593,10 +593,10 @@ public:
      * @param size
      *    the number of threads started for performing tasks.
      *    The default value is 4 threads.
-     * @param stackSize
+     * @param stack_size
      *    the stack size for each thread.
      */
-    QueuedThreadPool(size_t size, size_t stackSize);
+    QueuedThreadPool(size_t size, size_t stack_size);
 
     /**
      * Destructor will wait for termination of all threads.
@@ -665,7 +665,7 @@ private:
     /**
      * @note asserted to be called with lock! CK
      **/
-    bool is_stopped() { return !go; }
+    bool is_stopped() const { return !go; }
 
     void EmptyQueue();
 };
@@ -687,10 +687,11 @@ public:
      *
      * @param threadPool
      *    a pointer to a ThreadPool instance.
-     * @param stackSize
+     * @param stack_size
      *    the stack size for the managed thread.
      */
-    TaskManager(ThreadPool*, size_t stackSize = AGENTPP_DEFAULT_STACKSIZE);
+    explicit TaskManager(
+        ThreadPool* tp, size_t stack_size = AGENTPP_DEFAULT_STACKSIZE);
 
     /**
      * Destructor will wait for thread to terminate.
@@ -717,7 +718,7 @@ public:
      *   FALSE if another thread has assigned a task concurrently.
      *   In the latter case, the task has not been assigned!
      */
-    bool set_task(Runnable*);
+    bool set_task(Runnable* it);
 
     /**
      * Clone this TaskManager.

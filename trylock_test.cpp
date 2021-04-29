@@ -24,6 +24,8 @@
 #    define VERBOSE
 #endif
 
+namespace
+{
 using namespace boost;
 
 mutex mtx; // warning: initialization of 'mutex' with static storage duration
@@ -58,9 +60,12 @@ void unique()
         ++counter;
     }
 }
+} // namespace
 
 int main()
 {
+    using namespace boost;
+
     Stopwatch::duration best_time(std::numeric_limits<Stopwatch::rep>::max
             BOOST_PREVENT_MACRO_SUBSTITUTION());
 

@@ -252,20 +252,20 @@ if(USE_BOOST OR BUILD_TESTING)
         threads_test Boost::unit_test_framework Boost::chrono Boost::thread
         ${LIB_AGENT_PP} # MAYBE: ${LIB_SNMP_PP}
       )
-      add_test(NAME threads_test COMMAND threads_test --log_level=success)
+      add_test(NAME threads_test COMMAND threads_test --log_level=warning)
       if(USE_ThreadSanitizer)
         target_compile_options(threads_test PRIVATE -fsanitize=thread -O1)
         target_link_options(threads_test PRIVATE -fsanitize=thread -O1)
       else()
         add_test(NAME threads_test-random COMMAND threads_test
-                                                  --log_level=success --random
+                                                  --log_level=warning --random
         )
         add_test(NAME threads_test-thread
-                 COMMAND threads_test --log_level=success
+                 COMMAND threads_test --log_level=warning
                          --run_test=ThreadPool_test -25
         )
         add_test(NAME threads_test-queue
-                 COMMAND threads_test --log_level=success
+                 COMMAND threads_test --log_level=warning
                          --run_test=QueuedThreadPoolLoad_test -25
         )
       endif()

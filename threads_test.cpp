@@ -89,7 +89,7 @@ public:
 
     void run() BOOST_OVERRIDE
     {
-        Thread::sleep((rand() % 3) * delay); // ms
+        Thread::sleep((rand() % 3) * delay); // NOLINT
 
         scoped_lock l(lock);
         // WARNING: ThreadSanitizer: data race
@@ -326,7 +326,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
 {
     result_queue_t result;
     {
-        QueuedThreadPool queuedThreadPool;
+        QueuedThreadPool queuedThreadPool(1);
 
 #if !defined(AGENTPP_USE_IMPLIZIT_START)
         queuedThreadPool.start(); // NOTE: different to ThreadPool, but this
@@ -349,7 +349,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
         std::srand(static_cast<unsigned>(std::time(0)));
         unsigned i = 4;
         do {
-            unsigned delay = rand() % 100;
+            unsigned delay = rand() % 100; // NOLINT
             std::string msg(std::to_string(i));
             queuedThreadPool.execute(
                 new TestTask(msg + " Queuing ...", result, delay));
@@ -378,7 +378,8 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
             if (i >= 4) {
                 std::string msg(
                     boost::lexical_cast<std::string>(i) + " Queuing ...");
-                BOOST_TEST(boost::hash_value(value) == boost::hash_value(msg),
+                BOOST_TEST_WARN(
+                    boost::hash_value(value) == boost::hash_value(msg),
                     "expected msg: " << msg);
             }
         }
@@ -405,7 +406,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolLoad_test)
         unsigned i = 20;
         do {
             if (i > 5) {
-                unsigned delay = rand() % 100;
+                unsigned delay = rand() % 100; // NOLINT
                 defaultThreadPool.execute(
                     new TestTask("Running ...", result, delay));
 
@@ -598,12 +599,14 @@ BOOST_AUTO_TEST_CASE(Synchronized_test)
         BOOST_TEST(sync.lock());
         BOOST_TEST(sync.unlock());
 
-#ifndef __linux__ // ThreadSanitizer: unlock of an unlocked mutex (or by a wrong thread)
+#ifndef __linux__ // ThreadSanitizer: unlock of an unlocked mutex (or by a
+                  // wrong thread)
         BOOST_TEST(!sync.unlock(), "second unlock() returns OK");
 #endif
     }
 
-#ifndef __linux__ // ThreadSanitizer: unlock of an unlocked mutex (or by a wrong thread)
+#ifndef __linux__ // ThreadSanitizer: unlock of an unlocked mutex (or by a
+                  // wrong thread)
     BOOST_TEST(!sync.unlock(), "unlock() without previous lock() returns OK");
 #endif
 }
@@ -623,7 +626,8 @@ BOOST_AUTO_TEST_CASE(SyncTrylock_test)
 #endif
     }
 
-#ifndef __linux__ // ThreadSanitizer: unlock of an unlocked mutex (or by a wrong thread)
+#ifndef __linux__ // ThreadSanitizer: unlock of an unlocked mutex (or by a
+                  // wrong thread)
     BOOST_TEST(!sync.unlock(), "second unlock() returns OK");
 #endif
 }
@@ -670,16 +674,16 @@ BOOST_AUTO_TEST_CASE(SyncWait_test)
 class BadTask : public Runnable {
 private:
     Synchronized& sync;
-    boost::atomic<bool> done { false };
+    boost::atomic<bool> stopped { false };
 
 public:
     BadTask(Synchronized& _sync)
         : sync(_sync) {};
 
-    void signal()
+    void stop()
     {
         Lock l(sync); // wait for the scoped lock
-        done = true;
+        stopped = true;
         sync.notify_all();
     }
 
@@ -693,14 +697,18 @@ public:
         // BOOST_TEST_MESSAGE(
         //     BOOST_CURRENT_FUNCTION << ": Hello world! I'am waiting ...");
 
-        while (!done) {
-            sync.wait(); // wait for the signal ..
+        if (!stopped) {
+            throw std::runtime_error("Fatal Error, can't continue!");
         }
-        Thread::sleep(rand() % 13);
 
-        throw std::runtime_error("Fatal Error, can't continue!");
-        // WARNING: ThreadSanitizer: use of an invalid mutex (e.g. uninitialized or destroyed)
-        // WARNING: ThreadSanitizer: unlock of an unlocked mutex (or by a wrong thread)
+        while (stopped) {
+            sync.wait();                 // wait for the stop signal ..
+            Thread::sleep(rand() % 113); // NOLINT
+        }
+
+        // WARNING: ThreadSanitizer: use of an invalid mutex (e.g.
+        // uninitialized or destroyed) WARNING: ThreadSanitizer: unlock of an
+        // unlocked mutex (or by a wrong thread)
     };
 
 #ifdef USE_UNIQUE_PTR
@@ -711,6 +719,9 @@ public:
 #endif
 };
 
+//==================================================
+
+#ifndef USE_AGENTPP
 BOOST_AUTO_TEST_CASE(ThreadTaskThrow_test)
 {
     Stopwatch sw;
@@ -722,11 +733,11 @@ BOOST_AUTO_TEST_CASE(ThreadTaskThrow_test)
         start_latch.reset(1);
         Thread thread(task);
 
-#if defined(_POSIX_TIMEOUTS) && _POSIX_TIMEOUTS > 0
+#    if defined(_POSIX_TIMEOUTS) && _POSIX_TIMEOUTS > 0
         BOOST_TEST(sync->lock(11));
-#else
+#    else
         BOOST_TEST(sync->lock());
-#endif
+#    endif
 
         thread.start(); // first the task will wait for the lock
         sync->unlock();
@@ -734,20 +745,33 @@ BOOST_AUTO_TEST_CASE(ThreadTaskThrow_test)
         start_latch.count_down();
         boost::this_thread::yield();
 
-        task.signal(); // ... and than the task wait for the signal
+        // NO! task.stop(); // ... and than the task will throw now! CK
 
-#ifndef __linux__
-        delete sync; // try to delete locked mutex ...
-#endif
+#    ifndef __linux__
+        BOOST_CHECK_NO_THROW(delete sync); // try to delete locked mutex ...
+#    endif
 
-        Thread::sleep(BOOST_THREAD_TEST_TIME_MS);
         BOOST_TEST(thread.is_alive());
-
-#ifdef __linux__
-        delete sync;
-#endif
     }
     BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
+}
+#endif
+
+BOOST_AUTO_TEST_CASE(SynchonizeInterface_test)
+{
+    Synchronized* sync = new Synchronized();
+    BadTask task(*sync);
+    Thread thread(task);
+    task.stop(); // NOTE: befor start, so the task will not throw! ck
+
+    start_latch.reset(1);
+    thread.start();
+    start_latch.count_down();
+    boost::this_thread::yield();
+
+    BOOST_CHECK_NO_THROW(delete sync); // try to delete used mutex ...
+    // FIXME! deadlock
+    // NOTE: at this point, the Thread.join() waits forever! CK
 }
 
 BOOST_AUTO_TEST_CASE(ThreadLivetime_test)

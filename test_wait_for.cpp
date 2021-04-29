@@ -14,21 +14,24 @@ using namespace boost;
 using namespace std;
 #endif
 
+#include <csignal>
 #include <iostream>
 
-#include <signal.h>
 #include <unistd.h>
 
-void handler(int signal)
+void handler(int signum)
 {
-    switch (signal) {
-    case SIGALRM: // ignored
+    switch (signum) {
+    case SIGALRM:
+        signal(signum, SIG_DFL);
+        break;
+    default: // ignored
         break;
     }
 }
 
 volatile bool flag = { false };
-bool predicate() { return flag == true; }
+bool predicate() { return flag; }
 
 int main(int /*argc*/, char* /*argv*/[])
 {
