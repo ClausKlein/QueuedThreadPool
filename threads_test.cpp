@@ -660,15 +660,22 @@ void handler(int signum)
 
 BOOST_AUTO_TEST_CASE(SyncDeleteLocked_test)
 {
-#ifndef _WIN32
+#ifdef __APPLE__
     signal(SIGALRM, &handler);
     ualarm(1000, 0); // us
 #endif
 
+    Stopwatch sw;
     try {
+
         auto sync = boost::make_shared<Synchronized>();
         BOOST_TEST(sync->lock());
-        sync->wait(); // for signal ...
+
+#ifdef __APPLE__
+        sync->wait(123); // for signal with timout
+#endif
+
+        BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
     } catch (std::exception& e) {
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
         BOOST_TEST_MESSAGE(e.what());
@@ -811,7 +818,7 @@ BOOST_AUTO_TEST_CASE(ThreadNanoSleep_test)
 {
 #ifndef _WIN32
     signal(SIGALRM, &handler);
-    ualarm(10000, 0); // us
+    alarm(1); // s
 #endif
 
     {
