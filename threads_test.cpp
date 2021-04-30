@@ -9,7 +9,7 @@
 #    include "agent_pp/threads.h" // ThreadPool, QueuedThreadPool
 using namespace Agentpp;
 #elif USE_AGENTPP_CK
-#    include "possix/threadpool.hpp" // ThreadPool, QueuedThreadPool
+#    include "posix/threadpool.hpp" // ThreadPool, QueuedThreadPool
 #    define TEST_INDEPENDENTLY
 #    define USE_BUSY_TEST
 #    define TEST_USAGE_AFTER_TERMINATE
@@ -81,9 +81,9 @@ public:
     }
 
 #ifdef USE_UNIQUE_PTR
-    std::unique_ptr<Runnable> clone() const BOOST_OVERRIDE
+    boost::unique_ptr<Runnable> clone() const BOOST_OVERRIDE
     {
-        return std::make_unique<TestTask>(text, result, delay);
+        return boost::make_unique<TestTask>(text, result, delay);
     }
 #endif
 
@@ -175,10 +175,10 @@ BOOST_AUTO_TEST_CASE(ThreadPoolInterface_test)
 
 BOOST_AUTO_TEST_CASE(ThreadPool_busy_test)
 {
-    constexpr size_t MAX_LOAD { 4 };
-    constexpr size_t threadCount(MAX_LOAD / 2);
+    constexpr size_t MAX_LOAD { 8 };
+    constexpr size_t threadCount { 1 };
     {
-        constexpr size_t stacksize = AGENTPP_DEFAULT_STACKSIZE * 2;
+        constexpr size_t stacksize { AGENTPP_DEFAULT_STACKSIZE * 2 };
         ThreadPool threadPool(threadCount, stacksize);
 
         BOOST_TEST_MESSAGE("threadPool.size: " << threadPool.size());
@@ -229,7 +229,7 @@ BOOST_AUTO_TEST_CASE(ThreadPool_test)
 
         BOOST_TEST_MESSAGE("threadPool.size: " << threadPool.size());
         BOOST_TEST(threadPool.size() == 4UL);
-        BOOST_TEST(threadPool.stack_size() == AGENTPP_DEFAULT_STACKSIZE);
+        BOOST_TEST_WARN(threadPool.stack_size() == AGENTPP_DEFAULT_STACKSIZE);
         BOOST_TEST(threadPool.is_idle());
 
 #ifdef USE_BUSY_TEST
@@ -273,7 +273,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_busy_test)
 {
     result_queue_t result;
     constexpr size_t MAX_LOAD { 4 };
-    constexpr size_t threadCount(MAX_LOAD / 2);
+    constexpr size_t threadCount { MAX_LOAD / 2 };
     {
         constexpr size_t stacksize { AGENTPP_DEFAULT_STACKSIZE * 2 };
         QueuedThreadPool threadPool(threadCount, stacksize);
@@ -337,7 +337,8 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
             "queuedThreadPool.size: " << queuedThreadPool.size());
         BOOST_TEST(queuedThreadPool.size() == 1UL);
 
-        BOOST_TEST(queuedThreadPool.stack_size() == AGENTPP_DEFAULT_STACKSIZE);
+        BOOST_TEST_WARN(
+            queuedThreadPool.stack_size() == AGENTPP_DEFAULT_STACKSIZE);
         BOOST_TEST(queuedThreadPool.is_idle());
 
         queuedThreadPool.execute(new TestTask("1 Hi again.", result, 10));
@@ -646,6 +647,34 @@ BOOST_AUTO_TEST_CASE(SyncDeadlock_test)
     BOOST_TEST(sync.unlock());
 }
 
+void handler(int signum)
+{
+    switch (signum) {
+    case SIGALRM:
+        signal(signum, SIG_DFL);
+        break;
+    default: // ignored
+        break;
+    }
+}
+
+BOOST_AUTO_TEST_CASE(SyncDeleteLocked_test)
+{
+#ifndef _WIN32
+    signal(SIGALRM, &handler);
+    ualarm(1000, 0); // us
+#endif
+
+    try {
+        auto sync = boost::make_shared<Synchronized>();
+        BOOST_TEST(sync->lock());
+        sync->wait(); // for signal ...
+    } catch (std::exception& e) {
+        BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
+        BOOST_TEST_MESSAGE(e.what());
+    }
+}
+
 #ifndef _WIN32
 BOOST_AUTO_TEST_CASE(SyncWait_test)
 {
@@ -675,16 +704,24 @@ class BadTask : public Runnable {
 private:
     Synchronized sync;
     boost::atomic<bool> stopped { false };
+    const bool doit;
 
 public:
-    BadTask()
-        : sync() {};
+    explicit BadTask(bool do_throw)
+        : sync()
+        , doit(do_throw) {};
+
+    ~BadTask()
+    {
+        stopped = true;
+        sync.notify_all();
+    }
 
     void stop()
     {
         Lock l(sync); // wait for the scoped lock
         stopped = true;
-        sync.notify_all();
+        sync.notify();
     }
 
     void run() BOOST_OVERRIDE
@@ -697,7 +734,7 @@ public:
         // BOOST_TEST_MESSAGE(
         //     BOOST_CURRENT_FUNCTION << ": Hello world! I'am waiting ...");
 
-        if (!stopped) {
+        if (doit) {
             throw std::runtime_error("Fatal Error, can't continue!");
         }
 
@@ -708,9 +745,9 @@ public:
     };
 
 #ifdef USE_UNIQUE_PTR
-    std::unique_ptr<Runnable> clone() const BOOST_OVERRIDE
+    boost::unique_ptr<Runnable> clone() const BOOST_OVERRIDE
     {
-        return std::make_unique<BadTask>();
+        return boost::make_unique<BadTask>();
     }
 #endif
 };
@@ -722,15 +759,13 @@ BOOST_AUTO_TEST_CASE(ThreadTaskThrow_test)
 {
     Stopwatch sw;
     {
-        BadTask task;
+        BadTask task(true);
         Thread thread(task);
 
         start_latch.reset(1);
         thread.start(); // first the task will wait for the lock
         start_latch.count_down();
         boost::this_thread::yield();
-
-        // NO! task.stop(); // ... and than the task will throw now! CK
 
         BOOST_TEST(thread.is_alive());
     }
@@ -740,14 +775,21 @@ BOOST_AUTO_TEST_CASE(ThreadTaskThrow_test)
 
 BOOST_AUTO_TEST_CASE(ThreadTaskJoin_test)
 {
-    BadTask task;
-    Thread thread(task);
-    task.stop(); // NOTE: befor start, so the task will not throw! ck
+    Stopwatch sw;
+    {
+        BadTask task(false);
+        Thread thread(task);
 
-    start_latch.reset(1);
-    thread.start();
-    start_latch.count_down();
-    boost::this_thread::yield();
+        start_latch.reset(1);
+        thread.start();
+        start_latch.count_down();
+        boost::this_thread::yield();
+
+        task.stop();
+
+        BOOST_TEST(thread.is_alive());
+    }
+    BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
 }
 
 BOOST_AUTO_TEST_CASE(ThreadLivetime_test)
@@ -765,21 +807,11 @@ BOOST_AUTO_TEST_CASE(ThreadLivetime_test)
     BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
 }
 
-#ifndef _WIN32
-void handler(int signal)
-{
-    switch (signal) {
-    case SIGALRM: // ignored
-        break;
-    }
-}
-#endif
-
 BOOST_AUTO_TEST_CASE(ThreadNanoSleep_test)
 {
 #ifndef _WIN32
     signal(SIGALRM, &handler);
-    alarm(1); // s
+    ualarm(10000, 0); // us
 #endif
 
     {

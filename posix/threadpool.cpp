@@ -22,7 +22,7 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
   _##
   _##########################################################################*/
 
-#include "possix/threadpool.hpp"
+#include "posix/threadpool.hpp"
 
 #include <cerrno>
 #include <cstring> // memset()
@@ -48,7 +48,7 @@ static const char* loggerModuleName = "agent++.threads";
 int Synchronized::next_id = 0;
 #endif
 
-#define ERR_CHK_WITHOUT_EXCEPTIONS(x) \
+#define ERR_CHK_WITH_EXCEPTIONS(x) \
     do { \
         int err = (x); \
         if (err) { \
@@ -56,6 +56,7 @@ int Synchronized::next_id = 0;
             LOG("Constructing Synchronized failed at '" #x "' with (err)"); \
             LOG(strerror(err)); \
             LOG_END; \
+            throw std::runtime_error(strerror(err)); \
         } \
     } while (0)
 
@@ -73,21 +74,17 @@ Synchronized::Synchronized()
 #endif
 
     pthread_mutexattr_t attr;
-    ERR_CHK_WITHOUT_EXCEPTIONS(pthread_mutexattr_init(&attr));
+    ERR_CHK_WITH_EXCEPTIONS(pthread_mutexattr_init(&attr));
 
-    //#ifdef PTHREAD_MUTEX_ERRORCHECK
-    //#    warning "PTHREAD_MUTEX_ERRORCHECK set"
-    //#endif
-
-    ERR_CHK_WITHOUT_EXCEPTIONS(
+    ERR_CHK_WITH_EXCEPTIONS(
         pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK));
 
     memset(&monitor, 0, sizeof(monitor));
-    ERR_CHK_WITHOUT_EXCEPTIONS(pthread_mutex_init(&monitor, &attr));
-    ERR_CHK_WITHOUT_EXCEPTIONS(pthread_mutexattr_destroy(&attr));
+    ERR_CHK_WITH_EXCEPTIONS(pthread_mutex_init(&monitor, &attr));
+    ERR_CHK_WITH_EXCEPTIONS(pthread_mutexattr_destroy(&attr));
 
     memset(&cond, 0, sizeof(cond));
-    ERR_CHK_WITHOUT_EXCEPTIONS(pthread_cond_init(&cond, NULL));
+    ERR_CHK_WITH_EXCEPTIONS(pthread_cond_init(&cond, NULL));
 }
 
 Synchronized::~Synchronized()
@@ -100,14 +97,13 @@ Synchronized::~Synchronized()
         // first try to get the lock
         error = pthread_mutex_trylock(&monitor);
         if (!error) {
-            notify_all();
             (void)pthread_mutex_unlock(&monitor);
             // if another thread waits for signal with mutex, let's wait.
 
 #    if defined(_POSIX_TIMEOUTS) && _POSIX_TIMEOUTS > 0
             if (lock(10)) // NOTE: but not forever! CK
 #    else
-            error = pthread_mutex_lock(&monitor); // NOTE: FOREVER! CK
+            error = pthread_mutex_trylock(&monitor);
             if (!error)
 #    endif
             {
@@ -119,10 +115,16 @@ Synchronized::~Synchronized()
                 }
             }
         } else {
+            // in case this thread hold the lock:
+            error = pthread_mutex_unlock(&monitor);
+            if (error != EPERM) {
+                break;
+            }
+            notify_all();
             ++errors;
             Thread::sleep(errors * 2);
         }
-        if (errors > 11) {
+        if (errors > AGENTPP_SYNCHRONIZED_UNLOCK_RETRIES) {
             break;
         }
     } while (EBUSY == error);
@@ -130,7 +132,7 @@ Synchronized::~Synchronized()
     error              = pthread_mutex_destroy(&monitor);
 #endif
 
-    if (error) {
+    if (error == EBUSY) {
         ++errors;
         LOG_BEGIN(loggerModuleName, ERROR_LOG | 2);
         LOG("Synchronized mutex_destroy failed with (error)(ptr)");
@@ -144,7 +146,7 @@ Synchronized::~Synchronized()
     }
 
     error = pthread_cond_destroy(&cond);
-    if (error) {
+    if (error == EBUSY) {
         ++errors;
         LOG_BEGIN(loggerModuleName, ERROR_LOG | 2);
         LOG("Synchronized cond_destroy failed with (error)(ptr)");
@@ -172,23 +174,14 @@ void Synchronized::wait()
 }
 
 #ifndef _WIN32
-int Synchronized::cond_timed_wait(const struct timespec* ts)
+int Synchronized::cond_timed_wait(const struct timespec& ts)
 {
-    // NOTE from:
-    // http://man7.org/linux/man-pages/man3/pthread_cond_timedwait.3p.html
-
-    // Timed Wait Semantics:
-    // For cases when the system clock is advanced discontinuously by an
-    // operator, it is expected that implementations process any timed wait
-    // expiring at an intervening time as if that time had actually occurred.
-
-    int result;
-    if (ts) {
-        result = pthread_cond_timedwait(&cond, &monitor, ts);
-    } else {
-        result = pthread_cond_wait(&cond, &monitor); // NOTE: FOREVER! CK
+    int error = pthread_cond_timedwait(&cond, &monitor, &ts);
+    if (error == EINVAL) {
+        throw std::runtime_error("pthread_cond_timedwait: The cond or the "
+                                 "mutex ot the timespec is invalid!");
     }
-    return result;
+    return error;
 }
 #endif
 
@@ -222,7 +215,7 @@ bool Synchronized::wait(unsigned long timeout)
     ts.tv_nsec = (millis % 1000) * 1000000;
 #    endif
 
-    int err = cond_timed_wait(&ts);
+    int err = cond_timed_wait(ts);
     if (err) {
         switch (err) {
         case EINVAL:
@@ -620,6 +613,7 @@ TaskManager::~TaskManager()
 void TaskManager::run()
 {
     Lock l(*this);
+
     while (go) {
         if (task) {
             try {
@@ -636,10 +630,14 @@ void TaskManager::run()
             // via QueuedThreadPool::run() => QueuedThreadPool::assign()
             threadPool->idle_notification();
             //==============================
-        } else {
-            wait(); // NOTE: idle, wait until notify signal CK
+        }
+
+        while (go && !task) {
+            DTRACE("idle! Synchronized::wait()");
+            wait(); // NOTE: until notify signal! CK
         }
     }
+
     if (task) {
         delete task;
         task = NULL;
@@ -698,9 +696,10 @@ void ThreadPool::execute(Runnable* t)
             }
             tm = NULL;
         }
+
         if (!tm) {
             DTRACE("busy! Synchronized::wait()");
-            wait(); // NOTE: for idle_notification ... CK
+            wait(); // TODO: until idle_notification or timeout? CK
         }
     }
 }
@@ -887,21 +886,27 @@ void QueuedThreadPool::run()
 {
     Lock l(thread);
 
-    while (go) {
-        if (!queue.empty()) {
+    do {
+        while (go && !queue.empty()) {
             LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
             LOG("queue.front");
             LOG_END;
             Runnable* t = queue.front();
-            if (t) {
+            while (go && t) {
                 if (assign(t)) {
                     queue.pop(); // OK, now we pop this entry
+                    break;
                 }
+                DTRACE("busy! Synchronized::wait()");
+                thread.wait(); // NOTE: until idle_notification! CK
             }
         }
-        DTRACE("idle! Synchronized::wait()");
-        thread.wait(); // NOTE: for idle_notification ... CK
-    }
+
+        while (go && queue.empty()) {
+            DTRACE("idle! Synchronized::wait()");
+            thread.wait(); // NOTE: until idle_notification! CK
+        }
+    } while (go);
 }
 
 /// NOTE: asserted to be called with lock! CK

@@ -26,7 +26,7 @@ CHECKS?='-*,cppcoreguidelines-*,-cppcoreguidelines-pro-*,-cppcoreguidelines-avoi
 CHECKS?='-*,portability-*,readability-*'
 CHECKS?='-*,misc-*,boost-*,cert-*,misc-unused-parameters'
 
-ThreadSanitizer?=0
+#FIXME ThreadSanitizer?=0
 ifeq ($(BUILD_TYPE),Coverage)
     ThreadSanitizer:=0
 else
@@ -34,11 +34,11 @@ else
 endif
 
 # prevent hard config of find_package(asio 1.14.1 CONFIG CMAKE_FIND_ROOT_PATH_BOTH)
-ifeq (${ThreadSanitizer},0)
-    #FIXME CC:=/usr/local/opt/llvm/bin/clang
-    #FIXME CXX:=/usr/local/opt/llvm/bin/clang++
-    CC:=clang
-    CXX:=clang++
+ifeq (${ThreadSanitizer},1)
+    #XXX CC:=/usr/local/opt/llvm/bin/clang
+    #XXX CXX:=/usr/local/opt/llvm/bin/clang++
+    CC?=clang
+    CXX?=clang++
 
     CMAKE_INSTALL_PREFIX?=/usr/local
     export CMAKE_INSTALL_PREFIX

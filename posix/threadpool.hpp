@@ -26,10 +26,12 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #define agent_pp_ck_threadpool_hpp_
 
 // NOTE: do not change! CK
-#define NO_FAST_MUTEXES
-#define TRACE_VERBOSE
-#define NO_LOGGING
 #define AGENTPP_USE_IMPLIZIT_START
+#define NO_FAST_MUTEXES
+
+// NOTE: prevent ThreadSanitizer data reaces warnings! CK
+#undef TRACE_VERBOSE
+#define NO_LOGGING
 
 #ifdef __INTEGRITY
 #    define BOOST_OVERRIDE
@@ -57,6 +59,7 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #include <boost/current_function.hpp>
 #include <boost/noncopyable.hpp>
 
+#define AGENTPP_SYNCHRONIZED_UNLOCK_RETRIES 10
 #define AGENTPP_DEFAULT_STACKSIZE 0x10000UL
 #define AGENTPP_OPAQUE_PTHREAD_T void*
 #define AGENTX_DEFAULT_PRIORITY 32
@@ -224,7 +227,7 @@ private:
 #endif
 
 #ifndef _WIN32
-    int cond_timed_wait(const timespec* ts);
+    int cond_timed_wait(const timespec& ts);
 #endif
 
     pthread_cond_t cond;
@@ -270,11 +273,13 @@ public:
      *
      * @param timeout
      *    timeout in milliseconds.
+     *
+     * @note negativ values means: wait forever!
      */
     void wait(long timeout) // TODO: why NOT return bool? CK
     {
         if (timeout < 0) {
-            (void)sync.wait();
+            (void)sync.wait(); // NOTE: forever! CK
         } else {
             (void)sync.wait(timeout);
         }

@@ -273,7 +273,7 @@ if(USE_BOOST OR BUILD_TESTING)
   endif()
   # ----------------------------------------------------------------------
 
-  add_library(threadpool possix/threadpool.cpp possix/threadpool.hpp)
+  add_library(threadpool posix/threadpool.cpp posix/threadpool.hpp)
   set_target_properties(threadpool PROPERTIES CXX_STANDARD 98)
   if(NOT DISABLE_LOGGING)
     target_compile_definitions(threadpool PRIVATE TRACE_VERBOSE)
@@ -286,29 +286,29 @@ if(USE_BOOST OR BUILD_TESTING)
   endif()
 
   # ----------------------------------------------------------------------
-  add_executable(threads_test_possix threads_test.cpp)
-  set_target_properties(threads_test_possix PROPERTIES CXX_STANDARD 17)
+  add_executable(threads_test_posix threads_test.cpp)
+  set_target_properties(threads_test_posix PROPERTIES CXX_STANDARD 17)
   target_link_libraries(
-    threads_test_possix threadpool Boost::unit_test_framework
+    threads_test_posix threadpool Boost::unit_test_framework
   )
-  target_compile_definitions(threads_test_possix PRIVATE USE_AGENTPP_CK)
-  add_test(NAME threads_test_possix COMMAND threads_test_possix
+  target_compile_definitions(threads_test_posix PRIVATE USE_AGENTPP_CK)
+  add_test(NAME threads_test_posix COMMAND threads_test_posix
                                             --log_level=success
   )
-  add_test(NAME threads_test_possix-throw
-           COMMAND threads_test_possix --log_level=success
+  add_test(NAME threads_test_posix-throw
+           COMMAND threads_test_posix --log_level=success
                    --run_test=ThreadTaskThrow_test -25
   )
   if(NOT USE_ThreadSanitizer AND NOT ${CMAKE_BUILD_TYPE} STREQUAL Coverage)
-    add_test(NAME threads_test_possix-random
-             COMMAND threads_test_possix --log_level=success --random
+    add_test(NAME threads_test_posix-random
+             COMMAND threads_test_posix --log_level=success --random
     )
-    add_test(NAME threads_test_possix-thread
-             COMMAND threads_test_possix --log_level=success
+    add_test(NAME threads_test_posix-thread
+             COMMAND threads_test_posix --log_level=success
                      --run_test=ThreadPool_test -25
     )
-    add_test(NAME threads_test_possix-queue
-             COMMAND threads_test_possix --log_level=success
+    add_test(NAME threads_test_posix-queue
+             COMMAND threads_test_posix --log_level=success
                      --run_test=QueuedThreadPoolLoad_test -25
     )
   endif()
