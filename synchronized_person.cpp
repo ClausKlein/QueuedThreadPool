@@ -169,8 +169,9 @@ private:
     };
     void Invariant(boost::const_strict_lock_ptr<Member>& mbr) const
     {
-        if (mbr->age < 1)
+        if (mbr->age < 1) {
             throw std::runtime_error("Age cannot be negative");
+        }
     }
     boost::synchronized_value<Member> member;
 };
@@ -196,8 +197,9 @@ private:
     unsigned int age_;
     void Invariant() const
     {
-        if (age_ < 1)
+        if (age_ < 1) {
             throw std::runtime_error("Age cannot be negative");
+        }
     }
 };
 

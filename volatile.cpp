@@ -63,12 +63,12 @@ public:
     // ...
 
 protected:
-    void Operation()
+    void Operation() // NOLINT(readability-convert-member-functions-to-static)
     {
         std::cout << BOOST_CURRENT_FUNCTION << " called" << std::endl;
         Helper();
     };
-    void Helper()
+    static void Helper()
     {
         std::cout << BOOST_CURRENT_FUNCTION << " called" << std::endl;
     }

@@ -192,7 +192,7 @@ int main(int argc, char* argv[])
      * the program will deadlock on a recursive lock
      */
     if (argc > 1) {
-        recursive = atoi(argv[1]);
+        recursive = strtol(argv[1], NULL, 10);
     }
 
     pthread_mutexattr_init(&attr);

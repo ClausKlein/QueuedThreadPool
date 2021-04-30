@@ -26,11 +26,12 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #define agent_pp_ck_threadpool_hpp_
 
 // NOTE: do not change! CK
-#ifndef _WIN32
-#    define NO_FAST_MUTEXES
-#endif
-#define NO_LOGGING
 #define AGENTPP_USE_IMPLIZIT_START
+#define NO_FAST_MUTEXES
+
+// NOTE: prevent ThreadSanitizer data reaces warnings! CK
+#undef TRACE_VERBOSE
+#define NO_LOGGING
 
 #ifdef __INTEGRITY
 #    define BOOST_OVERRIDE
@@ -58,6 +59,7 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #include <boost/current_function.hpp>
 #include <boost/noncopyable.hpp>
 
+#define AGENTPP_SYNCHRONIZED_UNLOCK_RETRIES 10
 #define AGENTPP_DEFAULT_STACKSIZE 0x10000UL
 #define AGENTPP_OPAQUE_PTHREAD_T void*
 #define AGENTX_DEFAULT_PRIORITY 32
@@ -225,7 +227,7 @@ private:
 #endif
 
 #ifndef _WIN32
-    int cond_timed_wait(const timespec*);
+    int cond_timed_wait(const timespec& ts);
 #endif
 
     pthread_cond_t cond;
@@ -271,11 +273,13 @@ public:
      *
      * @param timeout
      *    timeout in milliseconds.
+     *
+     * @note negativ values means: wait forever!
      */
     void wait(long timeout) // TODO: why NOT return bool? CK
     {
         if (timeout < 0) {
-            (void)sync.wait();
+            (void)sync.wait(); // NOTE: forever! CK
         } else {
             (void)sync.wait(timeout);
         }
@@ -314,13 +318,13 @@ class AGENTPP_DECL Thread : public Synchronized, public Runnable {
     enum ThreadStatus { IDLE, RUNNING, FINISHED };
 
     friend class Synchronized;
-    friend void* thread_starter(void*);
+    friend void* thread_starter(void* t);
 
 public:
     /**
      * Create a new thread.
      */
-    Thread();
+    explicit Thread(size_t stack_size = AGENTPP_DEFAULT_STACKSIZE);
 
     /**
      * Create a new thread which will execute the given Runnable.
@@ -328,7 +332,7 @@ public:
      * @param runnable
      *    a Runnable subclass.
      */
-    explicit Thread(Runnable* r);
+    explicit Thread(Runnable& r);
 
     /**
      * Destroy thread. If thread is running or has been finished but
@@ -391,7 +395,7 @@ public:
      * Before calling the start method this method can be used
      * to change the stack size of the thread.
      *
-     * @param stackSize
+     * @param s
      *    the thread's stack size in bytes.
      */
     void set_stack_size(size_t s) { stackSize = s; }
@@ -408,11 +412,11 @@ public:
      * Clone this thread. This method must not be called on
      * running threads.
      */
-    Thread* clone() { return new Thread(get_runnable()); }
+    Thread* clone() const { return new Thread(stackSize); }
 
 private:
-    Runnable* runnable;
     ThreadStatus status;
+    Runnable& runnable;
     size_t stackSize;
     pthread_t tid;
     static ThreadList threadList;
@@ -492,10 +496,10 @@ public:
      * @param size
      *    the number of threads started for performing tasks.
      *    The default value is 4 threads.
-     * @param stackSize
+     * @param stack_size
      *    the stack size for each thread.
      */
-    ThreadPool(size_t size, size_t stackSize);
+    ThreadPool(size_t size, size_t stack_size);
 
     /**
      * Destructor will wait for termination of all threads.
@@ -541,6 +545,7 @@ public:
      *   the stack size of each thread in this thread pool.
      */
     size_t get_stack_size() const { return stackSize; }
+    size_t stack_size() const { return stackSize; }
 
     /**
      * Notifies the thread pool about an idle thread (synchronized).
@@ -581,7 +586,7 @@ public:
      *
      * @param size
      *    the number of threads started for performing tasks.
-     *    The default value is 4 threads.
+     *    The default value is 1 threads.
      */
     explicit QueuedThreadPool(size_t size = 1);
 
@@ -592,10 +597,10 @@ public:
      * @param size
      *    the number of threads started for performing tasks.
      *    The default value is 4 threads.
-     * @param stackSize
+     * @param stack_size
      *    the stack size for each thread.
      */
-    QueuedThreadPool(size_t size, size_t stackSize);
+    QueuedThreadPool(size_t size, size_t stack_size);
 
     /**
      * Destructor will wait for termination of all threads.
@@ -664,7 +669,7 @@ private:
     /**
      * @note asserted to be called with lock! CK
      **/
-    bool is_stopped() { return !go; }
+    bool is_stopped() const { return !go; }
 
     void EmptyQueue();
 };
@@ -686,10 +691,11 @@ public:
      *
      * @param threadPool
      *    a pointer to a ThreadPool instance.
-     * @param stackSize
+     * @param stack_size
      *    the stack size for the managed thread.
      */
-    TaskManager(ThreadPool*, size_t stackSize = AGENTPP_DEFAULT_STACKSIZE);
+    explicit TaskManager(
+        ThreadPool* tp, size_t stack_size = AGENTPP_DEFAULT_STACKSIZE);
 
     /**
      * Destructor will wait for thread to terminate.
@@ -716,7 +722,7 @@ public:
      *   FALSE if another thread has assigned a task concurrently.
      *   In the latter case, the task has not been assigned!
      */
-    bool set_task(Runnable*);
+    bool set_task(Runnable* it);
 
     /**
      * Clone this TaskManager.
