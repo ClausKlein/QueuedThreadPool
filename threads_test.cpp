@@ -37,6 +37,7 @@ using namespace Agentpp;
 #include <boost/functional/hash.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/lockfree/queue.hpp>
+#include <boost/smart_ptr/make_shared.hpp>
 #include <boost/thread/latch.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/mutex.hpp>
@@ -647,6 +648,7 @@ BOOST_AUTO_TEST_CASE(SyncDeadlock_test)
     BOOST_TEST(sync.unlock());
 }
 
+#ifndef _WIN32
 void handler(int signum)
 {
     switch (signum) {
@@ -657,6 +659,7 @@ void handler(int signum)
         break;
     }
 }
+#endif
 
 BOOST_AUTO_TEST_CASE(SyncDeleteLocked_test)
 {

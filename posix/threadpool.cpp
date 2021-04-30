@@ -626,8 +626,6 @@ void TaskManager::run()
             delete task;
             task = NULL;
             //==============================
-            // NOTE: may direct call set_task()
-            // via QueuedThreadPool::run() => QueuedThreadPool::assign()
             threadPool->idle_notification();
             //==============================
         }
