@@ -245,9 +245,9 @@ if(USE_BOOST OR BUILD_TESTING)
     if(NOT ${LIB_AGENT_PP} STREQUAL LIB_AGENT_PP-NOTFOUND)
       message(STATUS "LIB_AGENT_PP: ${LIB_AGENT_PP}")
       # MAYBE: find_library(LIB_SNMP_PP snmp++_static)
-      add_executable(threads_test threads_test.cpp)
+      add_executable(threads_test threads_test.cpp threads.cpp agent_pp/threads.h)
       target_compile_definitions(threads_test PRIVATE USE_AGENTPP)
-      set_target_properties(threads_test PROPERTIES CXX_STANDARD 14)
+      set_target_properties(threads_test PROPERTIES CXX_STANDARD 17)
       target_link_libraries(
         threads_test Boost::unit_test_framework Boost::chrono Boost::thread
         ${LIB_AGENT_PP} # MAYBE: ${LIB_SNMP_PP}

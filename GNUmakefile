@@ -20,13 +20,14 @@ PROJECT_NAME:=$(shell basename $(CURDIR))
 checkAllHeader?='$(CURDIR)/.*'
 
 # NOTE: there are many errors with boost::test, doctest, catch test framework! CK
-CHECKS:='-*,cert-*,hicpp-*,-hicpp-use-*,-hicpp-special-*,-hicpp-no-array-decay,-hicpp-vararg,misc-*,-misc-unused-*,-misc-no-recursion,modernize-use-override,performance-*,portability-*,readability-*,-readability-implicit-*,-readability-magic-* '
+CHECKS:='-*,cert-*,-cert-err58-cpp,hicpp-*,-hicpp-use-*,-hicpp-special-*,-hicpp-no-array-decay,-hicpp-vararg,misc-*,-misc-unused-*,-misc-no-recursion,modernize-use-override,performance-*,portability-*,-readability-*,-readability-implicit-*,-readability-magic-* '
 CHECKS?='-cppcoreguidelines-avoid-c-arrays,-modernize-avoid-c-arrays'
 CHECKS?='-*,cppcoreguidelines-*,-cppcoreguidelines-pro-*,-cppcoreguidelines-avoid-c-arrays'
 CHECKS?='-*,portability-*,readability-*'
 CHECKS?='-*,misc-*,boost-*,cert-*,misc-unused-parameters'
 
-#FIXME ThreadSanitizer?=0
+#FIXME
+ThreadSanitizer?=0
 ifeq ($(BUILD_TYPE),Coverage)
     ThreadSanitizer:=0
 else
@@ -120,8 +121,8 @@ clean: $(BUILD_DIR)
 
 distclean:
 	rm -rf $(BUILD_DIR) .configure-$(BUILD_TYPE) .buildfiles.lst compile_commands.json *~ .*~ tags
-	rm -rf generated/*
 	find . -name '*~' -delete
+	#TODO rm -rf generated/*
 
 
 # These rules keep make from trying to use the match-anything rule below
