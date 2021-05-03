@@ -25,11 +25,20 @@
 
 #include "agent_pp/threads.h"
 
-#include <libagent.h>
+//FIXME #include <libagent.h>
+#include <cassert>
+#include <cerrno>
 
 #include <agent_pp/mib.h>
 #include <agent_pp/mib_entry.h>
-#include <snmp_pp/log.h>
+
+//FIXME #include <snmp_pp/log.h>
+#undef LOG_BEGIN
+#define LOG_BEGIN(x, y)
+#undef LOG
+#define LOG(x)
+#undef LOG_END
+#define LOG_END
 
 namespace Agentpp
 {
@@ -163,18 +172,28 @@ Synchronized::~Synchronized()
     }
     result = pthread_mutex_destroy(&monitor);
 
-#ifdef NO_FAST_MUTEXES
+#if 1 // XXX defined(NO_FAST_MUTEXES)
     if (result == EBUSY) {
         // wait for other threads ...
-        if (EBUSY == pthread_mutex_trylock(&monitor))
-            pthread_mutex_lock(
-                &monitor); // another thread owns the mutex, let's wait ...
-        int retries = 0;
-        do {
-            pthread_mutex_unlock(&monitor);
-            result = pthread_mutex_destroy(&monitor);
-        } while (EBUSY == result
-            && (retries++ < AGENTPP_SYNCHRONIZED_UNLOCK_RETRIES));
+        if (EBUSY == pthread_mutex_trylock(&monitor)) {
+            // another thread owns the mutex,
+
+#if defined(_POSIX_TIMEOUTS) && _POSIX_TIMEOUTS > 0
+            if (lock(1234)) // NOTE: let's wait, but not forever! CK
+#else
+            result = pthread_mutex_lock(&monitor); // FIXME: forever? CK
+            if (!result)
+#endif
+
+            {
+                int retries = 0;
+                do {
+                    pthread_mutex_unlock(&monitor);
+                    result = pthread_mutex_destroy(&monitor);
+                } while (EBUSY == result
+                    && (retries++ < AGENTPP_SYNCHRONIZED_UNLOCK_RETRIES));
+            }
+        }
     }
 #endif
 

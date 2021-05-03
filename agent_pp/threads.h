@@ -27,7 +27,7 @@
 #define agent_pp_threads_h_
 
 #include <agent_pp/List.h>
-#include <agent_pp/agent++.h>
+#include <agent_pp/agentpp.h>
 
 #include <ctime>
 #include <pthread.h>

@@ -7,6 +7,7 @@
 #define USE_BUSY_TEST
 
 #ifdef USE_AGENTPP
+#    define _NO_LOGGING 1
 #    include "agent_pp/threads.h" // ThreadPool, QueuedThreadPool
 #    define TEST_INDEPENDENTLY
 using namespace Agentpp;
@@ -663,7 +664,7 @@ void handler(int signum)
 
 BOOST_AUTO_TEST_CASE(SyncDeleteLocked_test)
 {
-#ifdef __APPLE__
+#ifndef _WIN32
     signal(SIGALRM, &handler);
     ualarm(1000, 0); // us
 #endif
@@ -674,7 +675,7 @@ BOOST_AUTO_TEST_CASE(SyncDeleteLocked_test)
         auto sync = boost::make_shared<Synchronized>();
         BOOST_TEST(sync->lock());
 
-#ifdef __APPLE__
+#ifndef __WIN32
         sync->wait(123); // for signal with timout
 #endif
 
@@ -764,7 +765,6 @@ public:
 
 //==================================================
 
-#ifndef USE_AGENTPP
 BOOST_AUTO_TEST_CASE(ThreadTaskThrow_test)
 {
     Stopwatch sw;
@@ -781,7 +781,6 @@ BOOST_AUTO_TEST_CASE(ThreadTaskThrow_test)
     }
     BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
 }
-#endif
 
 BOOST_AUTO_TEST_CASE(ThreadTaskJoin_test)
 {
@@ -1100,7 +1099,7 @@ BOOST_AUTO_TEST_CASE(SyncDelete_while_used_test)
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
     }
 }
-#endif // !defined(USE_AGENTPP_CK)
+#endif // !defined(USE_WAIT_FOR)
 
 #ifndef _WIN32
 int main(int argc, char* argv[])
