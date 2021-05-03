@@ -208,7 +208,7 @@ bool Synchronized::wait(unsigned long timeout)
     bool timeoutOccurred = false;
     struct timespec ts   = {};
 
-#ifdef HAVE_CLOCK_GETTIME
+#if defined(__APPLE__) || defined(HAVE_CLOCK_GETTIME)
     clock_gettime(CLOCK_REALTIME, &ts);
     ts.tv_sec += (time_t)timeout / 1000;
     int millis = ts.tv_nsec / 1000000 + (timeout % 1000);
@@ -330,7 +330,7 @@ bool Synchronized::lock(unsigned long timeout)
 {
     struct timespec ts = {};
 
-#ifdef HAVE_CLOCK_GETTIME
+#if defined(__APPLE__) || defined(HAVE_CLOCK_GETTIME)
     clock_gettime(CLOCK_REALTIME, &ts);
     ts.tv_sec += (time_t)timeout / 1000;
     int millis = ts.tv_nsec / 1000000 + (timeout % 1000);

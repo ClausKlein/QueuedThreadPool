@@ -240,7 +240,7 @@ if(USE_BOOST OR BUILD_TESTING)
   # TODO add_executable(threads_test threads_test.cpp threadpool.cpp threadpool.hpp)
   # ----------------------------------------------------------------------
   option(USE_AGENT_PP "Test the agent++ lib too" ON)
-  if(USE_AGENT_PP AND NOT ${CMAKE_BUILD_TYPE} STREQUAL Coverage)
+  if(USE_AGENT_PP)
     find_library(LIB_AGENT_PP agent++_static)
     if(NOT ${LIB_AGENT_PP} STREQUAL LIB_AGENT_PP-NOTFOUND)
       message(STATUS "LIB_AGENT_PP: ${LIB_AGENT_PP}")
