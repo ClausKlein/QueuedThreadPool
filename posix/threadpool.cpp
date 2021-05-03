@@ -212,7 +212,7 @@ bool Synchronized::wait(unsigned long timeout)
     if (millis >= 1000) {
         ts.tv_sec += 1;
     }
-    ts.tv_nsec = (millis % 1000) * 1000000;
+    ts.tv_nsec              = (millis % 1000) * 1000000;
 #    endif
 
     int err = cond_timed_wait(ts);
@@ -294,7 +294,7 @@ bool Synchronized::lock()
 #if defined(_POSIX_TIMEOUTS) && _POSIX_TIMEOUTS > 0
 bool Synchronized::lock(unsigned long timeout)
 {
-    struct timespec ts;
+    struct timespec ts = {};
 
 #    if defined(__APPLE__) || defined(_POSIX_TIMERS) && _POSIX_TIMERS > 0
     clock_gettime(CLOCK_REALTIME, &ts);
@@ -305,8 +305,7 @@ bool Synchronized::lock(unsigned long timeout)
     }
     ts.tv_nsec = (millis % 1000) * 1000000;
 #    else
-#        warning "gettimeofday() used"
-    struct timeval tv;
+    struct timeval tv = {};
     gettimeofday(&tv, 0);
     ts.tv_sec = tv.tv_sec + (time_t)timeout / 1000;
     int millis = tv.tv_usec / 1000 + (timeout % 1000);
@@ -395,11 +394,6 @@ void* thread_starter(void* t)
     Thread* thread = (Thread*)t;
     Thread::threadList.add(thread);
 
-    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-    LOG("Thread: started (tid)");
-    LOG((AGENTPP_OPAQUE_PTHREAD_T)(thread->tid));
-    LOG_END;
-
 #if defined(__APPLE__)
     pthread_setname_np(AGENTX_DEFAULT_THREAD_NAME);
 #elif defined(__linux__) && defined(_GNU_SOURCE)
@@ -413,11 +407,6 @@ void* thread_starter(void* t)
     } catch (...) {
         // OK; ignored CK
     }
-
-    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-    LOG("Thread: ended (tid)");
-    LOG((AGENTPP_OPAQUE_PTHREAD_T)(thread->tid));
-    LOG_END;
 
     Thread::threadList.remove(thread);
     // NO! ThreadSanitizer: data race thread->status = Thread::FINISHED;
@@ -446,7 +435,12 @@ void Thread::run()
     LOG_END;
 }
 
-Thread::~Thread() { join(); }
+Thread::~Thread()
+{
+    if (status == RUNNING) {
+        join();
+    }
+}
 
 Runnable* Thread::get_runnable() { return &runnable; }
 
@@ -461,13 +455,14 @@ void Thread::join()
             LOG("Thread: join failed (error)");
             LOG(strerror(err));
             LOG_END;
-        } else {
-            status = IDLE;
-            LOG_BEGIN(loggerModuleName, DEBUG_LOG | 4);
-            LOG("Thread: joined thread successfully (tid)");
-            LOG((AGENTPP_OPAQUE_PTHREAD_T)tid);
-            LOG_END;
+            return;
         }
+
+        status = IDLE;
+        LOG_BEGIN(loggerModuleName, DEBUG_LOG | 4);
+        LOG("Thread: joined thread successfully (tid)");
+        LOG((AGENTPP_OPAQUE_PTHREAD_T)tid);
+        LOG_END;
     } else {
         status = IDLE;
         LOG_BEGIN(loggerModuleName, WARNING_LOG | 1);
@@ -546,6 +541,7 @@ void Thread::nsleep(time_t secs, long nanos)
 #else
     time_t s                  = secs + nanos / 1000000000;
     long n                    = nanos % 1000000000;
+
 #    if defined(__APPLE__) || defined(_POSIX_TIMERS) && _POSIX_TIMERS > 0
     struct timespec interval  = {};
     struct timespec remainder = {};
@@ -563,9 +559,9 @@ void Thread::nsleep(time_t secs, long nanos)
         break;
     }
 #    else
-    struct timeval interval;
-    interval.tv_sec  = s;
-    interval.tv_usec = n / 1000;
+    struct timeval interval = {};
+    interval.tv_sec         = s;
+    interval.tv_usec        = n / 1000;
     fd_set writefds, readfds, exceptfds;
     FD_ZERO(&writefds);
     FD_ZERO(&readfds);
@@ -606,7 +602,7 @@ TaskManager::~TaskManager()
 
     thread.join();
     LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-    LOG("TaskManager: thread joined");
+    LOG("TaskManager: thread stopped");
     LOG_END;
 }
 
@@ -652,6 +648,7 @@ bool TaskManager::is_idle()
 bool TaskManager::set_task(Runnable* t)
 {
     Lock l(*this);
+
     if (!task) {
         task = t;
         notify();
@@ -696,21 +693,13 @@ void ThreadPool::execute(Runnable* t)
         }
 
         if (!tm) {
-            DTRACE("busy! Synchronized::wait()");
-            wait(); // TODO: until idle_notification or timeout? CK
+            wait(); // TODO: until idle_notification or with 1s timeout? CK
         }
     }
 }
 
 /// NOTE: asserted to be called with lock! CK
-void ThreadPool::idle_notification()
-{
-    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-    LOG("notify");
-    LOG_END;
-
-    notify();
-}
+void ThreadPool::idle_notification() { notify(); }
 
 /// return true if NONE of the threads in the pool is currently executing any
 /// task.
@@ -873,9 +862,6 @@ void QueuedThreadPool::execute(Runnable* t)
         return;
     }
 
-    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-    LOG("queue.push");
-    LOG_END;
     queue.push(t);
     thread.notify();
 }
@@ -908,13 +894,7 @@ void QueuedThreadPool::run()
 }
 
 /// NOTE: asserted to be called with lock! CK
-void QueuedThreadPool::idle_notification()
-{
-    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
-    LOG("notify");
-    LOG_END;
-    thread.notify();
-}
+void QueuedThreadPool::idle_notification() { thread.notify(); }
 
 bool QueuedThreadPool::is_idle()
 {

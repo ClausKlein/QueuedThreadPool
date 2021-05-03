@@ -162,6 +162,7 @@ Synchronized::~Synchronized()
         LOG_END;
     }
     result = pthread_mutex_destroy(&monitor);
+
 #ifdef NO_FAST_MUTEXES
     if (result == EBUSY) {
         // wait for other threads ...
@@ -176,6 +177,7 @@ Synchronized::~Synchronized()
             && (retries++ < AGENTPP_SYNCHRONIZED_UNLOCK_RETRIES));
     }
 #endif
+
     isLocked = false;
     if (result) {
         LOG_BEGIN(loggerModuleName, ERROR_LOG | 2);
@@ -216,7 +218,7 @@ bool Synchronized::wait(unsigned long timeout)
     ts.tv_nsec = (millis % 1000) * 1000000;
 #else
     struct timeval tv = {};
-    gettimeofday(&tv, 0);
+    gettimeofday(&tv, NULL);
     ts.tv_sec  = tv.tv_sec + (time_t)timeout / 1000;
     int millis = tv.tv_usec / 1000 + (timeout % 1000);
     if (millis >= 1000) {
@@ -234,6 +236,7 @@ bool Synchronized::wait(unsigned long timeout)
             LOG("Synchronized: wait with timeout returned (error)");
             LOG(err);
             LOG_END;
+        // fallthrough
         case ETIMEDOUT:
             timeoutOccurred = true;
             break;
@@ -347,6 +350,7 @@ bool Synchronized::lock(unsigned long timeout)
 #endif
 
     int error;
+
 #ifdef HAVE_PTHREAD_MUTEX_TIMEDLOCK
     if ((error = pthread_mutex_timedlock(&monitor, &ts)) == 0) {
 #else
@@ -360,9 +364,10 @@ bool Synchronized::lock(unsigned long timeout)
     } while (error == EBUSY && (remaining_millis > 0));
     if (error == 0) {
 #endif
+
 #ifndef AGENTPP_PTHREAD_RECURSIVE
         isLocked = true;
-        return true;
+        return true; // NOTE: PTHREAD_MUTEX_ERRORCHECK is used! CK
 #else
         if (isLocked) {
             // This thread owns already the lock, but
@@ -385,6 +390,7 @@ bool Synchronized::lock(unsigned long timeout)
         }
         return true;
 #endif
+
     } else {
         LOG_BEGIN(loggerModuleName, DEBUG_LOG | 8);
         LOG("Synchronized: lock failed (id)(error)");
@@ -399,8 +405,8 @@ bool Synchronized::unlock()
 {
     bool wasLocked = isLocked;
     isLocked       = false;
-    int err;
-    if ((err = pthread_mutex_unlock(&monitor)) != 0) {
+    int err        = pthread_mutex_unlock(&monitor);
+    if (err != 0) {
         LOG_BEGIN(loggerModuleName, WARNING_LOG | 1);
         LOG("Synchronized: unlock failed (id)(error)(wasLocked)");
         LOG(id);
@@ -408,6 +414,7 @@ bool Synchronized::unlock()
         LOG(wasLocked);
         LOG_END;
         isLocked = wasLocked;
+        assert(!isLocked);
         return false;
     }
     return true;
@@ -418,6 +425,7 @@ Synchronized::TryLockResult Synchronized::trylock()
 #ifndef AGENTPP_PTHREAD_RECURSIVE
     int err = pthread_mutex_trylock(&monitor);
     if (!err) {
+        assert(!isLocked);
         isLocked = true;
         LOG_BEGIN(loggerModuleName, DEBUG_LOG | 8);
         LOG("Synchronized: try lock success (id)(ptr)");
@@ -433,7 +441,8 @@ Synchronized::TryLockResult Synchronized::trylock()
         LOG(id);
         LOG((long)this);
         LOG_END;
-        return OWNED;
+        assert(isLocked);
+        return OWNED; // NOTE: PTHREAD_MUTEX_ERRORCHECK is used! CK
     }
 #else
     if (pthread_mutex_trylock(&monitor) == 0) {
@@ -467,12 +476,14 @@ Synchronized::TryLockResult Synchronized::trylock()
         return LOCKED;
     }
 #endif
+
     else {
         LOG_BEGIN(loggerModuleName, DEBUG_LOG | 9);
         LOG("Synchronized: try lock busy (id)(ptr)");
         LOG(id);
         LOG((long)this);
         LOG_END;
+        assert(isLocked);
         return BUSY;
     }
 }
@@ -493,7 +504,11 @@ void* thread_starter(void* t)
     LOG_END;
 #endif
 
-    thread->get_runnable().run();
+    try {
+        thread->get_runnable().run();
+    } catch (...) {
+        // OK; ignored CK
+    }
 
 #ifndef NO_FAST_MUTEXES
     LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
@@ -501,27 +516,26 @@ void* thread_starter(void* t)
     LOG((AGENTPP_OPAQUE_PTHREAD_T)(thread->tid));
     LOG_END;
 #endif
+
     Thread::threadList.remove(thread);
-    thread->status = Thread::FINISHED;
+    // NO! ThreadSanitizer: data race thread->status = Thread::FINISHED;
 
     return t;
 }
 
-Thread::Thread()
-    : tid {}
-{
-    stackSize = AGENTPP_DEFAULT_STACKSIZE;
-    runnable  = (Runnable*)this;
-    status    = IDLE;
-}
+Thread::Thread(int stack_size)
+    : status(IDLE)
+    , runnable(this)
+    , stackSize(stack_size)
+    , tid()
+{ }
 
 Thread::Thread(Runnable& r)
-    : tid {}
-{
-    stackSize = AGENTPP_DEFAULT_STACKSIZE;
-    runnable  = &r;
-    status    = IDLE;
-}
+    : status(IDLE)
+    , runnable(&r)
+    , stackSize(AGENTPP_DEFAULT_STACKSIZE)
+    , tid()
+{ }
 
 void Thread::run()
 {
@@ -532,7 +546,7 @@ void Thread::run()
 
 Thread::~Thread()
 {
-    if (status != IDLE) {
+    if (status == RUNNING) {
         join();
     }
 }
@@ -541,21 +555,25 @@ Runnable& Thread::get_runnable() { return *runnable; }
 
 void Thread::join()
 {
-    if (status) {
+    if (status == RUNNING) {
         void* retstat;
         int err = pthread_join(tid, &retstat);
         if (err) {
+            status = FINISHED;
             LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
             LOG("Thread: join failed (error)");
             LOG(err);
             LOG_END;
+            return;
         }
+
         status = IDLE;
         LOG_BEGIN(loggerModuleName, DEBUG_LOG | 4);
         LOG("Thread: joined thread successfully (tid)");
         LOG((AGENTPP_OPAQUE_PTHREAD_T)tid);
         LOG_END;
     } else {
+        status = IDLE;
         LOG_BEGIN(loggerModuleName, WARNING_LOG | 1);
         LOG("Thread: thread not running (tid)");
         LOG((AGENTPP_OPAQUE_PTHREAD_T)tid);
@@ -575,7 +593,7 @@ void Thread::start()
             LOG("Thread: cannot start thread (error)");
             LOG(err);
             LOG_END;
-            status = IDLE;
+            status = FINISHED; // NOTE: we are not started, see join()! CK
         } else {
             status = RUNNING;
         }
@@ -589,30 +607,34 @@ void Thread::start()
 
 void Thread::sleep(long millis)
 {
-    nsleep((int)(millis / 1000), (millis % 1000) * 1000000);
+    nsleep((time_t)(millis / 1000), (millis % 1000) * 1000000);
 }
 
-void Thread::sleep(long millis, int nanos)
+void Thread::sleep(long millis, long nanos)
 {
-    nsleep((int)(millis / 1000), (millis % 1000) * 1000000 + nanos);
+    nsleep((time_t)(millis / 1000), (millis % 1000) * 1000000 + nanos);
 }
 
-void Thread::nsleep(int secs, long nanos)
+void Thread::nsleep(time_t secs, long nanos)
 {
-    long s = secs + nanos / 1000000000;
-    long n = nanos % 1000000000;
+    time_t s = secs + nanos / 1000000000;
+    long n   = nanos % 1000000000;
 
-#ifdef _POSIX_TIMERS
+#if defined(__APPLE__) || defined(_POSIX_TIMERS) && _POSIX_TIMERS > 0
     struct timespec interval  = {};
     struct timespec remainder = {};
-    interval.tv_sec           = (int)s;
+    interval.tv_sec           = s;
     interval.tv_nsec          = n;
-    if (nanosleep(&interval, &remainder) == -1) {
+    while (nanosleep(&interval, &remainder) == -1) {
         if (errno == EINTR) {
             LOG_BEGIN(loggerModuleName, EVENT_LOG | 3);
-            LOG("Thread: sleep interrupted");
+            LOG("Thread: nsleep interrupted");
             LOG_END;
+            interval = remainder;
+            continue;
         }
+
+        break;
     }
 #else
     struct timeval interval = {};
@@ -625,7 +647,7 @@ void Thread::nsleep(int secs, long nanos)
     if (select(0, &writefds, &readfds, &exceptfds, &interval) == -1) {
         if (errno == EINTR) {
             LOG_BEGIN(loggerModuleName, EVENT_LOG | 3);
-            LOG("Thread: sleep interrupted");
+            LOG("Thread: nsleep interrupted");
             LOG_END;
         }
     }
@@ -638,7 +660,7 @@ TaskManager::TaskManager(ThreadPool* tp, int stackSize)
     : thread(*this)
 {
     threadPool = tp;
-    task       = 0;
+    task       = NULL;
     go         = true;
     thread.set_stack_size(stackSize);
     thread.start();
@@ -649,10 +671,12 @@ TaskManager::TaskManager(ThreadPool* tp, int stackSize)
 
 TaskManager::~TaskManager()
 {
-    lock();
-    go = false;
-    notify();
-    unlock();
+    {
+        Lock l(*this);
+        go = false;
+        notify();
+    }
+
     thread.join();
     LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
     LOG("TaskManager: thread stopped");
@@ -661,55 +685,64 @@ TaskManager::~TaskManager()
 
 void TaskManager::run()
 {
-    lock();
+    Lock l(*this);
+
     while (go) {
         if (task) {
-            task->run();
+            try {
+                task->run(); // NOTE: executes the task
+            } catch (...) {
+                // OK; ignored CK
+            }
             delete task;
-            task = 0;
-            unlock();
+            task = NULL;
             if (threadPool->is_one_time_execution()) {
                 return;
             }
+            //==============================
             threadPool->idle_notification();
-            lock();
-        } else {
-            wait();
+            //==============================
+            // FIXME: ThreadSanitizer: data race on vptr (ctor/dtor vs virtual
+            // call) threads.cpp:693 in Agentpp::TaskManager::run()
+        }
+
+        while (go && !task) {
+            wait(); // NOTE: until notify signal! CK
         }
     }
+
     if (task) {
         delete task;
-        task = 0;
+        task = NULL;
     }
-    unlock();
 }
 
 bool TaskManager::set_task(Runnable* t)
 {
-    lock();
+    Lock l(*this);
+
     if (!task) {
         task = t;
         notify();
-        unlock();
         LOG_BEGIN(loggerModuleName, DEBUG_LOG | 2);
         LOG("TaskManager: after notify");
         LOG_END;
         return true;
-    } else {
-        unlock();
-        LOG_BEGIN(loggerModuleName, DEBUG_LOG | 2);
-        LOG("TaskManager: got already a task");
-        LOG_END;
-        return false;
     }
+
+    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 2);
+    LOG("TaskManager: got already a task");
+    LOG_END;
+    return false;
 }
 
 /*--------------------- class ThreadPool --------------------------*/
 
 void ThreadPool::execute(Runnable* t)
 {
-    lock();
-    TaskManager* tm = 0;
+    Lock l(*this);
+
+    TaskManager* tm = NULL;
     while (!tm) {
         ArrayCursor<TaskManager> cur;
         for (cur.init(&taskList); cur.get(); cur.next()) {
@@ -719,79 +752,74 @@ void ThreadPool::execute(Runnable* t)
                 LOG("TaskManager: task manager found");
                 LOG_END;
 
-                unlock();
                 if (tm->set_task(t)) {
-                    return;
+                    return; // done
                 } else {
                     // task could not be assigned
-                    tm = 0;
-                    lock();
+                    tm = NULL;
                 }
             }
-            tm = 0;
+            tm = NULL;
         }
+
         if (!tm) {
             wait(1000);
         }
     }
-    unlock();
 }
 
 bool ThreadPool::is_idle()
 {
-    lock();
+    Lock l(*this);
+
     ArrayCursor<TaskManager> cur;
     for (cur.init(&taskList); cur.get(); cur.next()) {
         if (!cur.get()->is_idle()) {
-            unlock();
             return false;
         }
     }
-    unlock();
     return true;
 }
 
 bool ThreadPool::is_busy()
 {
-    lock();
+    Lock l(*this);
+
     ArrayCursor<TaskManager> cur;
     for (cur.init(&taskList); cur.get(); cur.next()) {
         if (cur.get()->is_busy()) {
-            unlock();
             return true;
         }
     }
-    unlock();
     return false;
 }
 
 void ThreadPool::terminate()
 {
-    lock();
+    Lock l(*this);
+
     ArrayCursor<TaskManager> cur;
     for (cur.init(&taskList); cur.get(); cur.next()) {
         cur.get()->stop();
         cur.get()->notify();
     }
     notify();
-    unlock();
 }
 
 void ThreadPool::join()
 {
+    Lock l(*this);
+
     Array<TaskManager> joined;
-    lock();
     ArrayCursor<TaskManager> cur;
     for (cur.init(&taskList); cur.get(); cur.next()) {
         TaskManager* joining = cur.get();
         if (joined.index(joining) < 0) {
-            unlock();
             joining->join();
             joined.add(joining);
             lock();
         }
     }
-    unlock();
     joined.clear();
 }
 
@@ -824,26 +852,28 @@ ThreadPool::~ThreadPool()
 
 QueuedThreadPool::QueuedThreadPool(int size)
     : ThreadPool(size)
-    , go(false)
+    , go(true)
 { }
 
 QueuedThreadPool::QueuedThreadPool(int size, int stack_size)
     : ThreadPool(size, stack_size)
-    , go(false)
+    , go(true)
 { }
 
 QueuedThreadPool::~QueuedThreadPool()
 {
-    go = false;
     Thread::lock();
+    go = false;
     Thread::notify_all();
     Thread::unlock();
+
     Thread::join();
 }
 
+/// TODO: asserted to be called with lock! CK
 void QueuedThreadPool::assign(Runnable* t)
 {
-    TaskManager* tm = 0;
+    TaskManager* tm = NULL;
     ArrayCursor<TaskManager> cur;
     for (cur.init(&taskList); cur.get(); cur.next()) {
         tm = cur.get();
@@ -851,17 +881,18 @@ void QueuedThreadPool::assign(Runnable* t)
             LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
             LOG("TaskManager: task manager found");
             LOG_END;
-            Thread::unlock();
+            // NO! Thread::unlock();
             if (!tm->set_task(t)) {
-                tm = 0;
-                Thread::lock();
+                tm = NULL; // still busy!
+                // NO! Thread::lock();
             } else {
-                Thread::lock();
+                // NO! Thread::lock();
                 break;
             }
         }
-        tm = 0;
+        tm = NULL;
     }
+
     if (!tm) {
         queue.add(t);
         Thread::notify();
@@ -871,18 +902,20 @@ void QueuedThreadPool::assign(Runnable* t)
 void QueuedThreadPool::execute(Runnable* t)
 {
     Thread::lock();
+
     if (queue.empty()) {
         assign(t);
     } else {
         queue.add(t);
     }
+
     Thread::unlock();
 }
 
 void QueuedThreadPool::run()
 {
-    go = true;
     Thread::lock();
+
     while (go) {
         Runnable* t = queue.removeFirst();
         if (t) {
@@ -890,6 +923,7 @@ void QueuedThreadPool::run()
         }
         Thread::wait(1000);
     }
+
     Thread::unlock();
 }
 
@@ -898,15 +932,15 @@ unsigned int QueuedThreadPool::queue_length()
     Thread::lock();
     int length = queue.size();
     Thread::unlock();
+
     return length;
 }
 
+/// TODO: asserted to be called with lock! CK
 void QueuedThreadPool::idle_notification()
 {
-    Thread::lock();
     Thread::notify();
-    Thread::unlock();
-    ThreadPool::idle_notification();
+    // TODO: check if needed? CK ThreadPool::idle_notification();
 }
 
 void MibTask::run() { (task->called_class->*task->method)(task->req); }

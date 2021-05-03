@@ -33,8 +33,8 @@
 #include <pthread.h>
 #include <sys/types.h>
 
-#define MULTI_THREADED true
-#define SINGLE_THREADED false
+// #define MULTI_THREADED true
+// #define SINGLE_THREADED false
 #define AGENTPP_DEFAULT_STACKSIZE 0x10000
 
 namespace Agentpp
@@ -305,7 +305,7 @@ public:
     /**
      * Create a new thread.
      */
-    Thread();
+    explicit Thread(int stackSize = AGENTPP_DEFAULT_STACKSIZE);
 
     /**
      * Create a new thread which will execute the given Runnable.
@@ -340,7 +340,7 @@ public:
      * @param nanos
      *    0-999999 additional nanoseconds to sleep.
      */
-    static void sleep(long millis, int nanos);
+    static void sleep(long millis, long nanos);
 
     /**
      * If this thread was constructed using a separate Runnable
@@ -396,12 +396,12 @@ public:
     Thread* clone() { return new Thread(get_runnable()); }
 
 private:
-    Runnable* runnable;
     ThreadStatus status;
+    Runnable* runnable;
     long stackSize;
     pthread_t tid;
     static ThreadList threadList;
-    static void nsleep(int secs, long nanos);
+    static void nsleep(time_t secs, long nanos);
 };
 
 /**
@@ -537,12 +537,7 @@ public:
     /**
      * Notifies the thread pool about an idle thread (synchronized).
      */
-    virtual void idle_notification()
-    {
-        lock();
-        notify();
-        unlock();
-    }
+    virtual void idle_notification() { notify(); }
 
     /**
      * Gracefully stops all running task managers after their current
@@ -722,7 +717,11 @@ public:
      *   not currently execute any task and the associated thread is running;
      *   false otherwise.
      */
-    bool is_idle() { return (!task) && thread.is_alive(); }
+    bool is_idle()
+    {
+        Lock l(*this);
+        return !task && thread.is_alive();
+    }
 
     /**
      * Check whether a task is being executed by this TaskManager.
@@ -730,7 +729,11 @@ public:
      *    true if there is a task assigned this TaskManager.
      * @since 4.3.0
      */
-    bool is_busy() { return (task); }
+    bool is_busy()
+    {
+        Lock l(*this);
+        return task;
+    }
 
     /**
      * Start thread execution.
@@ -740,7 +743,13 @@ public:
     /**
      * Stop thread execution after having finished current task.
      */
-    void stop() { go = false; }
+    void stop()
+    {
+        lock();
+        go = false;
+        notify_all();
+        unlock();
+    }
 
     /**
      * Wait for the internal thread to join
@@ -751,6 +760,7 @@ public:
         lock();
         notify_all();
         unlock();
+
         thread.join();
     }
 

@@ -159,7 +159,7 @@ public:
      * @param timeout
      *    timeout in milliseconds.
      * @param
-     *    return TRUE if timeout occured, FALSE otherwise.
+     *    return true if timeout occured, false otherwise.
      */
     bool wait(unsigned long timeout);
 
@@ -176,31 +176,31 @@ public:
 
     /**
      * Enter a critical section. If this thread owned this
-     * lock already, the call succeeds too (returns TRUE), but there
+     * lock already, the call succeeds too (returns true), but there
      * will not be recursive locking. Unlocking will always free the lock.
      *
      * @return
-     *    TRUE if the attempt was successful, FALSE otherwise.
+     *    true if the attempt was successful, false otherwise.
      */
     bool lock();
 
 #if defined(_POSIX_TIMEOUTS) && _POSIX_TIMEOUTS > 0
     /**
      * Try to enter a critical section. If this thread owned this
-     * lock already, the call succeeds too (returns TRUE), but there
+     * lock already, the call succeeds too (returns true), but there
      * will not be recursive locking. Unlocking will always free the lock.
      *
      * @param timeout
-     *    timeout in milliseconds. If timeout occurred FALSE is returned.
+     *    timeout in milliseconds. If timeout occurred false is returned.
      * @return
-     *    TRUE if the attempt was successful, FALSE otherwise.
+     *    true if the attempt was successful, false otherwise.
      */
     bool lock(unsigned long timeout);
 #endif
 
     /**
      * Try to enter a critical section. If this thread owned this
-     * lock already, the call succeeds too (returns TRUE), but there
+     * lock already, the call succeeds too (returns true), but there
      * will not be recursive locking. Unlocking will always free the lock.
      *
      * @return
@@ -215,7 +215,7 @@ public:
      * more than once successfully, this call will nevertheless release
      * the lock (non-recursive locking).
      * @return
-     *    TRUE if the unlock succeeded, FALSE if there was no lock
+     *    true if the unlock succeeded, false if there was no lock
      *    to unlock.
      */
     bool unlock();
@@ -404,7 +404,7 @@ public:
      * Check whether thread is alive.
      *
      * @return
-     *    Returns TRUE if the thread is running; otherwise FALSE.
+     *    Returns true if the thread is running; otherwise false.
      */
     bool is_alive() const { return (status == RUNNING); }
 
@@ -516,7 +516,7 @@ public:
      * Check whether the ThreadPool is idle or not.
      *
      * @return
-     *    TRUE if non of the threads in the pool is currently
+     *    true if non of the threads in the pool is currently
      *    executing any task.
      */
     virtual bool is_idle();
@@ -526,7 +526,7 @@ public:
      * running a task) or not.
      *
      * @return
-     *    TRUE if all of the threads in the pool is currently
+     *    true if all of the threads in the pool is currently
      *    executing any task.
      */
     virtual bool is_busy();
@@ -629,7 +629,7 @@ public:
      * Check whether QueuedThreadPool is idle
      *
      * @return
-     *    TRUE if non of the threads in the pool are currently
+     *    true if non of the threads in the pool are currently
      *    executing a task and the queue is emtpy().
      */
     bool is_idle() BOOST_OVERRIDE;
@@ -638,7 +638,7 @@ public:
      * Check whether the ThreadPool is busy
      *
      * @return
-     *    TRUE if all of the threads in the pool are currently
+     *    true if all of the threads in the pool are currently
      *    executing a task and the queue is not empty.
      */
     bool is_busy() BOOST_OVERRIDE;
@@ -706,8 +706,8 @@ public:
      * Check whether this thread is idle or not.
      *
      * @return
-     *   TRUE if the thread managed by this TaskManager does
-     *   not currently execute any task; FALSE otherwise.
+     *   true if the thread managed by this TaskManager does
+     *   not currently execute any task; false otherwise.
      */
     bool is_idle();
 
@@ -718,8 +718,8 @@ public:
      * @param task
      *   a Runnable instance.
      * @return
-     *   TRUE if the task could be assigned successfully and
-     *   FALSE if another thread has assigned a task concurrently.
+     *   true if the task could be assigned successfully and
+     *   false if another thread has assigned a task concurrently.
      *   In the latter case, the task has not been assigned!
      */
     bool set_task(Runnable* it);
