@@ -185,7 +185,7 @@ int Synchronized::cond_timed_wait(const struct timespec& ts)
 }
 #endif
 
-bool Synchronized::wait(unsigned long timeout)
+bool Synchronized::wait(long timeout)
 {
     bool timeoutOccurred = false;
 
@@ -198,7 +198,7 @@ bool Synchronized::wait(unsigned long timeout)
 #    if defined(__APPLE__) || defined(_POSIX_TIMERS) && _POSIX_TIMERS > 0
     clock_gettime(CLOCK_REALTIME, &ts);
     ts.tv_sec += (time_t)timeout / 1000;
-    int millis = ts.tv_nsec / 1000000 + (timeout % 1000);
+    long millis = ts.tv_nsec / 1000000 + (timeout % 1000);
     if (millis >= 1000) {
         ts.tv_sec += 1;
     }
@@ -207,8 +207,8 @@ bool Synchronized::wait(unsigned long timeout)
 #        warning "gettimeofday() used"
     struct timeval tv = {};
     gettimeofday(&tv, NULL);
-    ts.tv_sec  = tv.tv_sec + (time_t)timeout / 1000;
-    int millis = tv.tv_usec / 1000 + (timeout % 1000);
+    ts.tv_sec   = tv.tv_sec + (time_t)timeout / 1000;
+    long millis = tv.tv_usec / 1000 + (timeout % 1000);
     if (millis >= 1000) {
         ts.tv_sec += 1;
     }
@@ -299,7 +299,7 @@ bool Synchronized::lock(unsigned long timeout)
 #    if defined(__APPLE__) || defined(_POSIX_TIMERS) && _POSIX_TIMERS > 0
     clock_gettime(CLOCK_REALTIME, &ts);
     ts.tv_sec += (time_t)timeout / 1000;
-    int millis = ts.tv_nsec / 1000000 + (timeout % 1000);
+    long millis = ts.tv_nsec / 1000000 + (timeout % 1000);
     if (millis >= 1000) {
         ts.tv_sec += 1;
     }
@@ -308,7 +308,7 @@ bool Synchronized::lock(unsigned long timeout)
     struct timeval tv = {};
     gettimeofday(&tv, 0);
     ts.tv_sec = tv.tv_sec + (time_t)timeout / 1000;
-    int millis = tv.tv_usec / 1000 + (timeout % 1000);
+    long millis = tv.tv_usec / 1000 + (timeout % 1000);
     if (millis >= 1000) {
         ts.tv_sec += 1;
     }
@@ -447,8 +447,8 @@ Runnable* Thread::get_runnable() { return &runnable; }
 void Thread::join()
 {
     if (status == RUNNING) {
-        void* retstat;
-        int err = pthread_join(tid, &retstat);
+        void* retstat = NULL;
+        int err       = pthread_join(tid, &retstat);
         if (err) {
             status = FINISHED;
             LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
@@ -627,7 +627,6 @@ void TaskManager::run()
         }
 
         while (go && !task) {
-            DTRACE("idle! Synchronized::wait()");
             wait(); // NOTE: until notify signal! CK
         }
     }
@@ -698,7 +697,7 @@ void ThreadPool::execute(Runnable* t)
     }
 }
 
-/// NOTE: asserted to be called with lock! CK
+/// NOTE: should to be called with lock! CK
 void ThreadPool::idle_notification() { notify(); }
 
 /// return true if NONE of the threads in the pool is currently executing any
@@ -823,14 +822,13 @@ QueuedThreadPool::~QueuedThreadPool()
     terminate();
 
     thread.join();
-    DTRACE("thread joined");
 
     EmptyQueue();
 
     ThreadPool::terminate();
 }
 
-/// NOTE: asserted to be called with lock! CK
+/// NOTE: should to be called with lock! CK
 bool QueuedThreadPool::assign(Runnable* t)
 {
     TaskManager* tm = NULL;
@@ -881,19 +879,17 @@ void QueuedThreadPool::run()
                     queue.pop(); // OK, now we pop this entry
                     break;
                 }
-                DTRACE("busy! Synchronized::wait()");
                 thread.wait(); // NOTE: until idle_notification! CK
             }
         }
 
         while (go && queue.empty()) {
-            DTRACE("idle! Synchronized::wait()");
             thread.wait(); // NOTE: until idle_notification! CK
         }
     } while (go);
 }
 
-/// NOTE: asserted to be called with lock! CK
+/// NOTE: should to be called with lock! CK
 void QueuedThreadPool::idle_notification() { thread.notify(); }
 
 bool QueuedThreadPool::is_idle()

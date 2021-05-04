@@ -32,6 +32,7 @@
 #include <cassert>
 #include <cerrno>
 
+#undef _NO_LOGGING
 #ifndef _NO_LOGGING
 #    define _NO_LOGGING 1
 #    undef LOG_BEGIN
@@ -205,8 +206,8 @@ void Synchronized::wait() { cond_timed_wait(0); }
 
 int Synchronized::cond_timed_wait(const struct timespec* ts)
 {
-    int result;
-    isLocked = false;
+    int result = 0;
+    isLocked   = false;
     if (ts) {
         result = pthread_cond_timedwait(&cond, &monitor, ts);
     } else {
@@ -216,7 +217,7 @@ int Synchronized::cond_timed_wait(const struct timespec* ts)
     return result;
 }
 
-bool Synchronized::wait(unsigned long timeout)
+bool Synchronized::wait(long timeout)
 {
     bool timeoutOccurred = false;
     struct timespec ts   = {};
@@ -224,7 +225,7 @@ bool Synchronized::wait(unsigned long timeout)
 #if defined(__APPLE__) || defined(HAVE_CLOCK_GETTIME)
     clock_gettime(CLOCK_REALTIME, &ts);
     ts.tv_sec += (time_t)timeout / 1000;
-    int millis = ts.tv_nsec / 1000000 + (timeout % 1000);
+    long millis = ts.tv_nsec / 1000000 + (timeout % 1000);
     if (millis >= 1000) {
         ts.tv_sec += 1;
     }
@@ -233,14 +234,14 @@ bool Synchronized::wait(unsigned long timeout)
     struct timeval tv = {};
     gettimeofday(&tv, NULL);
     ts.tv_sec  = tv.tv_sec + (time_t)timeout / 1000;
-    int millis = tv.tv_usec / 1000 + (timeout % 1000);
+    long millis = tv.tv_usec / 1000 + (timeout % 1000);
     if (millis >= 1000) {
         ts.tv_sec += 1;
     }
     ts.tv_nsec = (millis % 1000) * 1000000;
 #endif
 
-    int err;
+    int err  = 0;
     isLocked = false;
     if ((err = cond_timed_wait(&ts)) > 0) {
         switch (err) {
@@ -337,14 +338,14 @@ bool Synchronized::lock()
     }
 }
 
-bool Synchronized::lock(unsigned long timeout)
+bool Synchronized::lock(long timeout)
 {
     struct timespec ts = {};
 
 #if defined(__APPLE__) || defined(HAVE_CLOCK_GETTIME)
     clock_gettime(CLOCK_REALTIME, &ts);
     ts.tv_sec += (time_t)timeout / 1000;
-    int millis = ts.tv_nsec / 1000000 + (timeout % 1000);
+    long millis = ts.tv_nsec / 1000000 + (timeout % 1000);
     if (millis >= 1000) {
         ts.tv_sec += 1;
     }
@@ -352,15 +353,15 @@ bool Synchronized::lock(unsigned long timeout)
 #else
     struct timeval tv = {};
     gettimeofday(&tv, 0);
-    ts.tv_sec  = tv.tv_sec + (time_t)timeout / 1000;
-    int millis = tv.tv_usec / 1000 + (timeout % 1000);
+    ts.tv_sec   = tv.tv_sec + (time_t)timeout / 1000;
+    long millis = tv.tv_usec / 1000 + (timeout % 1000);
     if (millis >= 1000) {
         ts.tv_sec += 1;
     }
     ts.tv_nsec            = (millis % 1000) * 1000000;
 #endif
 
-    int error;
+    int error = 0;
 
 #ifdef HAVE_PTHREAD_MUTEX_TIMEDLOCK
     if ((error = pthread_mutex_timedlock(&monitor, &ts)) == 0) {
@@ -534,7 +535,7 @@ void* thread_starter(void* t)
     return t;
 }
 
-Thread::Thread(int stack_size)
+Thread::Thread(size_t stack_size)
     : status(IDLE)
     , runnable(this)
     , stackSize(stack_size)
@@ -567,8 +568,8 @@ Runnable& Thread::get_runnable() { return *runnable; }
 void Thread::join()
 {
     if (status == RUNNING) {
-        void* retstat;
-        int err = pthread_join(tid, &retstat);
+        void* retstat = NULL;
+        int err       = pthread_join(tid, &retstat);
         if (err) {
             status = FINISHED;
             LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
@@ -667,7 +668,7 @@ void Thread::nsleep(time_t secs, long nanos)
 
 /*--------------------- class TaskManager --------------------------*/
 
-TaskManager::TaskManager(ThreadPool* tp, int stackSize)
+TaskManager::TaskManager(ThreadPool* tp, size_t stackSize)
     : thread(*this)
 {
     threadPool = tp;
@@ -714,7 +715,7 @@ void TaskManager::run()
             threadPool->idle_notification();
             //==============================
             // FIXME: ThreadSanitizer: data race on vptr (ctor/dtor vs virtual
-            // call) threads.cpp:693 in Agentpp::TaskManager::run()
+            // call) threads.cpp:715 in Agentpp::TaskManager::run()
         }
 
         while (go && !task) {
@@ -834,51 +835,59 @@ void ThreadPool::join()
     joined.clear();
 }
 
-ThreadPool::ThreadPool(int size)
+ThreadPool::ThreadPool(size_t size)
     : stackSize(AGENTPP_DEFAULT_STACKSIZE)
     , oneTimeExecution(false)
 {
-    for (int i = 0; i < size; i++) {
+    for (size_t i = 0; i < size; i++) {
         taskList.add(new TaskManager(this));
     }
 }
 
-ThreadPool::ThreadPool(int size, int stack_size)
+ThreadPool::ThreadPool(size_t size, size_t stack_size)
     : stackSize(stack_size)
     , oneTimeExecution(false)
 {
     stackSize = stack_size;
-    for (int i = 0; i < size; i++) {
+    for (size_t i = 0; i < size; i++) {
         taskList.add(new TaskManager(this, stackSize));
     }
 }
 
 ThreadPool::~ThreadPool()
 {
+    // FIXME: ThreadSanitizer: data race on vptr (ctor/dtor vs virtual call) threads.cpp:858 in Agentpp::ThreadPool::~ThreadPool()
     terminate();
     join();
 }
 
 /*--------------------- class QueuedThreadPool --------------------------*/
 
-QueuedThreadPool::QueuedThreadPool(int size)
+QueuedThreadPool::QueuedThreadPool(size_t size)
     : ThreadPool(size)
+    , thread(*this)
     , go(true)
-{ }
+{
+    thread.start();
+}
 
-QueuedThreadPool::QueuedThreadPool(int size, int stack_size)
+QueuedThreadPool::QueuedThreadPool(size_t size, size_t stack_size)
     : ThreadPool(size, stack_size)
+    , thread(*this)
     , go(true)
-{ }
+{
+    thread.start();
+}
 
 QueuedThreadPool::~QueuedThreadPool()
 {
-    Thread::lock();
-    go = false;
-    Thread::notify_all();
-    Thread::unlock();
+    {
+        Lock l(thread);
+        go = false;
+        thread.notify_all();
+    }
 
-    Thread::join();
+    thread.join();
 }
 
 /// TODO: asserted to be called with lock! CK
@@ -892,12 +901,9 @@ void QueuedThreadPool::assign(Runnable* t)
             LOG_BEGIN(loggerModuleName, DEBUG_LOG | 1);
             LOG("TaskManager: task manager found");
             LOG_END;
-            // NO! Thread::unlock();
             if (!tm->set_task(t)) {
                 tm = NULL; // still busy!
-                // NO! Thread::lock();
             } else {
-                // NO! Thread::lock();
                 break;
             }
         }
@@ -906,13 +912,13 @@ void QueuedThreadPool::assign(Runnable* t)
 
     if (!tm) {
         queue.add(t);
-        Thread::notify();
+        thread.notify();
     }
 }
 
 void QueuedThreadPool::execute(Runnable* t)
 {
-    Thread::lock();
+    Lock l(thread);
 
     if (queue.empty()) {
         assign(t);
@@ -920,43 +926,38 @@ void QueuedThreadPool::execute(Runnable* t)
         queue.add(t);
     }
 
-    Thread::unlock();
+    thread.notify();
 }
 
 void QueuedThreadPool::run()
 {
-    Thread::lock();
+    Lock l(thread);
 
     while (go) {
         Runnable* t = queue.removeFirst();
         if (t) {
             assign(t);
         }
-        Thread::wait(1000);
+        thread.wait(1000);
     }
-
-    Thread::unlock();
 }
 
 unsigned int QueuedThreadPool::queue_length()
 {
-    Thread::lock();
-    int length = queue.size();
-    Thread::unlock();
-
-    return length;
+    Lock l(thread);
+    return queue.size();
 }
 
-/// TODO: asserted to be called with lock! CK
-void QueuedThreadPool::idle_notification()
-{
-    Thread::notify();
-    // TODO: check if needed? CK ThreadPool::idle_notification();
-}
+/// TODO: should to be called with lock! CK
+void QueuedThreadPool::idle_notification() { thread.notify(); }
+
+/*--------------------- class MibTask --------------------------*/
 
 void MibTask::run() { (task->called_class->*task->method)(task->req); }
 
 #ifdef NO_FAST_MUTEXES
+
+/*--------------------- class LockRequest --------------------------*/
 
 LockRequest::LockRequest(Synchronized* s)
 {
@@ -1020,8 +1021,8 @@ void LockQueue::run()
             LockRequest* r = pendingLock.removeFirst();
             // Only if target is not locked at all - also not by
             // this lock queue - then inform requester:
-            Synchronized::TryLockResult tryLockResult;
-            if ((tryLockResult = r->target->trylock()) == LOCKED) {
+            Synchronized::TryLockResult tryLockResult = r->target->trylock();
+            if (tryLockResult == LOCKED) {
                 LOG_BEGIN(loggerModuleName, DEBUG_LOG | 8);
                 LOG("LockQueue: lock (ptr)(pending)");
                 LOG((long)r->target);

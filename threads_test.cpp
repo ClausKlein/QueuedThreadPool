@@ -349,7 +349,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
         queuedThreadPool.execute(
             new TestTask("3 Under full load!", result, 30));
 
-        std::srand(static_cast<unsigned>(std::time(0)));
+        std::srand(static_cast<unsigned>(std::time(0))); // NOLINT
         unsigned i = 4;
         do {
             unsigned delay = rand() % 100; // NOLINT
@@ -376,7 +376,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
 
     BOOST_TEST_MESSAGE("NOTE: checking the order of execution");
     for (size_t i = 1; i < 10; i++) {
-        size_t value;
+        size_t value = 0;
         if (result.pop(value)) {
             if (i >= 4) {
                 std::string msg(
@@ -676,7 +676,7 @@ BOOST_AUTO_TEST_CASE(SyncDeleteLocked_test)
         BOOST_TEST(sync->lock());
 
 #ifndef __WIN32
-        sync->wait(4321); // for signal with timout
+        sync->wait(1234); // for signal with timout
 #endif
 
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
@@ -722,7 +722,7 @@ public:
         : sync()
         , doit(do_throw) {};
 
-    ~BadTask() final
+    ~BadTask() override
     {
         stopped = true;
         sync.notify_all();
@@ -1106,7 +1106,7 @@ int main(int argc, char* argv[])
 {
     // prototype for user's unit test init function
     extern ::boost::unit_test::test_suite* init_unit_test_suite(
-        int argc, char* argv[]);
+        int argc, char* argv[]); // NOLINT
     int loops                                       = 1;
     int error                                       = 0;
     boost::unit_test::init_unit_test_func init_func = &init_unit_test_suite;
@@ -1127,7 +1127,7 @@ int main(int argc, char* argv[])
 
     do {
         StopwatchReporter sw;
-        srand(time(NULL));
+        std::srand(time(NULL)); // NOLINT
 
         error = ::boost::unit_test::unit_test_main(init_func, argc, argv);
 

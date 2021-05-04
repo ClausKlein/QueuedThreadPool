@@ -82,7 +82,7 @@ pthread_mutexattr_t attr;
 
 static volatile long counter = 0;
 static time_t end_time       = 0;
-static int recursive         = 0; /* Whether to use use the mutex recursive */
+static long recursive        = 0; /* Whether to use use the mutex recursive */
 
 /*
  * Thread start routine that repeatedly locks a mutex and
@@ -90,8 +90,8 @@ static int recursive         = 0; /* Whether to use use the mutex recursive */
  */
 void* counter_thread(void* arg)
 {
-    int status;
-    int spin;
+    int status = 0;
+    int spin   = 0;
 
     /*
      * Until end_time, increment the counter each
@@ -153,7 +153,7 @@ void* counter_thread(void* arg)
  */
 void* monitor_thread(void* arg)
 {
-    int status;
+    int status = 0;
     int misses = 0;
 
     /*
@@ -182,9 +182,9 @@ void* monitor_thread(void* arg)
 
 int main(int argc, char* argv[])
 {
-    int status;
-    pthread_t counter_thread_id;
-    pthread_t monitor_thread_id;
+    int status                  = 0;
+    pthread_t counter_thread_id = NULL;
+    pthread_t monitor_thread_id = NULL;
 
     /*
      * If the first argument is absent, or zero, the program try

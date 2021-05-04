@@ -161,7 +161,7 @@ public:
      * @param
      *    return true if timeout occured, false otherwise.
      */
-    bool wait(unsigned long timeout);
+    bool wait(long timeout);
 
     /**
      * Wakes up a single thread that is waiting on this
@@ -317,7 +317,6 @@ class AGENTPP_DECL Thread : public Synchronized, public Runnable {
 
     enum ThreadStatus { IDLE, RUNNING, FINISHED };
 
-    friend class Synchronized;
     friend void* thread_starter(void* t);
 
 public:
@@ -548,7 +547,7 @@ public:
     size_t stack_size() const { return stackSize; }
 
     /**
-     * Notifies the thread pool about an idle thread (synchronized).
+     * Notifies the thread pool about an idle thread
      */
     virtual void idle_notification();
 
@@ -650,12 +649,12 @@ public:
      */
     void terminate() BOOST_OVERRIDE;
 
+private:
     /**
      * Notifies the thread pool about an idle thread.
      */
     void idle_notification() BOOST_OVERRIDE;
 
-private:
     /**
      * Runs the queue processing loop.
      */

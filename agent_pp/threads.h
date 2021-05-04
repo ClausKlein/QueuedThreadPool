@@ -41,6 +41,7 @@
 // #define MULTI_THREADED true
 // #define SINGLE_THREADED false
 #define AGENTPP_DEFAULT_STACKSIZE 0x10000
+#define AGENTPP_USE_IMPLIZIT_START
 
 namespace Agentpp
 {
@@ -151,7 +152,7 @@ public:
      * @param
      *    return true if timeout occurred, false otherwise.
      */
-    bool wait(unsigned long timeout);
+    bool wait(long timeout);
 
     /**
      * Wakes up a single thread that is waiting on this
@@ -184,7 +185,7 @@ public:
      * @return
      *    true if the attempt was successful, false otherwise.
      */
-    bool lock(unsigned long timeout);
+    bool lock(long timeout);
 
     /**
      * Try to enter a critical section. If this thread owned this
@@ -303,14 +304,13 @@ class AGENTPP_DECL Thread : public Synchronized, public Runnable {
 
     enum ThreadStatus { IDLE, RUNNING, FINISHED };
 
-    friend class Synchronized;
     friend void* thread_starter(void*);
 
 public:
     /**
      * Create a new thread.
      */
-    explicit Thread(int stackSize = AGENTPP_DEFAULT_STACKSIZE);
+    explicit Thread(size_t stackSize = AGENTPP_DEFAULT_STACKSIZE);
 
     /**
      * Create a new thread which will execute the given Runnable.
@@ -384,7 +384,7 @@ public:
      * @param stackSize
      *    the thread's stack size in bytes.
      */
-    void set_stack_size(long s) { stackSize = s; }
+    void set_stack_size(size_t s) { stackSize = s; }
 
     /**
      * Check whether thread is alive.
@@ -403,7 +403,7 @@ public:
 private:
     ThreadStatus status;
     Runnable* runnable;
-    long stackSize;
+    size_t stackSize;
     pthread_t tid;
     static ThreadList threadList;
     static void nsleep(time_t secs, long nanos);
@@ -469,7 +469,7 @@ class AGENTPP_DECL ThreadPool : public Synchronized {
 
 protected:
     Array<TaskManager> taskList;
-    int stackSize;
+    size_t stackSize;
     bool oneTimeExecution;
 
 public:
@@ -480,7 +480,7 @@ public:
      *    the number of threads started for performing tasks.
      *    The default value is 4 threads.
      */
-    explicit ThreadPool(int size = 4);
+    explicit ThreadPool(size_t size = 4);
 
     /**
      * Create a ThreadPool with a given number of threads and
@@ -492,7 +492,7 @@ public:
      * @param stackSize
      *    the stack size for each thread.
      */
-    ThreadPool(int size, int stackSize);
+    ThreadPool(size_t size, size_t stackSize);
 
     /**
      * Destructor will wait for termination of all threads.
@@ -537,10 +537,10 @@ public:
      * @return
      *   the stack size of each thread in this thread pool.
      */
-    int stack_size() const { return stackSize; }
+    size_t stack_size() const { return stackSize; }
 
     /**
-     * Notifies the thread pool about an idle thread (synchronized).
+     * Notifies the thread pool about an idle thread.
      */
     virtual void idle_notification() { notify(); }
 
@@ -603,9 +603,9 @@ AGENTPP_DECL_TEMPL template class AGENTPP_DECL List<Runnable>;
  * @author Frank Fock
  * @version 3.5.18
  */
-class AGENTPP_DECL QueuedThreadPool : public ThreadPool, public Thread {
-
+class AGENTPP_DECL QueuedThreadPool : public ThreadPool, public Runnable {
     List<Runnable> queue;
+    Thread thread;
     bool go;
 
 public:
@@ -616,7 +616,7 @@ public:
      *    the number of threads started for performing tasks.
      *    The default value is 4 threads.
      */
-    explicit QueuedThreadPool(int size = 4);
+    explicit QueuedThreadPool(size_t size = 4);
 
     /**
      * Create a ThreadPool with a given number of threads and
@@ -628,7 +628,7 @@ public:
      * @param stackSize
      *    the stack size for each thread.
      */
-    QueuedThreadPool(int size, int stackSize);
+    QueuedThreadPool(size_t size, size_t stackSize);
 
     /**
      * Destructor will wait for termination of all threads.
@@ -707,7 +707,7 @@ public:
      *    the stack size for the managed thread.
      */
     explicit TaskManager(
-        ThreadPool*, int stackSize = AGENTPP_DEFAULT_STACKSIZE);
+        ThreadPool*, size_t stackSize = AGENTPP_DEFAULT_STACKSIZE);
 
     /**
      * Destructor will wait for thread to terminate.
