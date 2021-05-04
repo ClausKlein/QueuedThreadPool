@@ -25,20 +25,22 @@
 
 #include "agent_pp/threads.h"
 
-//FIXME #include <libagent.h>
+#include <agent_pp/mib.h>
+#include <agent_pp/mib_entry.h>
+// NO! #include <snmp_pp/log.h>
+
 #include <cassert>
 #include <cerrno>
 
-#include <agent_pp/mib.h>
-#include <agent_pp/mib_entry.h>
-
-//FIXME #include <snmp_pp/log.h>
-#undef LOG_BEGIN
-#define LOG_BEGIN(x, y)
-#undef LOG
-#define LOG(x)
-#undef LOG_END
-#define LOG_END
+#ifndef _NO_LOGGING
+#    define _NO_LOGGING 1
+#    undef LOG_BEGIN
+#    define LOG_BEGIN(x, y)
+#    undef LOG
+#    define LOG(x)
+#    undef LOG_END
+#    define LOG_END
+#endif
 
 namespace Agentpp
 {
@@ -160,9 +162,7 @@ Synchronized::Synchronized()
 
 Synchronized::~Synchronized()
 {
-    int result;
-
-    result = pthread_cond_destroy(&cond);
+    int result = pthread_cond_destroy(&cond);
     if (result) {
         LOG_BEGIN(loggerModuleName, ERROR_LOG | 2);
         LOG("Synchronized cond_destroy failed with (result)(ptr)");
@@ -172,23 +172,17 @@ Synchronized::~Synchronized()
     }
     result = pthread_mutex_destroy(&monitor);
 
-#if 1 // XXX defined(NO_FAST_MUTEXES)
+#if defined(NO_FAST_MUTEXES)
     if (result == EBUSY) {
         // wait for other threads ...
         if (EBUSY == pthread_mutex_trylock(&monitor)) {
             // another thread owns the mutex,
-
-#if defined(_POSIX_TIMEOUTS) && _POSIX_TIMEOUTS > 0
-            if (lock(1234)) // NOTE: let's wait, but not forever! CK
-#else
-            result = pthread_mutex_lock(&monitor); // FIXME: forever? CK
-            if (!result)
-#endif
-
+            if (lock(123)) // NOTE: let's wait, but not forever! CK
             {
                 int retries = 0;
                 do {
                     pthread_mutex_unlock(&monitor);
+                    sleep(13);
                     result = pthread_mutex_destroy(&monitor);
                 } while (EBUSY == result
                     && (retries++ < AGENTPP_SYNCHRONIZED_UNLOCK_RETRIES));
@@ -273,8 +267,7 @@ bool Synchronized::wait(unsigned long timeout)
 
 void Synchronized::notify()
 {
-    int result;
-    result = pthread_cond_signal(&cond);
+    int result = pthread_cond_signal(&cond);
     if (result) {
         LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
         LOG("Synchronized: notify failed (result)");
@@ -285,8 +278,7 @@ void Synchronized::notify()
 
 void Synchronized::notify_all()
 {
-    int result;
-    result = pthread_cond_broadcast(&cond);
+    int result = pthread_cond_broadcast(&cond);
     if (result) {
         LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
         LOG("Synchronized: notify_all failed (result)");

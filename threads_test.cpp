@@ -676,7 +676,7 @@ BOOST_AUTO_TEST_CASE(SyncDeleteLocked_test)
         BOOST_TEST(sync->lock());
 
 #ifndef __WIN32
-        sync->wait(123); // for signal with timout
+        sync->wait(4321); // for signal with timout
 #endif
 
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
@@ -1050,7 +1050,7 @@ BOOST_AUTO_TEST_CASE(test_lock_ten_other_thread_locks_in_different_order)
     t.join();
 }
 
-BOOST_AUTO_TEST_CASE(SyncTry_lock_for_test)
+BOOST_AUTO_TEST_CASE(SyncWait_for_lock_test)
 {
     unsigned const num_mutexes = 2;
 
@@ -1078,7 +1078,7 @@ BOOST_AUTO_TEST_CASE(SyncTry_lock_for_test)
     }
 }
 
-BOOST_AUTO_TEST_CASE(SyncDelete_while_used_test)
+BOOST_AUTO_TEST_CASE(SyncDeleteWhileUsed_test)
 {
     unsigned const num_mutexes = 1;
 

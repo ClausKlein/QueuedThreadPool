@@ -27,7 +27,12 @@
 #define agent_pp_threads_h_
 
 #include <agent_pp/List.h>
-#include <agent_pp/agentpp.h>
+
+#if defined(AGENTPP_VERSION) && AGENTPP_VERSION >= 4
+#    include <agent_pp/agent++.h>
+#else
+#    include <agent_pp/agentpp.h>
+#endif
 
 #include <ctime>
 #include <pthread.h>
