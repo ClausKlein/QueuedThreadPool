@@ -27,15 +27,21 @@
 #define agent_pp_threads_h_
 
 #include <agent_pp/List.h>
-#include <agent_pp/agent++.h>
+
+#if defined(AGENTPP_VERSION) && AGENTPP_VERSION >= 4
+#    include <agent_pp/agent++.h>
+#else
+#    include <agent_pp/agentpp.h>
+#endif
 
 #include <ctime>
 #include <pthread.h>
 #include <sys/types.h>
 
-#define MULTI_THREADED true
-#define SINGLE_THREADED false
+// #define MULTI_THREADED true
+// #define SINGLE_THREADED false
 #define AGENTPP_DEFAULT_STACKSIZE 0x10000
+#define AGENTPP_USE_IMPLIZIT_START
 
 namespace Agentpp
 {
@@ -146,7 +152,7 @@ public:
      * @param
      *    return true if timeout occurred, false otherwise.
      */
-    bool wait(unsigned long timeout);
+    bool wait(long timeout);
 
     /**
      * Wakes up a single thread that is waiting on this
@@ -179,7 +185,7 @@ public:
      * @return
      *    true if the attempt was successful, false otherwise.
      */
-    bool lock(unsigned long timeout);
+    bool lock(long timeout);
 
     /**
      * Try to enter a critical section. If this thread owned this
@@ -298,14 +304,13 @@ class AGENTPP_DECL Thread : public Synchronized, public Runnable {
 
     enum ThreadStatus { IDLE, RUNNING, FINISHED };
 
-    friend class Synchronized;
     friend void* thread_starter(void*);
 
 public:
     /**
      * Create a new thread.
      */
-    Thread();
+    explicit Thread(size_t stackSize = AGENTPP_DEFAULT_STACKSIZE);
 
     /**
      * Create a new thread which will execute the given Runnable.
@@ -340,7 +345,7 @@ public:
      * @param nanos
      *    0-999999 additional nanoseconds to sleep.
      */
-    static void sleep(long millis, int nanos);
+    static void sleep(long millis, long nanos);
 
     /**
      * If this thread was constructed using a separate Runnable
@@ -379,7 +384,7 @@ public:
      * @param stackSize
      *    the thread's stack size in bytes.
      */
-    void set_stack_size(long s) { stackSize = s; }
+    void set_stack_size(size_t s) { stackSize = s; }
 
     /**
      * Check whether thread is alive.
@@ -387,7 +392,7 @@ public:
      * @return
      *    Returns true if the thread is running; otherwise false.
      */
-    bool is_alive() { return (status == RUNNING); }
+    bool is_alive() const { return (status == RUNNING); }
 
     /**
      * Clone this thread. This method must not be called on
@@ -396,12 +401,12 @@ public:
     Thread* clone() { return new Thread(get_runnable()); }
 
 private:
-    Runnable* runnable;
     ThreadStatus status;
-    long stackSize;
+    Runnable* runnable;
+    size_t stackSize;
     pthread_t tid;
     static ThreadList threadList;
-    static void nsleep(int secs, long nanos);
+    static void nsleep(time_t secs, long nanos);
 };
 
 /**
@@ -423,26 +428,26 @@ public:
 
     void add(Thread* t)
     {
-        lock();
+        Lock l(*this);
         list.add(t);
-        unlock();
     }
     void remove(Thread* t)
     {
-        lock();
+        Lock l(*this);
         list.remove(t);
-        unlock();
     }
-    int size() const { return list.size(); }
+    int size()
+    {
+        Lock l(*this);
+        return list.size();
+    }
     Thread* last()
     {
-        lock();
-        Thread* t = list.last();
-        unlock();
-        return t;
+        Lock l(*this);
+        return list.last();
     }
 
-protected:
+private:
     Array<Thread> list;
 };
 
@@ -464,7 +469,7 @@ class AGENTPP_DECL ThreadPool : public Synchronized {
 
 protected:
     Array<TaskManager> taskList;
-    int stackSize;
+    size_t stackSize;
     bool oneTimeExecution;
 
 public:
@@ -475,7 +480,7 @@ public:
      *    the number of threads started for performing tasks.
      *    The default value is 4 threads.
      */
-    explicit ThreadPool(int size = 4);
+    explicit ThreadPool(size_t size = 4);
 
     /**
      * Create a ThreadPool with a given number of threads and
@@ -487,7 +492,7 @@ public:
      * @param stackSize
      *    the stack size for each thread.
      */
-    ThreadPool(int size, int stackSize);
+    ThreadPool(size_t size, size_t stackSize);
 
     /**
      * Destructor will wait for termination of all threads.
@@ -532,17 +537,12 @@ public:
      * @return
      *   the stack size of each thread in this thread pool.
      */
-    int stack_size() const { return stackSize; }
+    size_t stack_size() const { return stackSize; }
 
     /**
-     * Notifies the thread pool about an idle thread (synchronized).
+     * Notifies the thread pool about an idle thread.
      */
-    virtual void idle_notification()
-    {
-        lock();
-        notify();
-        unlock();
-    }
+    virtual void idle_notification();
 
     /**
      * Gracefully stops all running task managers after their current
@@ -603,9 +603,9 @@ AGENTPP_DECL_TEMPL template class AGENTPP_DECL List<Runnable>;
  * @author Frank Fock
  * @version 3.5.18
  */
-class AGENTPP_DECL QueuedThreadPool : public ThreadPool, public Thread {
-
+class AGENTPP_DECL QueuedThreadPool : public ThreadPool, public Runnable {
     List<Runnable> queue;
+    Thread thread;
     bool go;
 
 public:
@@ -616,7 +616,7 @@ public:
      *    the number of threads started for performing tasks.
      *    The default value is 4 threads.
      */
-    explicit QueuedThreadPool(int size = 4);
+    explicit QueuedThreadPool(size_t size = 4);
 
     /**
      * Create a ThreadPool with a given number of threads and
@@ -628,7 +628,7 @@ public:
      * @param stackSize
      *    the stack size for each thread.
      */
-    QueuedThreadPool(int size, int stackSize);
+    QueuedThreadPool(size_t size, size_t stackSize);
 
     /**
      * Destructor will wait for termination of all threads.
@@ -707,7 +707,7 @@ public:
      *    the stack size for the managed thread.
      */
     explicit TaskManager(
-        ThreadPool*, int stackSize = AGENTPP_DEFAULT_STACKSIZE);
+        ThreadPool*, size_t stackSize = AGENTPP_DEFAULT_STACKSIZE);
 
     /**
      * Destructor will wait for thread to terminate.
@@ -722,7 +722,11 @@ public:
      *   not currently execute any task and the associated thread is running;
      *   false otherwise.
      */
-    bool is_idle() { return (!task) && thread.is_alive(); }
+    bool is_idle()
+    {
+        Lock l(*this);
+        return !task && thread.is_alive();
+    }
 
     /**
      * Check whether a task is being executed by this TaskManager.
@@ -730,7 +734,11 @@ public:
      *    true if there is a task assigned this TaskManager.
      * @since 4.3.0
      */
-    bool is_busy() { return (task); }
+    bool is_busy()
+    {
+        Lock l(*this);
+        return task;
+    }
 
     /**
      * Start thread execution.
@@ -740,7 +748,13 @@ public:
     /**
      * Stop thread execution after having finished current task.
      */
-    void stop() { go = false; }
+    void stop()
+    {
+        lock();
+        go = false;
+        notify_all();
+        unlock();
+    }
 
     /**
      * Wait for the internal thread to join
@@ -751,6 +765,7 @@ public:
         lock();
         notify_all();
         unlock();
+
         thread.join();
     }
 

@@ -239,18 +239,19 @@ if(USE_BOOST OR BUILD_TESTING)
   # ----------------------------------------------------------------------
   # TODO add_executable(threads_test threads_test.cpp threadpool.cpp threadpool.hpp)
   # ----------------------------------------------------------------------
-  option(USE_AGENT_PP "Test the agent++ lib too" OFF)
-  if(USE_AGENT_PP AND NOT ${CMAKE_BUILD_TYPE} STREQUAL Coverage)
+  option(USE_AGENT_PP "Test the agent++ lib too" ON)
+  if(USE_AGENT_PP)
     find_library(LIB_AGENT_PP agent++_static)
+    #XXX find_library(LIB_AGENT_PP agent_pp REQUIRED)
     if(NOT ${LIB_AGENT_PP} STREQUAL LIB_AGENT_PP-NOTFOUND)
       message(STATUS "LIB_AGENT_PP: ${LIB_AGENT_PP}")
-      # MAYBE: find_library(LIB_SNMP_PP snmp++_static)
+      #XXX find_library(LIB_SNMP_PP snmp_pp)
       add_executable(threads_test threads_test.cpp threads.cpp agent_pp/threads.h)
       target_compile_definitions(threads_test PRIVATE USE_AGENTPP)
       set_target_properties(threads_test PROPERTIES CXX_STANDARD 17)
       target_link_libraries(
         threads_test Boost::unit_test_framework Boost::chrono Boost::thread
-        ${LIB_AGENT_PP} # MAYBE: ${LIB_SNMP_PP}
+        ${LIB_AGENT_PP} #XXX ${LIB_SNMP_PP} des
       )
       add_test(NAME threads_test COMMAND threads_test --log_level=warning)
       if(USE_ThreadSanitizer)
