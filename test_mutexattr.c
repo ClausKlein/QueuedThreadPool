@@ -183,8 +183,8 @@ void* monitor_thread(void* arg)
 int main(int argc, char* argv[])
 {
     int status                  = 0;
-    pthread_t counter_thread_id = NULL;
-    pthread_t monitor_thread_id = NULL;
+    pthread_t counter_thread_id = 0;
+    pthread_t monitor_thread_id = 0;
 
     /*
      * If the first argument is absent, or zero, the program try

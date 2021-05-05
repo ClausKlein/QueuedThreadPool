@@ -688,8 +688,7 @@ private:
 
 public:
     explicit BadTask(bool do_throw)
-        : sync()
-        , doit(do_throw) {};
+        : doit(do_throw) {};
 
     ~BadTask() override
     {
@@ -1073,9 +1072,9 @@ BOOST_AUTO_TEST_CASE(SyncDeleteWhileUsed_test)
 #ifndef _WIN32
 int main(int argc, char* argv[])
 {
-    // prototype for user's unit test init function
-    extern ::boost::unit_test::test_suite* init_unit_test_suite(
-        int argc, char* argv[]); // NOLINT
+    // NOTE: prototype for user's unit test init function CK
+    // NOLINT extern ::boost::unit_test::test_suite* init_unit_test_suite(int
+    // argc, char* argv[]);
     int loops                                       = 1;
     int error                                       = 0;
     boost::unit_test::init_unit_test_func init_func = &init_unit_test_suite;
