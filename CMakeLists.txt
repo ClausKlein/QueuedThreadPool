@@ -40,7 +40,7 @@ if(NOT CMAKE_BUILD_TYPE)
       Debug
       CACHE
         STRING
-        "supported values are: None Debug Release RelWithDebInfo MinSizeRel Lcov."
+        "supported values are: None Debug Release RelWithDebInfo MinSizeRel Coverage."
   )
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
@@ -96,10 +96,9 @@ endif()
 set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
 
-option(BUILD_TESTING "build other tests too" ON)
 
 # ----------------------------------------------------------------------
-option(USE_ASIO "use the standalon asio lib too" ON)
+option(USE_ASIO "Test the standalon asio lib too" OFF)
 set(ASIO_ROOT
     $ENV{ASIO_ROOT}
     CACHE PATH "path to install dir"
@@ -118,8 +117,6 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   add_compile_options(-Wno-unused-parameter -Wno-tautological-compare)
 endif()
 
-option(USE_ThreadSanitizer "Compile with tool that detects data races" OFF)
-
 option(DISABLE_LOGGING "if you do not want any logging output " ON)
 if(DISABLE_LOGGING)
   set(WITH_LOGGING
@@ -130,7 +127,7 @@ if(DISABLE_LOGGING)
 else()
   set(WITH_LOGGING
       ON
-      CACHE BOOL "Use logging" FORCE
+      CACHE BOOL "Enable logging" FORCE
   )
   add_definitions(-DDEFAULT_LOG_PROFILE -DDEBUG)
 endif()
@@ -156,9 +153,11 @@ endif()
 
 find_package(Threads REQUIRED)
 
+option(BUILD_TESTING "build other tests too" ON)
 if(USE_BOOST OR BUILD_TESTING)
   enable_testing()
 
+  option(USE_ThreadSanitizer "Compile with tool that detects data races" OFF)
   if(BUILD_TESTING AND NOT USE_ThreadSanitizer)
     # additional single file examples from boost/thread and boost/asio
     set(NOINST_PROGRAMS
@@ -182,8 +181,13 @@ if(USE_BOOST OR BUILD_TESTING)
         # #SW test_shared_mutex.cpp
         ###NO! daytime_client
         ###NO! make_future
-        default_executor serial_executor strict_lock synchronized_person
-        thread_tss_test volatile
+        default_executor
+        serial_executor
+        strict_lock
+        synchronized_person
+        thread_tss_test
+        volatile
+        test_wait_for
     )
 
     foreach(program ${NOINST_PROGRAMS})
@@ -207,20 +211,24 @@ if(USE_BOOST OR BUILD_TESTING)
     endif()
   endif()
 
+  # ----------------------------------------------------------------------
   # additional tests from me (CK)
+  # ----------------------------------------------------------------------
   add_executable(test_mutexattr test_mutexattr.c)
   set_target_properties(test_mutexattr PROPERTIES CXX_STANDARD 99)
   target_link_libraries(test_mutexattr Threads::Threads)
   if(USE_ThreadSanitizer)
     target_compile_options(test_mutexattr PRIVATE -fsanitize=thread -O1)
     target_link_options(test_mutexattr PRIVATE -fsanitize=thread -O1)
+  else()
+    add_test(NAME test_mutexattr-errorcheck COMMAND test_mutexattr 1)
   endif()
   add_test(NAME test_mutexattr COMMAND test_mutexattr)
   add_test(NAME test_mutexattr-recursive COMMAND test_mutexattr -1)
-  add_test(NAME test_mutexattr-errorcheck COMMAND test_mutexattr 1)
 
+  # ----------------------------------------------------------------------
   add_executable(test_trylock trylock_test.cpp)
-  set_target_properties(test_trylock PROPERTIES CXX_STANDARD 17)
+  set_target_properties(test_trylock PROPERTIES CXX_STANDARD 98)
   target_link_libraries(test_trylock Boost::chrono Boost::thread)
   if(USE_ThreadSanitizer)
     target_compile_options(test_trylock PRIVATE -fsanitize=thread -O1)
@@ -228,24 +236,45 @@ if(USE_BOOST OR BUILD_TESTING)
   endif()
   add_test(NAME test_trylock COMMAND test_trylock)
 
-  # add_executable(threads_test threads_test.cpp threadpool.cpp threadpool.hpp)
-  # set_target_properties(threads_test PROPERTIES CXX_STANDARD 17)
-  # target_link_libraries(
-  #   threads_test Boost::unit_test_framework Boost::chrono Boost::thread
-  # )
-  # add_test(NAME threads_test COMMAND threads_test --log_level=success)
-  # add_test(NAME threads_test-random COMMAND threads_test --log_level=success
-  #                                           --random
-  # )
-  # add_test(NAME threads_test-thread COMMAND threads_test --log_level=success
-  #                                           --run_test=ThreadPool_test -25
-  # )
-  # add_test(NAME threads_test-queue
-  #          COMMAND threads_test --log_level=success
-  #                  --run_test=QueuedThreadPoolLoad_test -25
-  # )
+  # ----------------------------------------------------------------------
+  # TODO add_executable(threads_test threads_test.cpp threadpool.cpp threadpool.hpp)
+  # ----------------------------------------------------------------------
+  option(USE_AGENT_PP "Test the agent++ lib too" ON)
+  if(USE_AGENT_PP)
+    find_library(LIB_AGENT_PP agent++_static)
+    #XXX find_library(LIB_AGENT_PP agent_pp REQUIRED)
+    if(NOT ${LIB_AGENT_PP} STREQUAL LIB_AGENT_PP-NOTFOUND)
+      message(STATUS "LIB_AGENT_PP: ${LIB_AGENT_PP}")
+      #XXX find_library(LIB_SNMP_PP snmp_pp)
+      add_executable(threads_test threads_test.cpp threads.cpp agent_pp/threads.h)
+      target_compile_definitions(threads_test PRIVATE USE_AGENTPP)
+      set_target_properties(threads_test PROPERTIES CXX_STANDARD 17)
+      target_link_libraries(
+        threads_test Boost::unit_test_framework Boost::chrono Boost::thread
+        ${LIB_AGENT_PP} #XXX ${LIB_SNMP_PP} des
+      )
+      add_test(NAME threads_test COMMAND threads_test --log_level=warning)
+      if(USE_ThreadSanitizer)
+        target_compile_options(threads_test PRIVATE -fsanitize=thread -O1)
+        target_link_options(threads_test PRIVATE -fsanitize=thread -O1)
+      else()
+        add_test(NAME threads_test-random COMMAND threads_test
+                                                  --log_level=warning --random
+        )
+        add_test(NAME threads_test-thread
+                 COMMAND threads_test --log_level=warning
+                         --run_test=ThreadPool_test -25
+        )
+        add_test(NAME threads_test-queue
+                 COMMAND threads_test --log_level=warning
+                         --run_test=QueuedThreadPoolLoad_test -25
+        )
+      endif()
+    endif()
+  endif()
+  # ----------------------------------------------------------------------
 
-  add_library(threadpool possix/threadpool.cpp possix/threadpool.hpp)
+  add_library(threadpool posix/threadpool.cpp posix/threadpool.hpp)
   set_target_properties(threadpool PROPERTIES CXX_STANDARD 98)
   if(NOT DISABLE_LOGGING)
     target_compile_definitions(threadpool PRIVATE TRACE_VERBOSE)
@@ -257,29 +286,30 @@ if(USE_BOOST OR BUILD_TESTING)
     target_link_options(threadpool PUBLIC -fsanitize=thread -O1)
   endif()
 
-  add_executable(threads_test_possix threads_test.cpp)
-  set_target_properties(threads_test_possix PROPERTIES CXX_STANDARD 17)
+  # ----------------------------------------------------------------------
+  add_executable(threads_test_posix threads_test.cpp)
+  set_target_properties(threads_test_posix PROPERTIES CXX_STANDARD 17)
   target_link_libraries(
-    threads_test_possix threadpool Boost::unit_test_framework
+    threads_test_posix threadpool Boost::unit_test_framework
   )
-  target_compile_definitions(threads_test_possix PRIVATE USE_AGENTPP_CK)
-  add_test(NAME threads_test_possix COMMAND threads_test_possix
+  target_compile_definitions(threads_test_posix PRIVATE USE_AGENTPP_CK)
+  add_test(NAME threads_test_posix COMMAND threads_test_posix
                                             --log_level=success
   )
-  add_test(NAME threads_test_possix-throw
-           COMMAND threads_test_possix --log_level=success
+  add_test(NAME threads_test_posix-throw
+           COMMAND threads_test_posix --log_level=success
                    --run_test=ThreadTaskThrow_test -25
   )
-  if(NOT USE_ThreadSanitizer AND NOT CMAKE_BUILD_TYPE STREQUAL Lcov)
-    add_test(NAME threads_test_possix-random
-             COMMAND threads_test_possix --log_level=success --random
+  if(NOT USE_ThreadSanitizer AND NOT ${CMAKE_BUILD_TYPE} STREQUAL Coverage)
+    add_test(NAME threads_test_posix-random
+             COMMAND threads_test_posix --log_level=success --random
     )
-    add_test(NAME threads_test_possix-thread
-             COMMAND threads_test_possix --log_level=success
+    add_test(NAME threads_test_posix-thread
+             COMMAND threads_test_posix --log_level=success
                      --run_test=ThreadPool_test -25
     )
-    add_test(NAME threads_test_possix-queue
-             COMMAND threads_test_possix --log_level=success
+    add_test(NAME threads_test_posix-queue
+             COMMAND threads_test_posix --log_level=success
                      --run_test=QueuedThreadPoolLoad_test -25
     )
   endif()

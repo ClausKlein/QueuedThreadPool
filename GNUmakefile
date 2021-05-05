@@ -20,24 +20,25 @@ PROJECT_NAME:=$(shell basename $(CURDIR))
 checkAllHeader?='$(CURDIR)/.*'
 
 # NOTE: there are many errors with boost::test, doctest, catch test framework! CK
-CHECKS:='-*,misc-*,-misc-unused-*,-misc-no-recursion,modernize-use-override,performance-*,portability-*,-readability-*'
-CHECKS?='-cppcoreguidelines-avoid-c-arrays,-modernize-avoid-c-arrays'
-CHECKS?='-*,cppcoreguidelines-*,-cppcoreguidelines-pro-*,-cppcoreguidelines-avoid-c-arrays'
+# CHECKS:='-*,cert-*,-cert-err58-cpp,hicpp-*,-hicpp-use-*,-hicpp-special-*,-hicpp-no-array-decay,-hicpp-vararg,misc-*,-misc-unused-*,-misc-no-recursion,modernize-use-override,performance-*,portability-*,-readability-*,-readability-implicit-*,-readability-magic-* '
+# CHECKS?='-cppcoreguidelines-avoid-c-arrays,-modernize-avoid-c-arrays'
+CHECKS?='-*,cppcoreguidelines-*,cppcoreguidelines-pro-*,-cppcoreguidelines-avoid-*'
 CHECKS?='-*,portability-*,readability-*'
 CHECKS?='-*,misc-*,boost-*,cert-*,misc-unused-parameters'
 
+#FIXME! ThreadSanitizer?=0
 ifeq ($(BUILD_TYPE),Coverage)
     ThreadSanitizer:=0
 else
-    ThreadSanitizer?=1
+   ThreadSanitizer?=1
 endif
 
 # prevent hard config of find_package(asio 1.14.1 CONFIG CMAKE_FIND_ROOT_PATH_BOTH)
 ifeq (${ThreadSanitizer},1)
     #XXX CC:=/usr/local/opt/llvm/bin/clang
     #XXX CXX:=/usr/local/opt/llvm/bin/clang++
-    CC:=clang
-    CXX:=clang++
+    CC?=clang
+    CXX?=clang++
 
     CMAKE_INSTALL_PREFIX?=/usr/local
     export CMAKE_INSTALL_PREFIX
@@ -58,7 +59,7 @@ GENERATOR?=Ninja
 ##################################################
 
 
-BUILD_DIR:=../.build-$(PROJECT_NAME)-${CROSS_COMPILE}$(BUILD_TYPE)
+BUILD_DIR:=../build-$(PROJECT_NAME)-${CROSS_COMPILE}$(BUILD_TYPE)
 ifeq ($(BUILD_TYPE),Coverage)
     USE_LOCV=ON
     ifeq (NO${CROSS_COMPILE},NO)
@@ -119,8 +120,8 @@ clean: $(BUILD_DIR)
 
 distclean:
 	rm -rf $(BUILD_DIR) .configure-$(BUILD_TYPE) .buildfiles.lst compile_commands.json *~ .*~ tags
-	rm -rf generated/*
 	find . -name '*~' -delete
+	#TODO rm -rf generated/*
 
 
 # These rules keep make from trying to use the match-anything rule below

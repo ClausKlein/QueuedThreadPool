@@ -6,8 +6,8 @@
 //  http://www.boost.org/LICENSE_1_0.txt) See
 //  http://www.boost.org/libs/libs/chrono/stopwatches for documentation.
 
-#ifndef BOOST_CHRONO_STOPWATCHES_SIMPLE_STOPWATCH__HPP
-#define BOOST_CHRONO_STOPWATCHES_SIMPLE_STOPWATCH__HPP
+#ifndef BOOST_CHRONO_STOPWATCHES_SIMPLE_STOPWATCH_HPP
+#define BOOST_CHRONO_STOPWATCHES_SIMPLE_STOPWATCH_HPP
 
 #include <boost/chrono/config.hpp>
 

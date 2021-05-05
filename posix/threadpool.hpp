@@ -22,20 +22,25 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
   _##
   _##########################################################################*/
 
-#ifndef agent_pp_threadpool_hpp_
-#define agent_pp_threadpool_hpp_
+#ifndef agent_pp_ck_threadpool_hpp_
+#define agent_pp_ck_threadpool_hpp_
 
 // NOTE: do not change! CK
-#define NO_FAST_MUTEXES
-#define NO_LOGGING
 #define AGENTPP_USE_IMPLIZIT_START
+#define NO_FAST_MUTEXES
+
+// NOTE: prevent ThreadSanitizer data reaces warnings! CK
+#undef TRACE_VERBOSE
+#define NO_LOGGING
 
 #ifdef __INTEGRITY
+#    define BOOST_OVERRIDE
 #    include <integrity.h>
 #endif
 
 #ifdef _WIN32
-#    define HAVE_STRUCT_TIMESPEC
+#    define HAVE_STRUCT_TIMESPE
+#    define BOOST_OVERRIDE override
 #else
 #    include <unistd.h> // _POSIX_MONOTONIC_CLOCK _POSIX_TIMEOUTS _POSIX_TIMERS _POSIX_THREADS ...
 #endif
@@ -44,15 +49,17 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #    include <iostream>
 #endif
 
+#include <ctime>
 #include <list>
 #include <pthread.h>
 #include <queue>
-#include <time.h>
 #include <vector>
 
+#include <boost/config.hpp>
 #include <boost/current_function.hpp>
 #include <boost/noncopyable.hpp>
 
+#define AGENTPP_SYNCHRONIZED_UNLOCK_RETRIES 10
 #define AGENTPP_DEFAULT_STACKSIZE 0x10000UL
 #define AGENTPP_OPAQUE_PTHREAD_T void*
 #define AGENTX_DEFAULT_PRIORITY 32
@@ -152,9 +159,9 @@ public:
      * @param timeout
      *    timeout in milliseconds.
      * @param
-     *    return TRUE if timeout occured, FALSE otherwise.
+     *    return true if timeout occured, false otherwise.
      */
-    bool wait(unsigned long timeout);
+    bool wait(long timeout);
 
     /**
      * Wakes up a single thread that is waiting on this
@@ -169,31 +176,31 @@ public:
 
     /**
      * Enter a critical section. If this thread owned this
-     * lock already, the call succeeds too (returns TRUE), but there
+     * lock already, the call succeeds too (returns true), but there
      * will not be recursive locking. Unlocking will always free the lock.
      *
      * @return
-     *    TRUE if the attempt was successful, FALSE otherwise.
+     *    true if the attempt was successful, false otherwise.
      */
     bool lock();
 
 #if defined(_POSIX_TIMEOUTS) && _POSIX_TIMEOUTS > 0
     /**
      * Try to enter a critical section. If this thread owned this
-     * lock already, the call succeeds too (returns TRUE), but there
+     * lock already, the call succeeds too (returns true), but there
      * will not be recursive locking. Unlocking will always free the lock.
      *
      * @param timeout
-     *    timeout in milliseconds. If timeout occurred FALSE is returned.
+     *    timeout in milliseconds. If timeout occurred false is returned.
      * @return
-     *    TRUE if the attempt was successful, FALSE otherwise.
+     *    true if the attempt was successful, false otherwise.
      */
     bool lock(unsigned long timeout);
 #endif
 
     /**
      * Try to enter a critical section. If this thread owned this
-     * lock already, the call succeeds too (returns TRUE), but there
+     * lock already, the call succeeds too (returns true), but there
      * will not be recursive locking. Unlocking will always free the lock.
      *
      * @return
@@ -208,7 +215,7 @@ public:
      * more than once successfully, this call will nevertheless release
      * the lock (non-recursive locking).
      * @return
-     *    TRUE if the unlock succeeded, FALSE if there was no lock
+     *    true if the unlock succeeded, false if there was no lock
      *    to unlock.
      */
     bool unlock();
@@ -220,7 +227,7 @@ private:
 #endif
 
 #ifndef _WIN32
-    int cond_timed_wait(const timespec*);
+    int cond_timed_wait(const timespec& ts);
 #endif
 
     pthread_cond_t cond;
@@ -266,11 +273,13 @@ public:
      *
      * @param timeout
      *    timeout in milliseconds.
+     *
+     * @note negativ values means: wait forever!
      */
     void wait(long timeout) // TODO: why NOT return bool? CK
     {
         if (timeout < 0) {
-            (void)sync.wait();
+            (void)sync.wait(); // NOTE: forever! CK
         } else {
             (void)sync.wait(timeout);
         }
@@ -308,14 +317,13 @@ class AGENTPP_DECL Thread : public Synchronized, public Runnable {
 
     enum ThreadStatus { IDLE, RUNNING, FINISHED };
 
-    friend class Synchronized;
-    friend void* thread_starter(void*);
+    friend void* thread_starter(void* t);
 
 public:
     /**
      * Create a new thread.
      */
-    Thread();
+    explicit Thread(size_t stack_size = AGENTPP_DEFAULT_STACKSIZE);
 
     /**
      * Create a new thread which will execute the given Runnable.
@@ -323,7 +331,7 @@ public:
      * @param runnable
      *    a Runnable subclass.
      */
-    explicit Thread(Runnable* r);
+    explicit Thread(Runnable& r);
 
     /**
      * Destroy thread. If thread is running or has been finished but
@@ -369,7 +377,7 @@ public:
      *    when created through the default constructor or the
      *    Runnable object given at creation time.
      */
-    Runnable* get_runnable();
+    Runnable& get_runnable();
 
     /**
      * Waits for this thread to die.
@@ -386,7 +394,7 @@ public:
      * Before calling the start method this method can be used
      * to change the stack size of the thread.
      *
-     * @param stackSize
+     * @param s
      *    the thread's stack size in bytes.
      */
     void set_stack_size(size_t s) { stackSize = s; }
@@ -395,7 +403,7 @@ public:
      * Check whether thread is alive.
      *
      * @return
-     *    Returns TRUE if the thread is running; otherwise FALSE.
+     *    Returns true if the thread is running; otherwise false.
      */
     bool is_alive() const { return (status == RUNNING); }
 
@@ -403,11 +411,11 @@ public:
      * Clone this thread. This method must not be called on
      * running threads.
      */
-    Thread* clone() { return new Thread(get_runnable()); }
+    Thread* clone() const { return new Thread(stackSize); }
 
 private:
-    Runnable* runnable;
     ThreadStatus status;
+    Runnable& runnable;
     size_t stackSize;
     pthread_t tid;
     static ThreadList threadList;
@@ -441,12 +449,10 @@ public:
         Lock l(*this);
         return list.size();
     }
-
     Thread* last()
     {
         Lock l(*this);
-        Thread* t = list.back();
-        return t;
+        return list.back();
     }
 
 private:
@@ -463,8 +469,9 @@ class TaskManager;
  * @version 3.5.19
  */
 class AGENTPP_DECL ThreadPool : public Synchronized {
-
+private:
     size_t stackSize;
+    void EmptyTaskList();
 
 protected:
     std::vector<TaskManager*> taskList;
@@ -486,10 +493,10 @@ public:
      * @param size
      *    the number of threads started for performing tasks.
      *    The default value is 4 threads.
-     * @param stackSize
+     * @param stack_size
      *    the stack size for each thread.
      */
-    ThreadPool(size_t size, size_t stackSize);
+    ThreadPool(size_t size, size_t stack_size);
 
     /**
      * Destructor will wait for termination of all threads.
@@ -500,13 +507,13 @@ public:
      * Execute a task. The task will be deleted after call of
      * its run() method.
      */
-    virtual void execute(Runnable*);
+    virtual void execute(Runnable* task);
 
     /**
      * Check whether the ThreadPool is idle or not.
      *
      * @return
-     *    TRUE if non of the threads in the pool is currently
+     *    true if non of the threads in the pool is currently
      *    executing any task.
      */
     virtual bool is_idle();
@@ -516,7 +523,7 @@ public:
      * running a task) or not.
      *
      * @return
-     *    TRUE if all of the threads in the pool is currently
+     *    true if all of the threads in the pool is currently
      *    executing any task.
      */
     virtual bool is_busy();
@@ -535,9 +542,10 @@ public:
      *   the stack size of each thread in this thread pool.
      */
     size_t get_stack_size() const { return stackSize; }
+    size_t stack_size() const { return stackSize; }
 
     /**
-     * Notifies the thread pool about an idle thread (synchronized).
+     * Notifies the thread pool about an idle thread
      */
     virtual void idle_notification();
 
@@ -546,7 +554,7 @@ public:
      * task execution. The ThreadPool cannot be used thereafter and should
      * be destroyed. This call blocks until all threads are stopped.
      */
-    void terminate();
+    virtual void terminate();
 };
 
 /**
@@ -575,7 +583,7 @@ public:
      *
      * @param size
      *    the number of threads started for performing tasks.
-     *    The default value is 4 threads.
+     *    The default value is 1 threads.
      */
     explicit QueuedThreadPool(size_t size = 1);
 
@@ -586,10 +594,10 @@ public:
      * @param size
      *    the number of threads started for performing tasks.
      *    The default value is 4 threads.
-     * @param stackSize
+     * @param stack_size
      *    the stack size for each thread.
      */
-    QueuedThreadPool(size_t size, size_t stackSize);
+    QueuedThreadPool(size_t size, size_t stack_size);
 
     /**
      * Destructor will wait for termination of all threads.
@@ -600,7 +608,7 @@ public:
      * Execute a task. The task will be deleted after call of
      * its run() method.
      */
-    void execute(Runnable*) BOOST_OVERRIDE;
+    void execute(Runnable* task) BOOST_OVERRIDE;
 
     /**
      * Gets the current number of queued tasks.
@@ -615,35 +623,36 @@ public:
     }
 
     /**
-     * Check whether QueuedThreadPool is idle or not.
+     * Check whether QueuedThreadPool is idle
      *
      * @return
-     *    TRUE if non of the threads in the pool is currently
-     *    executing any task and the queue is emtpy().
+     *    true if non of the threads in the pool are currently
+     *    executing a task and the queue is emtpy().
      */
     bool is_idle() BOOST_OVERRIDE;
 
     /**
      * Check whether the ThreadPool is busy
-     * (i.e., (!queue.empty() || ThreadPool::is_busy())
      *
      * @return
-     *    TRUE if all of the threads in the pool is currently
-     *    executing any task or the queue is not empty.
+     *    true if all of the threads in the pool are currently
+     *    executing a task and the queue is not empty.
      */
     bool is_busy() BOOST_OVERRIDE;
 
     /**
-     * Stop queue processing.
+     * Terminate the QueuedThreadPool.
+     *
+     * This call blocks until all threads are stopped.
      */
-    void stop();
+    void terminate() BOOST_OVERRIDE;
 
+private:
     /**
      * Notifies the thread pool about an idle thread.
      */
     void idle_notification() BOOST_OVERRIDE;
 
-private:
     /**
      * Runs the queue processing loop.
      */
@@ -652,12 +661,12 @@ private:
     /**
      * @note asserted to be called with lock! CK
      **/
-    bool assign(Runnable* task, bool withQueuing = true);
+    bool assign(Runnable* task);
 
     /**
      * @note asserted to be called with lock! CK
      **/
-    bool is_stopped() { return !go; }
+    bool is_stopped() const { return !go; }
 
     void EmptyQueue();
 };
@@ -679,10 +688,11 @@ public:
      *
      * @param threadPool
      *    a pointer to a ThreadPool instance.
-     * @param stackSize
+     * @param stack_size
      *    the stack size for the managed thread.
      */
-    TaskManager(ThreadPool*, size_t stackSize = AGENTPP_DEFAULT_STACKSIZE);
+    explicit TaskManager(
+        ThreadPool* tp, size_t stack_size = AGENTPP_DEFAULT_STACKSIZE);
 
     /**
      * Destructor will wait for thread to terminate.
@@ -693,8 +703,8 @@ public:
      * Check whether this thread is idle or not.
      *
      * @return
-     *   TRUE if the thread managed by this TaskManager does
-     *   not currently execute any task; FALSE otherwise.
+     *   true if the thread managed by this TaskManager does
+     *   not currently execute any task; false otherwise.
      */
     bool is_idle();
 
@@ -705,11 +715,11 @@ public:
      * @param task
      *   a Runnable instance.
      * @return
-     *   TRUE if the task could be assigned successfully and
-     *   FALSE if another thread has assigned a task concurrently.
+     *   true if the task could be assigned successfully and
+     *   false if another thread has assigned a task concurrently.
      *   In the latter case, the task has not been assigned!
      */
-    bool set_task(Runnable*);
+    bool set_task(Runnable* it);
 
     /**
      * Clone this TaskManager.
