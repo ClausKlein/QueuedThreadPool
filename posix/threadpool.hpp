@@ -377,7 +377,7 @@ public:
      *    when created through the default constructor or the
      *    Runnable object given at creation time.
      */
-    Runnable* get_runnable();
+    Runnable& get_runnable();
 
     /**
      * Waits for this thread to die.
@@ -449,12 +449,10 @@ public:
         Lock l(*this);
         return list.size();
     }
-
     Thread* last()
     {
         Lock l(*this);
-        Thread* t = list.back();
-        return t;
+        return list.back();
     }
 
 private:

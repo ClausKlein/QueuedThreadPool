@@ -392,7 +392,7 @@ public:
      * @return
      *    Returns true if the thread is running; otherwise false.
      */
-    bool is_alive() { return (status == RUNNING); }
+    bool is_alive() const { return (status == RUNNING); }
 
     /**
      * Clone this thread. This method must not be called on
@@ -428,26 +428,26 @@ public:
 
     void add(Thread* t)
     {
-        lock();
+        Lock l(*this);
         list.add(t);
-        unlock();
     }
     void remove(Thread* t)
     {
-        lock();
+        Lock l(*this);
         list.remove(t);
-        unlock();
     }
-    int size() const { return list.size(); }
+    int size()
+    {
+        Lock l(*this);
+        return list.size();
+    }
     Thread* last()
     {
-        lock();
-        Thread* t = list.last();
-        unlock();
-        return t;
+        Lock l(*this);
+        return list.last();
     }
 
-protected:
+private:
     Array<Thread> list;
 };
 
@@ -542,7 +542,7 @@ public:
     /**
      * Notifies the thread pool about an idle thread.
      */
-    virtual void idle_notification() { notify(); }
+    virtual void idle_notification();
 
     /**
      * Gracefully stops all running task managers after their current

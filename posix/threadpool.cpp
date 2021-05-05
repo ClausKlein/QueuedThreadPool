@@ -401,7 +401,7 @@ void* thread_starter(void* t)
 #endif
 
     try {
-        thread->get_runnable()->run();
+        thread->get_runnable().run();
     } catch (std::exception& ex) {
         DTRACE("Exception: " << ex.what());
     } catch (...) {
@@ -442,7 +442,7 @@ Thread::~Thread()
     }
 }
 
-Runnable* Thread::get_runnable() { return &runnable; }
+Runnable& Thread::get_runnable() { return runnable; }
 
 void Thread::join()
 {
@@ -734,11 +734,11 @@ bool ThreadPool::is_busy()
 
     for (std::vector<TaskManager*>::iterator cur = taskList.begin();
          cur != taskList.end(); ++cur) {
-        if ((*cur)->is_idle()) {
-            return false;
+        if (!(*cur)->is_idle()) {
+            return true;
         }
     }
-    return true; // NOTE: all threads are busy
+    return false; // NOTE: non of the threads are busy
 #endif
 }
 
@@ -828,7 +828,7 @@ QueuedThreadPool::~QueuedThreadPool()
     ThreadPool::terminate();
 }
 
-/// NOTE: should to be called with lock! CK
+/// NOTE: asserted to be called with lock! CK
 bool QueuedThreadPool::assign(Runnable* t)
 {
     TaskManager* tm = NULL;

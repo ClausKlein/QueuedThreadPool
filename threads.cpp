@@ -202,7 +202,7 @@ Synchronized::~Synchronized()
     }
 }
 
-void Synchronized::wait() { cond_timed_wait(0); }
+void Synchronized::wait() { cond_timed_wait(NULL); }
 
 int Synchronized::cond_timed_wait(const struct timespec* ts)
 {
@@ -233,7 +233,7 @@ bool Synchronized::wait(long timeout)
 #else
     struct timeval tv = {};
     gettimeofday(&tv, NULL);
-    ts.tv_sec  = tv.tv_sec + (time_t)timeout / 1000;
+    ts.tv_sec   = tv.tv_sec + (time_t)timeout / 1000;
     long millis = tv.tv_usec / 1000 + (timeout % 1000);
     if (millis >= 1000) {
         ts.tv_sec += 1;
@@ -241,9 +241,9 @@ bool Synchronized::wait(long timeout)
     ts.tv_nsec = (millis % 1000) * 1000000;
 #endif
 
-    int err  = 0;
     isLocked = false;
-    if ((err = cond_timed_wait(&ts)) > 0) {
+    int err  = cond_timed_wait(&ts);
+    if (err) {
         switch (err) {
         case EINVAL:
             LOG_BEGIN(loggerModuleName, WARNING_LOG | 1);
@@ -268,22 +268,22 @@ bool Synchronized::wait(long timeout)
 
 void Synchronized::notify()
 {
-    int result = pthread_cond_signal(&cond);
-    if (result) {
+    int err = pthread_cond_signal(&cond);
+    if (err) {
         LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
-        LOG("Synchronized: notify failed (result)");
-        LOG(result);
+        LOG("Synchronized: notify failed (err)");
+        LOG(err);
         LOG_END;
     }
 }
 
 void Synchronized::notify_all()
 {
-    int result = pthread_cond_broadcast(&cond);
-    if (result) {
+    int err = pthread_cond_broadcast(&cond);
+    if (err) {
         LOG_BEGIN(loggerModuleName, ERROR_LOG | 1);
-        LOG("Synchronized: notify_all failed (result)");
-        LOG(result);
+        LOG("Synchronized: notify_all failed (err)");
+        LOG(err);
         LOG_END;
     }
 }
@@ -714,8 +714,6 @@ void TaskManager::run()
             //==============================
             threadPool->idle_notification();
             //==============================
-            // FIXME: ThreadSanitizer: data race on vptr (ctor/dtor vs virtual
-            // call) threads.cpp:715 in Agentpp::TaskManager::run()
         }
 
         while (go && !task) {
@@ -780,6 +778,11 @@ void ThreadPool::execute(Runnable* t)
     }
 }
 
+/// NOTE: should to be called with lock! CK
+void ThreadPool::idle_notification() { notify(); }
+
+/// return true if NONE of the threads in the pool is currently executing any
+/// task.
 bool ThreadPool::is_idle()
 {
     Lock l(*this);
@@ -790,7 +793,7 @@ bool ThreadPool::is_idle()
             return false;
         }
     }
-    return true;
+    return true; // NOTE: all threads are idle
 }
 
 bool ThreadPool::is_busy()
@@ -848,7 +851,6 @@ ThreadPool::ThreadPool(size_t size, size_t stack_size)
     : stackSize(stack_size)
     , oneTimeExecution(false)
 {
-    stackSize = stack_size;
     for (size_t i = 0; i < size; i++) {
         taskList.add(new TaskManager(this, stackSize));
     }
@@ -856,8 +858,8 @@ ThreadPool::ThreadPool(size_t size, size_t stack_size)
 
 ThreadPool::~ThreadPool()
 {
-    // FIXME: ThreadSanitizer: data race on vptr (ctor/dtor vs virtual call) threads.cpp:858 in Agentpp::ThreadPool::~ThreadPool()
-    terminate();
+    ThreadPool::terminate();
+
     join();
 }
 
@@ -881,6 +883,7 @@ QueuedThreadPool::QueuedThreadPool(size_t size, size_t stack_size)
 
 QueuedThreadPool::~QueuedThreadPool()
 {
+    // terminate();
     {
         Lock l(thread);
         go = false;
@@ -888,9 +891,14 @@ QueuedThreadPool::~QueuedThreadPool()
     }
 
     thread.join();
+
+    // NOTE: Prevent ThreadSanitizer: data race on vptr (ctor/dtor vs virtual
+    // call) threads.cpp:715 Previous write at
+    // Agentpp::ThreadPool::~ThreadPool() threads.cpp:860! CK
+    ThreadPool::terminate();
 }
 
-/// TODO: asserted to be called with lock! CK
+/// NOTE: asserted to be called with lock! CK
 void QueuedThreadPool::assign(Runnable* t)
 {
     TaskManager* tm = NULL;
@@ -948,7 +956,7 @@ unsigned int QueuedThreadPool::queue_length()
     return queue.size();
 }
 
-/// TODO: should to be called with lock! CK
+/// NOTE: should to be called with lock! CK
 void QueuedThreadPool::idle_notification() { thread.notify(); }
 
 /*--------------------- class MibTask --------------------------*/

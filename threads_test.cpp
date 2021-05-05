@@ -159,10 +159,7 @@ BOOST_AUTO_TEST_CASE(ThreadPoolInterface_test)
     result_queue_t result;
     ThreadPool emptyThreadPool(0);
 
-#    ifdef USE_BUSY_TEST
     BOOST_TEST(emptyThreadPool.is_busy());
-#    endif
-
     BOOST_TEST(!emptyThreadPool.is_idle());
 
     emptyThreadPool.execute(new TestTask("I want to run!", result));
@@ -200,9 +197,7 @@ BOOST_AUTO_TEST_CASE(ThreadPool_busy_test)
         boost::this_thread::yield();
         completion_latch.wait();
 
-#ifdef USE_BUSY_TEST
-        // FIXME! CK BOOST_TEST(threadPool.is_busy());
-#endif
+        BOOST_TEST_WARN(threadPool.is_busy());
 
         do {
             BOOST_TEST_MESSAGE(
@@ -210,10 +205,7 @@ BOOST_AUTO_TEST_CASE(ThreadPool_busy_test)
             Thread::sleep(BOOST_THREAD_TEST_TIME_MS); // ms
         } while (!threadPool.is_idle());
         BOOST_TEST(threadPool.is_idle());
-
-#ifdef USE_BUSY_TEST
-        BOOST_TEST(!threadPool.is_busy());
-#endif
+        BOOST_TEST_WARN(!threadPool.is_busy());
 
         threadPool.terminate();
     }
@@ -259,10 +251,7 @@ BOOST_AUTO_TEST_CASE(ThreadPool_test)
                 "outstanding tasks: " << TestTask::task_count());
             Thread::sleep(BOOST_THREAD_TEST_TIME_MS); // ms
         } while (!threadPool.is_idle());
-
-#ifdef USE_BUSY_TEST
-        BOOST_TEST(!threadPool.is_busy());
-#endif
+        BOOST_TEST_WARN(!threadPool.is_busy());
 
         threadPool.terminate();
     }
@@ -302,20 +291,14 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_busy_test)
         boost::this_thread::yield();
         completion_latch.wait();
 
-#ifdef USE_BUSY_TEST
-        // FIXME! CK BOOST_TEST(threadPool.is_busy());
-#endif
-
+        BOOST_TEST_WARN(threadPool.is_busy());
         do {
             BOOST_TEST_MESSAGE(
                 "outstanding tasks: " << TestTask::task_count());
             Thread::sleep(BOOST_THREAD_TEST_TIME_MS); // ms
         } while (!threadPool.is_idle());
         BOOST_TEST(threadPool.is_idle());
-
-#ifdef USE_BUSY_TEST
-        // FIXME! CK BOOST_TEST(!threadPool.is_busy());
-#endif
+        BOOST_TEST_WARN(!threadPool.is_busy());
 
         threadPool.terminate();
     }
@@ -364,9 +347,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPool_test)
             Thread::sleep(500); // NOTE: after more than 1/2 sec! CK
         } while (!queuedThreadPool.is_idle());
 
-#ifdef USE_BUSY_TEST
-        BOOST_TEST(!queuedThreadPool.is_busy());
-#endif
+        BOOST_TEST_WARN(!queuedThreadPool.is_busy());
 
         queuedThreadPool.terminate();
     }
@@ -412,10 +393,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolLoad_test)
                 unsigned delay = rand() % 100; // NOLINT
                 defaultThreadPool.execute(
                     new TestTask("Running ...", result, delay));
-
-#ifdef USE_BUSY_TEST
-                // FIXME! CK BOOST_TEST(defaultThreadPool.is_busy());
-#endif
+                BOOST_TEST_WARN(defaultThreadPool.is_busy());
             }
             BOOST_TEST_MESSAGE("defaultThreadPool.queue_length: "
                 << defaultThreadPool.queue_length());
@@ -427,10 +405,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolLoad_test)
             Thread::sleep(100); // ms
         } while (!defaultThreadPool.is_idle());
 
-#ifdef USE_BUSY_TEST
         BOOST_TEST_WARN(!defaultThreadPool.is_busy());
-#endif
-
         BOOST_TEST_MESSAGE("outstanding tasks: " << TestTask::task_count());
         BOOST_TEST_MESSAGE("executed tasks: " << TestTask::run_count());
 
@@ -463,10 +438,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolInterface_test)
 
         BOOST_TEST_MESSAGE("emptyThreadPool.size: " << emptyThreadPool.size());
         emptyThreadPool.execute(new TestTask("I want to run!", result));
-
-#    ifdef USE_BUSY_TEST
-        BOOST_TEST(emptyThreadPool.is_busy());
-#    endif
+        BOOST_TEST_WARN(emptyThreadPool.is_busy());
 
 #    if !defined(AGENTPP_USE_IMPLIZIT_START)
         emptyThreadPool.start();
@@ -510,10 +482,7 @@ BOOST_AUTO_TEST_CASE(QueuedThreadPoolIndependency_test)
 
     BOOST_TEST_MESSAGE("firstThreadPool.size: " << firstThreadPool.size());
     firstThreadPool.execute(new TestTask("Starting ...", result));
-
-#ifdef USE_BUSY_TEST
-    // FIXME! CK BOOST_TEST(firstThreadPool.is_busy());
-#endif
+    BOOST_TEST_WARN(firstThreadPool.is_busy());
 
     size_t n = 1;
     {
