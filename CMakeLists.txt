@@ -140,7 +140,7 @@ if(USE_BOOST)
   option(Boost_USE_MULTITHREADED "use -mt libs only" ON)
 
   find_package(
-    Boost 1.71 CONFIG REQUIRED COMPONENTS atomic chrono filesystem thread
+    Boost 1.72 CONFIG REQUIRED COMPONENTS atomic chrono filesystem thread
                                           unit_test_framework
   )
   if(Boost_FOUND)
