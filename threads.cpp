@@ -295,7 +295,9 @@ bool Synchronized::lock()
     if (!err) {
         isLocked = true;
         return true;
-    } else if (err == EDEADLK) {
+    }
+
+    if (err == EDEADLK) {
         // This thread owns already the lock, but
         // we do not like recursive locking and print a warning!
         LOG_BEGIN(loggerModuleName, WARNING_LOG | 5);
@@ -328,14 +330,13 @@ bool Synchronized::lock()
         return true;
     }
 #endif
-    else {
-        LOG_BEGIN(loggerModuleName, DEBUG_LOG | 8);
-        LOG("Synchronized: lock failed (id)(err)");
-        LOG(id);
-        LOG(err);
-        LOG_END;
-        return false;
-    }
+
+    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 8);
+    LOG("Synchronized: lock failed (id)(err)");
+    LOG(id);
+    LOG(err);
+    LOG_END;
+    return false;
 }
 
 bool Synchronized::lock(long timeout)
@@ -445,7 +446,9 @@ Synchronized::TryLockResult Synchronized::trylock()
         LOG((long)this);
         LOG_END;
         return LOCKED;
-    } else if (err == EDEADLK) {
+    }
+
+    if (err == EDEADLK) {
         // This thread owns already the lock, but
         // we do not like recursive locking and print a warning!
         LOG_BEGIN(loggerModuleName, WARNING_LOG | 5);
@@ -489,15 +492,13 @@ Synchronized::TryLockResult Synchronized::trylock()
     }
 #endif
 
-    else {
-        LOG_BEGIN(loggerModuleName, DEBUG_LOG | 9);
-        LOG("Synchronized: try lock busy (id)(ptr)");
-        LOG(id);
-        LOG((long)this);
-        LOG_END;
-        assert(isLocked);
-        return BUSY;
-    }
+    LOG_BEGIN(loggerModuleName, DEBUG_LOG | 9);
+    LOG("Synchronized: try lock busy (id)(ptr)");
+    LOG(id);
+    LOG((long)this);
+    LOG_END;
+    assert(isLocked);
+    return BUSY;
 }
 
 /*------------------------ class Thread ----------------------------*/
@@ -764,10 +765,9 @@ void ThreadPool::execute(Runnable* t)
 
                 if (tm->set_task(t)) {
                     return; // done
-                } else {
-                    // task could not be assigned
-                    tm = NULL;
                 }
+
+                // task could not be assigned
             }
             tm = NULL;
         }

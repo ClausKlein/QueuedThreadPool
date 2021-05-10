@@ -66,6 +66,14 @@ unifdef -U_WIN32THREADS -UWIN32 -DPOSIX_THREADS -DAGENTPP_NAMESPACE -D_THREADS
 #define AGENTX_DEFAULT_THREAD_NAME "ThreadPool::Thread"
 #define AGENTPP_DECL
 
+#ifndef BOOST_OVERRIDE
+#    if __cplusplus >= 201103L
+#        define BOOST_OVERRIDE override
+#    else
+#        define BOOST_OVERRIDE
+#    endif
+#endif
+
 #if !defined(NO_LOGGING) && !defined(NDEBUG)
 #    define LOG_BEGIN(x, y) std::cerr << BOOST_CURRENT_FUNCTION << ": "
 #    define LOG(x) std::cerr << x << ' '
