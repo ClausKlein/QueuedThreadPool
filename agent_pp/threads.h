@@ -42,6 +42,7 @@
 // #define SINGLE_THREADED false
 #define AGENTPP_DEFAULT_STACKSIZE 0x10000
 #define AGENTPP_USE_IMPLIZIT_START
+#define _NO_LOGGING
 
 #ifndef BOOST_OVERRIDE
 #    if __cplusplus >= 201103L

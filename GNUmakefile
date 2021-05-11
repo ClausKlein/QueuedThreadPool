@@ -37,8 +37,8 @@ endif
 ifeq (${ThreadSanitizer},1)
     #XXX CC:=/usr/local/opt/llvm/bin/clang
     #XXX CXX:=/usr/local/opt/llvm/bin/clang++
-    CC?=clang
-    CXX?=clang++
+    CC:=clang
+    CXX:=clang++
 
     CMAKE_INSTALL_PREFIX?=/usr/local
     export CMAKE_INSTALL_PREFIX
