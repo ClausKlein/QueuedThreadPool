@@ -4,6 +4,10 @@ cmake_minimum_required(VERSION 3.14...3.20)
 find_program(CCACHE_EXECUTABLE "ccache" HINTS /usr/local/bin /opt/local/bin)
 if(CCACHE_EXECUTABLE AND NOT CMAKE_TOOLCHAIN_FILE)
   message(STATUS "use ccache")
+  set(CMAKE_C_COMPILER_LAUNCHER
+      "${CCACHE_EXECUTABLE}"
+      CACHE PATH "ccache" FORCE
+  )
   set(CMAKE_CXX_COMPILER_LAUNCHER
       "${CCACHE_EXECUTABLE}"
       CACHE PATH "ccache" FORCE
@@ -95,7 +99,6 @@ endif()
 # libraries and executables (instead of CMAKE_CURRENT_BINARY_DIR)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
-
 
 # ----------------------------------------------------------------------
 option(USE_ASIO "Test the standalon asio lib too" OFF)
@@ -241,35 +244,30 @@ if(USE_BOOST OR BUILD_TESTING)
   # ----------------------------------------------------------------------
   option(USE_AGENT_PP "Test the agent++ lib too" ON)
   if(USE_AGENT_PP)
-    find_library(LIB_AGENT_PP agent++_static)
-    #XXX find_library(LIB_AGENT_PP agent_pp REQUIRED)
-    if(NOT ${LIB_AGENT_PP} STREQUAL LIB_AGENT_PP-NOTFOUND)
-      message(STATUS "LIB_AGENT_PP: ${LIB_AGENT_PP}")
-      #XXX find_library(LIB_SNMP_PP snmp_pp)
-      add_executable(threads_test threads_test.cpp threads.cpp agent_pp/threads.h)
-      target_compile_definitions(threads_test PRIVATE USE_AGENTPP)
-      set_target_properties(threads_test PROPERTIES CXX_STANDARD 17)
-      target_link_libraries(
-        threads_test Boost::unit_test_framework Boost::chrono Boost::thread
-        ${LIB_AGENT_PP} #XXX ${LIB_SNMP_PP} des
+    find_package(agent_pp 4.5.0 CONFIG REQUIRED)
+    add_executable(threads_test threads_test.cpp threads.cpp agent_pp/threads.h)
+    target_compile_definitions(threads_test PRIVATE USE_AGENTPP)
+    set_target_properties(threads_test PROPERTIES CXX_STANDARD 17)
+    target_link_libraries(
+      threads_test Boost::unit_test_framework Boost::chrono Boost::thread
+      ${LIB_AGENT_PP} agent_pp::agent_pp
+    )
+    add_test(NAME threads_test COMMAND threads_test --log_level=warning)
+    if(USE_ThreadSanitizer)
+      target_compile_options(threads_test PRIVATE -fsanitize=thread -O1)
+      target_link_options(threads_test PRIVATE -fsanitize=thread -O1)
+    else()
+      add_test(NAME threads_test-random COMMAND threads_test
+                                                --log_level=warning --random
       )
-      add_test(NAME threads_test COMMAND threads_test --log_level=warning)
-      if(USE_ThreadSanitizer)
-        target_compile_options(threads_test PRIVATE -fsanitize=thread -O1)
-        target_link_options(threads_test PRIVATE -fsanitize=thread -O1)
-      else()
-        add_test(NAME threads_test-random COMMAND threads_test
-                                                  --log_level=warning --random
-        )
-        add_test(NAME threads_test-thread
-                 COMMAND threads_test --log_level=warning
-                         --run_test=ThreadPool_test -25
-        )
-        add_test(NAME threads_test-queue
-                 COMMAND threads_test --log_level=warning
-                         --run_test=QueuedThreadPoolLoad_test -25
-        )
-      endif()
+      add_test(NAME threads_test-thread
+               COMMAND threads_test --log_level=warning
+                       --run_test=ThreadPool_test -25
+      )
+      add_test(NAME threads_test-queue
+               COMMAND threads_test --log_level=warning
+                       --run_test=QueuedThreadPoolLoad_test -25
+      )
     endif()
   endif()
   # ----------------------------------------------------------------------
@@ -294,7 +292,7 @@ if(USE_BOOST OR BUILD_TESTING)
   )
   target_compile_definitions(threads_test_posix PRIVATE USE_AGENTPP_CK)
   add_test(NAME threads_test_posix COMMAND threads_test_posix
-                                            --log_level=success
+                                           --log_level=success
   )
   add_test(NAME threads_test_posix-throw
            COMMAND threads_test_posix --log_level=success
