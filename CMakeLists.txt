@@ -42,9 +42,7 @@ endif()
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE
       Debug
-      CACHE
-        STRING
-        "supported values are: None Debug Release RelWithDebInfo MinSizeRel Coverage."
+      CACHE STRING "supported values are: None Debug Release RelWithDebInfo MinSizeRel Coverage."
   )
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
@@ -54,18 +52,10 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 # general user options for ninja and cppcheck
 #
 # ----------------------------------------------------------------------
-option(CMAKE_C_DEPFILE_EXTENSION_REPLACE
-       "name depend files as main.d instead of main.c.d" ON
-)
-option(CMAKE_C_OUTPUT_EXTENSION_REPLACE
-       "name object files as main.o instead of main.c.o" ON
-)
-option(CMAKE_CXX_DEPFILE_EXTENSION_REPLACE
-       "name depend files as main.d instead of main.cpp.d" ON
-)
-option(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE
-       "name object files as main.o instead of main.cpp.o" ON
-)
+option(CMAKE_C_DEPFILE_EXTENSION_REPLACE "name depend files as main.d instead of main.c.d" ON)
+option(CMAKE_C_OUTPUT_EXTENSION_REPLACE "name object files as main.o instead of main.c.o" ON)
+option(CMAKE_CXX_DEPFILE_EXTENSION_REPLACE "name depend files as main.d instead of main.cpp.d" ON)
+option(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE "name object files as main.o instead of main.cpp.o" ON)
 
 option(CMAKE_DEPENDS_IN_PROJECT_ONLY "do not use system header files" ON)
 if(CMAKE_DEPENDS_IN_PROJECT_ONLY)
@@ -142,10 +132,7 @@ if(USE_BOOST)
   option(Boost_USE_STATIC_LIBS "use static libs only" OFF)
   option(Boost_USE_MULTITHREADED "use -mt libs only" ON)
 
-  find_package(
-    Boost 1.72 CONFIG REQUIRED COMPONENTS atomic chrono filesystem thread
-                                          unit_test_framework
-  )
+  find_package(Boost 1.72 CONFIG REQUIRED COMPONENTS atomic chrono filesystem thread unit_test_framework)
   if(Boost_FOUND)
     add_definitions(-DBOOST_ALL_NO_LIB)
     # starting with boost V1.69.0, there is no chrono/stopwatches!
@@ -203,13 +190,8 @@ if(USE_BOOST OR BUILD_TESTING)
     if(USE_ASIO AND asio_FOUND)
       add_executable(test_priority_scheduler priority_scheduler.cpp)
       set_target_properties(test_priority_scheduler PROPERTIES CXX_STANDARD 17)
-      target_compile_definitions(
-        test_priority_scheduler PRIVATE ASIO_NO_DEPRECATED
-      )
-      target_link_libraries(
-        test_priority_scheduler asio::standalone ${Boost_LIBRARIES}
-        Threads::Threads
-      )
+      target_compile_definitions(test_priority_scheduler PRIVATE ASIO_NO_DEPRECATED)
+      target_link_libraries(test_priority_scheduler asio::standalone ${Boost_LIBRARIES} Threads::Threads)
       add_test(NAME test_priority_scheduler COMMAND test_priority_scheduler)
     endif()
   endif()
@@ -249,25 +231,16 @@ if(USE_BOOST OR BUILD_TESTING)
     target_compile_definitions(threads_test PRIVATE USE_AGENTPP)
     set_target_properties(threads_test PROPERTIES CXX_STANDARD 17)
     target_link_libraries(
-      threads_test Boost::unit_test_framework Boost::chrono Boost::thread
-      ${LIB_AGENT_PP} agent_pp::agent_pp
+      threads_test Boost::unit_test_framework Boost::chrono Boost::thread ${LIB_AGENT_PP} agent_pp::agent_pp
     )
     add_test(NAME threads_test COMMAND threads_test --log_level=warning)
     if(USE_ThreadSanitizer)
       target_compile_options(threads_test PRIVATE -fsanitize=thread -O1)
       target_link_options(threads_test PRIVATE -fsanitize=thread -O1)
     else()
-      add_test(NAME threads_test-random COMMAND threads_test
-                                                --log_level=warning --random
-      )
-      add_test(NAME threads_test-thread
-               COMMAND threads_test --log_level=warning
-                       --run_test=ThreadPool_test -25
-      )
-      add_test(NAME threads_test-queue
-               COMMAND threads_test --log_level=warning
-                       --run_test=QueuedThreadPoolLoad_test -25
-      )
+      add_test(NAME threads_test-random COMMAND threads_test --log_level=warning --random)
+      add_test(NAME threads_test-thread COMMAND threads_test --log_level=warning --run_test=ThreadPool_test -25)
+      add_test(NAME threads_test-queue COMMAND threads_test --log_level=warning --run_test=QueuedThreadPoolLoad_test -25)
     endif()
   endif()
   # ----------------------------------------------------------------------
@@ -287,36 +260,31 @@ if(USE_BOOST OR BUILD_TESTING)
   # ----------------------------------------------------------------------
   add_executable(threads_test_posix threads_test.cpp)
   set_target_properties(threads_test_posix PROPERTIES CXX_STANDARD 17)
-  target_link_libraries(
-    threads_test_posix threadpool Boost::unit_test_framework
-  )
+  target_link_libraries(threads_test_posix threadpool Boost::unit_test_framework)
   target_compile_definitions(threads_test_posix PRIVATE USE_AGENTPP_CK)
-  add_test(NAME threads_test_posix COMMAND threads_test_posix
-                                           --log_level=success
-  )
-  add_test(NAME threads_test_posix-throw
-           COMMAND threads_test_posix --log_level=success
-                   --run_test=ThreadTaskThrow_test -25
+  add_test(NAME threads_test_posix COMMAND threads_test_posix --log_level=success)
+  add_test(NAME threads_test_posix-throw COMMAND threads_test_posix --log_level=success --run_test=ThreadTaskThrow_test
+                                                 -25
   )
   if(NOT USE_ThreadSanitizer AND NOT ${CMAKE_BUILD_TYPE} STREQUAL Coverage)
-    add_test(NAME threads_test_posix-random
-             COMMAND threads_test_posix --log_level=success --random
-    )
-    add_test(NAME threads_test_posix-thread
-             COMMAND threads_test_posix --log_level=success
-                     --run_test=ThreadPool_test -25
-    )
-    add_test(NAME threads_test_posix-queue
-             COMMAND threads_test_posix --log_level=success
-                     --run_test=QueuedThreadPoolLoad_test -25
+    add_test(NAME threads_test_posix-random COMMAND threads_test_posix --log_level=success --random)
+    add_test(NAME threads_test_posix-thread COMMAND threads_test_posix --log_level=success --run_test=ThreadPool_test -25)
+    add_test(NAME threads_test_posix-queue COMMAND threads_test_posix --log_level=success
+                                                   --run_test=QueuedThreadPoolLoad_test -25
     )
   endif()
 
-  set(COVERAGE_EXCLUDES '/Applications/*' '/usr/*' '*/include/boost/*'
-                        '${CURRENT_SOURCE_DIR}/include/boost/*'
-  )
-  setup_target_for_coverage(
-    NAME lcov # New target name
-    EXECUTABLE ctest DEPENDENCIES all # build this targets first
+  setup_target_for_coverage_lcov(
+    NAME
+    lcov # New target name
+    EXECUTABLE
+    ctest
+    DEPENDENCIES
+    all # build this targets first
+    EXCLUDE
+    /Applications/*
+    /usr/*
+    include/boost/*
+    NO_DEMANGLE
   )
 endif()
