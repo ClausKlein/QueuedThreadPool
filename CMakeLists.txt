@@ -132,7 +132,7 @@ if(USE_BOOST)
   option(Boost_USE_STATIC_LIBS "use static libs only" OFF)
   option(Boost_USE_MULTITHREADED "use -mt libs only" ON)
 
-  find_package(Boost 1.72 CONFIG REQUIRED COMPONENTS atomic chrono filesystem thread unit_test_framework)
+  find_package(Boost 1.71 CONFIG REQUIRED COMPONENTS atomic chrono filesystem thread unit_test_framework)
   if(Boost_FOUND)
     add_definitions(-DBOOST_ALL_NO_LIB)
     # starting with boost V1.69.0, there is no chrono/stopwatches!

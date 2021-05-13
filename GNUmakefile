@@ -94,7 +94,7 @@ setup: $(BUILD_DIR) .clang-tidy compile_commands.json
 	touch $@
 
 compile_commands.json: .configure-$(BUILD_TYPE)
-	ln -sf $(CURDIR)/$(BUILD_DIR)/compile_commands.json .
+	ln -sf $(BUILD_DIR)/compile_commands.json .
 
 $(BUILD_DIR): GNUmakefile
 	mkdir -p $@
