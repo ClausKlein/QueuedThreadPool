@@ -20,8 +20,6 @@ project(AgentPro LANGUAGES CXX C)
 
 message(STATUS "Configuring on/for ${CMAKE_SYSTEM_NAME}")
 
-include(cmake/CodeCoverage.cmake)
-
 ## require a C++ standard
 if(NOT DEFINED CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 98)
@@ -274,17 +272,22 @@ if(USE_BOOST OR BUILD_TESTING)
     )
   endif()
 
-  setup_target_for_coverage_lcov(
-    NAME
-    lcov # New target name
-    EXECUTABLE
-    ctest
-    DEPENDENCIES
-    all # build this targets first
-    EXCLUDE
-    /Applications/*
-    /usr/*
-    include/boost/*
-    NO_DEMANGLE
-  )
+  if(${CMAKE_BUILD_TYPE} STREQUAL Coverage)
+    include(cmake/CodeCoverage.cmake)
+
+    setup_target_for_coverage_lcov(
+      NAME
+      lcov # New target name
+      EXECUTABLE
+      ctest
+      DEPENDENCIES
+      all # build this targets first
+      EXCLUDE
+      /Applications/*
+      /usr/*
+      include/boost/*
+      NO_DEMANGLE
+    )
+  endif()
+
 endif()
