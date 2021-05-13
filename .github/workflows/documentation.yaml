@@ -1,0 +1,44 @@
+---
+name: Documentation
+
+on:
+  push:
+    tags:
+      - "*"
+
+env:
+  CPM_SOURCE_CACHE: ${{ github.workspace }}/cpm_modules
+
+jobs:
+  build:
+    name: Build and publish documentation
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/cache@v2
+        with:
+          path: "**/cpm_modules"
+          key: ${{ github.workflow }}-cpm-modules-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake') }}
+
+      - name: Install dependencies
+        run: |
+          brew install doxygen graphviz ninja lcov
+          pip3 install jinja2 Pygments gcovr
+
+      - name: Build
+        run: |
+          cmake -S . -B build -G Ninja -D USE_ThreadSanitizer=YES -D USE_AGENT_PP=NO
+          cmake --build build --target all
+          cmake --build build --target test
+
+      - name: GCC Code Coverage Report
+        run: |
+          BUILD_TYPE=Coverage make lcov
+
+      - name: Publish
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./generated/lcov
+          # publish_dir: ./build/doxygen/html

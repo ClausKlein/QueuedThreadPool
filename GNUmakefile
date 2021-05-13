@@ -37,8 +37,8 @@ endif
 ifeq (${ThreadSanitizer},1)
     #XXX CC:=/usr/local/opt/llvm/bin/clang
     #XXX CXX:=/usr/local/opt/llvm/bin/clang++
-    CC?=clang
-    CXX?=clang++
+    CC:=clang
+    CXX:=clang++
 
     CMAKE_INSTALL_PREFIX?=/usr/local
     export CMAKE_INSTALL_PREFIX
@@ -94,7 +94,7 @@ setup: $(BUILD_DIR) .clang-tidy compile_commands.json
 	touch $@
 
 compile_commands.json: .configure-$(BUILD_TYPE)
-	ln -sf $(CURDIR)/$(BUILD_DIR)/compile_commands.json .
+	ln -sf $(BUILD_DIR)/compile_commands.json .
 
 $(BUILD_DIR): GNUmakefile
 	mkdir -p $@

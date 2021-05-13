@@ -42,6 +42,15 @@
 // #define SINGLE_THREADED false
 #define AGENTPP_DEFAULT_STACKSIZE 0x10000
 #define AGENTPP_USE_IMPLIZIT_START
+#define _NO_LOGGING
+
+#ifndef BOOST_OVERRIDE
+#    if __cplusplus >= 201103L
+#        define BOOST_OVERRIDE override
+#    else
+#        define BOOST_OVERRIDE
+#    endif
+#endif
 
 namespace Agentpp
 {
@@ -324,7 +333,7 @@ public:
      * Destroy thread. If thread is running or has been finished but
      * not joined yet, then join it.
      */
-    ~Thread() override;
+    ~Thread() BOOST_OVERRIDE;
 
     /**
      * Causes the currently executing thread to sleep (temporarily
@@ -354,7 +363,7 @@ public:
      *
      * Subclasses of Thread should override this method.
      */
-    void run() override;
+    void run() BOOST_OVERRIDE;
 
     /**
      * Get the Runnable object used for thread execution.
@@ -633,13 +642,13 @@ public:
     /**
      * Destructor will wait for termination of all threads.
      */
-    ~QueuedThreadPool() override;
+    ~QueuedThreadPool() BOOST_OVERRIDE;
 
     /**
      * Execute a task. The task will be deleted after call of
      * its run() method.
      */
-    void execute(Runnable*) override;
+    void execute(Runnable*) BOOST_OVERRIDE;
 
     /**
      * Gets the current number of queued tasks.
@@ -653,7 +662,7 @@ public:
     /**
      * Runs the queue processing loop.
      */
-    void run() override;
+    void run() BOOST_OVERRIDE;
 
     /**
      * Stop queue processing.
@@ -663,7 +672,7 @@ public:
     /**
      * Notifies the thread pool about an idle thread.
      */
-    void idle_notification() override;
+    void idle_notification() BOOST_OVERRIDE;
 
     /**
      * Check whether the ThreadPool is idle or not.
@@ -672,7 +681,7 @@ public:
      *    true if non of the threads in the pool is currently
      *    executing any task.
      */
-    bool is_idle() override { return ThreadPool::is_idle(); }
+    bool is_idle() BOOST_OVERRIDE { return ThreadPool::is_idle(); }
 
     /**
      * Check whether the ThreadPool is busy (i.e., all threads are
@@ -682,7 +691,7 @@ public:
      *    true if non of the threads in the pool is currently
      *    idle (not executing any task).
      */
-    bool is_busy() override { return ThreadPool::is_busy(); }
+    bool is_busy() BOOST_OVERRIDE { return ThreadPool::is_busy(); }
 
 private:
     void assign(Runnable* task);
@@ -712,7 +721,7 @@ public:
     /**
      * Destructor will wait for thread to terminate.
      */
-    ~TaskManager() override;
+    ~TaskManager() BOOST_OVERRIDE;
 
     /**
      * Check whether this thread is idle or not.
@@ -795,7 +804,7 @@ protected:
     Thread thread;
     ThreadPool* threadPool;
     Runnable* task;
-    void run() override;
+    void run() BOOST_OVERRIDE;
     bool go;
 };
 
@@ -809,9 +818,9 @@ protected:
 class AGENTPP_DECL MibTask : public Runnable {
 public:
     explicit MibTask(MibMethodCall* call) { task = call; }
-    ~MibTask() override { delete task; }
+    ~MibTask() BOOST_OVERRIDE { delete task; }
 
-    void run() override;
+    void run() BOOST_OVERRIDE;
 
 protected:
     MibMethodCall* task;
@@ -872,8 +881,8 @@ AGENTPP_DECL_TEMPL template class AGENTPP_DECL List<LockRequest>;
 class AGENTPP_DECL LockQueue : public Thread {
 public:
     LockQueue();
-    ~LockQueue() override;
-    void run() override;
+    ~LockQueue() BOOST_OVERRIDE;
+    void run() BOOST_OVERRIDE;
 
     /**
      * Lock a Synchronized instance.
@@ -956,7 +965,7 @@ protected:
 class AGENTPP_DECL SingleThreadObject : public ThreadManager {
 public:
     SingleThreadObject();
-    ~SingleThreadObject() override;
+    ~SingleThreadObject() BOOST_OVERRIDE;
 };
 
 } // namespace Agentpp
