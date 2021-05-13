@@ -37,7 +37,7 @@
           </tr>
           <tr>
             <td class="headerItem">Date:</td>
-            <td class="headerValue">2021-05-13 21:03:48</td>
+            <td class="headerValue">2021-05-13 21:27:58</td>
             <td></td>
             <td class="headerItem">Functions:</td>
             <td class="headerCovTableEntry">75</td>
@@ -128,15 +128,15 @@
 <a name="66"><span class="lineNum">      66 </span>            :     typedef boost::unique_lock&lt;lockable_type&gt; scoped_lock;</a>
 <a name="67"><span class="lineNum">      67 </span>            : </a>
 <a name="68"><span class="lineNum">      68 </span>            : public:</a>
-<a name="69"><span class="lineNum">      69 </span><span class="lineCov">        114 :     explicit TestTask(</span></a>
+<a name="69"><span class="lineNum">      69 </span><span class="lineCov">        116 :     explicit TestTask(</span></a>
 <a name="70"><span class="lineNum">      70 </span>            :         const std::string&amp; msg, result_queue_t&amp; rslt, unsigned ms_delay = 11)</a>
-<a name="71"><span class="lineNum">      71 </span><span class="lineCov">         57 :         : text(msg)</span></a>
-<a name="72"><span class="lineNum">      72 </span><span class="lineCov">         57 :         , result(rslt)</span></a>
-<a name="73"><span class="lineNum">      73 </span><span class="lineCov">         57 :         , delay(ms_delay)</span></a>
-<a name="74"><span class="lineNum">      74 </span><span class="lineCov">        171 :     {</span></a>
-<a name="75"><span class="lineNum">      75 </span><span class="lineCov">         57 :         scoped_lock l(lock);</span></a>
+<a name="71"><span class="lineNum">      71 </span><span class="lineCov">         58 :         : text(msg)</span></a>
+<a name="72"><span class="lineNum">      72 </span><span class="lineCov">         58 :         , result(rslt)</span></a>
+<a name="73"><span class="lineNum">      73 </span><span class="lineCov">         58 :         , delay(ms_delay)</span></a>
+<a name="74"><span class="lineNum">      74 </span><span class="lineCov">        174 :     {</span></a>
+<a name="75"><span class="lineNum">      75 </span><span class="lineCov">         58 :         scoped_lock l(lock);</span></a>
 <a name="76"><span class="lineNum">      76 </span><span class="lineCov">         58 :         ++counter;</span></a>
-<a name="77"><span class="lineNum">      77 </span><span class="lineCov">        115 :     }</span></a>
+<a name="77"><span class="lineNum">      77 </span><span class="lineCov">        116 :     }</span></a>
 <a name="78"><span class="lineNum">      78 </span>            : </a>
 <a name="79"><span class="lineNum">      79 </span><span class="lineCov">        174 :     ~TestTask() BOOST_OVERRIDE</span></a>
 <a name="80"><span class="lineNum">      80 </span><span class="lineCov">        174 :     {</span></a>
