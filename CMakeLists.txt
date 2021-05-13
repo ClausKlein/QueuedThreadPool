@@ -37,13 +37,13 @@ endif()
 # ----------------------------------------------------------------------
 # default cmake setup the build configuration for this project
 # ----------------------------------------------------------------------
-if(NOT CMAKE_BUILD_TYPE)
+if("${CMAKE_BUILD_TYPE}" STREQUAL "")
   set(CMAKE_BUILD_TYPE
       Debug
-      CACHE STRING "supported values are: None Debug Release RelWithDebInfo MinSizeRel Coverage."
+      CACHE STRING "supported values are: None Debug Release RelWithDebInfo MinSizeRel Coverage." FORCE
   )
+  message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 endif()
-message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 # ----------------------------------------------------------------------
 #
@@ -264,7 +264,7 @@ if(USE_BOOST OR BUILD_TESTING)
   add_test(NAME threads_test_posix-throw COMMAND threads_test_posix --log_level=success --run_test=ThreadTaskThrow_test
                                                  -25
   )
-  if(NOT USE_ThreadSanitizer AND NOT ${CMAKE_BUILD_TYPE} STREQUAL Coverage)
+  if(NOT USE_ThreadSanitizer AND NOT "${CMAKE_BUILD_TYPE}" STREQUAL "Coverage")
     add_test(NAME threads_test_posix-random COMMAND threads_test_posix --log_level=success --random)
     add_test(NAME threads_test_posix-thread COMMAND threads_test_posix --log_level=success --run_test=ThreadPool_test -25)
     add_test(NAME threads_test_posix-queue COMMAND threads_test_posix --log_level=success
@@ -272,7 +272,7 @@ if(USE_BOOST OR BUILD_TESTING)
     )
   endif()
 
-  if(${CMAKE_BUILD_TYPE} STREQUAL Coverage)
+  if("${CMAKE_BUILD_TYPE}" STREQUAL "Coverage")
     include(cmake/CodeCoverage.cmake)
 
     setup_target_for_coverage_lcov(
