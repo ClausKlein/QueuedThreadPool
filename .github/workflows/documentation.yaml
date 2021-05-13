@@ -23,8 +23,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          brew install doxygen graphviz ninja lcov
-          pip3 install jinja2 Pygments gcovr
+          brew install boost ninja lcov # doxygen graphviz
+          pip3 install gcovr # jinja2 Pygments
 
       - name: Build
         run: |
