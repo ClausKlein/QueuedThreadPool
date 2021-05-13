@@ -88,41 +88,13 @@ endif()
 set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
 
-# ----------------------------------------------------------------------
-option(USE_ASIO "Test the standalon asio lib too" OFF)
-set(ASIO_ROOT
-    $ENV{ASIO_ROOT}
-    CACHE PATH "path to install dir"
-)
-if(USE_ASIO)
-  find_package(asio 1.14 CONFIG HINTS ${ASIO_ROOT})
-endif()
-# ----------------------------------------------------------------------
-
 option(WARN_PEDANTIC "Compile with security and all extra warnings" ON)
 if(WARN_PEDANTIC)
   include(cmake/WarningsAsErrors.cmake)
-  add_compile_options(-Wno-unused-parameter -Wno-tautological-compare)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   add_compile_options(-Wall -Wextra)
-  add_compile_options(-Wno-unused-parameter -Wno-tautological-compare)
 endif()
-
-option(DISABLE_LOGGING "if you do not want any logging output " ON)
-if(DISABLE_LOGGING)
-  set(WITH_LOGGING
-      OFF
-      CACHE BOOL "NO logging" FORCE
-  )
-  add_definitions(-D_NO_LOGGING)
-else()
-  set(WITH_LOGGING
-      ON
-      CACHE BOOL "Enable logging" FORCE
-  )
-  add_definitions(-DDEFAULT_LOG_PROFILE -DDEBUG)
-endif()
-mark_as_advanced(FORCE WITH_LOGGING)
+add_compile_options(-Wno-unused-parameter -Wno-tautological-compare)
 
 option(USE_BOOST "build with BOOST support" ON)
 if(USE_BOOST)
@@ -185,13 +157,23 @@ if(USE_BOOST OR BUILD_TESTING)
       add_test(NAME ${program} COMMAND ${program})
     endforeach()
 
-    if(USE_ASIO AND asio_FOUND)
+    # ----------------------------------------------------------------------
+    option(USE_ASIO "Test the standalon asio lib too" OFF)
+    if(USE_ASIO)
+      set(ASIO_ROOT
+          $ENV{ASIO_ROOT}
+          CACHE PATH "path to install dir"
+      )
+      find_package(asio 1.14 CONFIG HINTS ${ASIO_ROOT})
+    endif()
+    if(asio_FOUND)
       add_executable(test_priority_scheduler priority_scheduler.cpp)
       set_target_properties(test_priority_scheduler PROPERTIES CXX_STANDARD 17)
       target_compile_definitions(test_priority_scheduler PRIVATE ASIO_NO_DEPRECATED)
       target_link_libraries(test_priority_scheduler asio::standalone ${Boost_LIBRARIES} Threads::Threads)
       add_test(NAME test_priority_scheduler COMMAND test_priority_scheduler)
     endif()
+    # ----------------------------------------------------------------------
   endif()
 
   # ----------------------------------------------------------------------
