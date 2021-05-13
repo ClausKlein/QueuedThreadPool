@@ -9,7 +9,7 @@ if(WarningsAsErrors)
   elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-Wall -Wextra -Wpedantic -Werror -Wno-long-long)
 
-    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_COMPILER_VERSION GREATER_EQUAL 10.0)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_VERSION GREATER_EQUAL 10.0)
       add_compile_options(-Wdeprecated-copy-dtor -Wnewline-eof -Wshadow -Wno-c++11-long-long)
     endif()
   elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
