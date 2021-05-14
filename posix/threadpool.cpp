@@ -92,11 +92,34 @@ Synchronized::~Synchronized()
     int error  = 0;
     int errors = 0;
 
-#ifdef NO_FAST_MUTEXES
+    notify_all();
+
+#if defined(NO_FAST_MUTEXES)
+    error = pthread_mutex_destroy(&monitor);
+    if (EBUSY == error) {
+        // wait for other threads ...
+        error = pthread_mutex_trylock(&monitor);
+        if (EBUSY == error) {
+            // another thread owns the mutex,
+            if (lock()) // FIXME: let's wait, but not forever! CK
+            {
+                int retries = 0;
+                do {
+                    pthread_mutex_unlock(&monitor);
+                    ++errors;
+                    sleep(errors * 2); // NOTE: prevent busy loops! CK
+                    error = pthread_mutex_destroy(&monitor);
+                } while (EBUSY == error
+                    && (retries++ < AGENTPP_SYNCHRONIZED_UNLOCK_RETRIES));
+            }
+        }
+    }
+#elif defined(NO_FAST_MUTEXES_CK)
     do {
         // first try to get the lock
         error = pthread_mutex_trylock(&monitor);
         if (!error) {
+            notify_all();
             (void)pthread_mutex_unlock(&monitor);
             // if another thread waits for signal with mutex, let's wait.
 
@@ -129,7 +152,7 @@ Synchronized::~Synchronized()
         }
     } while (EBUSY == error);
 #else
-    error              = pthread_mutex_destroy(&monitor);
+    error = pthread_mutex_destroy(&monitor);
 #endif
 
     if (error == EBUSY) {
@@ -207,12 +230,12 @@ bool Synchronized::wait(long timeout)
 #        warning "gettimeofday() used"
     struct timeval tv = {};
     gettimeofday(&tv, NULL);
-    ts.tv_sec   = tv.tv_sec + (time_t)timeout / 1000;
+    ts.tv_sec = tv.tv_sec + (time_t)timeout / 1000;
     long millis = tv.tv_usec / 1000 + (timeout % 1000);
     if (millis >= 1000) {
         ts.tv_sec += 1;
     }
-    ts.tv_nsec              = (millis % 1000) * 1000000;
+    ts.tv_nsec = (millis % 1000) * 1000000;
 #    endif
 
     int err = cond_timed_wait(ts);
@@ -307,7 +330,7 @@ bool Synchronized::lock(unsigned long timeout)
 #    else
     struct timeval tv = {};
     gettimeofday(&tv, 0);
-    ts.tv_sec = tv.tv_sec + (time_t)timeout / 1000;
+    ts.tv_sec   = tv.tv_sec + (time_t)timeout / 1000;
     long millis = tv.tv_usec / 1000 + (timeout % 1000);
     if (millis >= 1000) {
         ts.tv_sec += 1;
@@ -560,8 +583,8 @@ void Thread::nsleep(time_t secs, long nanos)
     }
 #    else
     struct timeval interval = {};
-    interval.tv_sec         = s;
-    interval.tv_usec        = n / 1000;
+    interval.tv_sec = s;
+    interval.tv_usec = n / 1000;
     fd_set writefds, readfds, exceptfds;
     FD_ZERO(&writefds);
     FD_ZERO(&readfds);

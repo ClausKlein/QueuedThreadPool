@@ -631,7 +631,7 @@ void handler(int signum)
 }
 #endif
 
-bool stop = false;
+boost::atomic<bool> stop { false };
 void lock_task(Synchronized* m)
 {
     Lock l(*m);
