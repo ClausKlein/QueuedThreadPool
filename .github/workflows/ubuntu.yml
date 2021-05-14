@@ -30,7 +30,7 @@ jobs:
       - name: Install boost libs
         shell: bash
         run: |
-          sudo apt-get install libboost-dev || echo IGNORED
+          sudo apt-get install libboost1.71-all-dev
 
       - name: configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
