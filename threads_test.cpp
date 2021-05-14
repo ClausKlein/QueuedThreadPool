@@ -631,24 +631,33 @@ void handler(int signum)
 }
 #endif
 
+bool stop = false;
+void lock_task(Synchronized* m)
+{
+    Lock l(*m);
+    stop = false;
+
+    while (!stop) {
+        m->wait();
+    }
+}
+
 BOOST_AUTO_TEST_CASE(SyncDeleteLocked_test)
 {
-#ifndef _WIN32
-    signal(SIGALRM, &handler);
-    ualarm(1000, 0); // us
-#endif
-
     Stopwatch sw;
     try {
-
         auto sync = boost::make_shared<Synchronized>();
-        BOOST_TEST(sync->lock());
 
-#ifndef __WIN32
-        sync->wait(1234); // for signal with timout
-#endif
+        boost::thread t(lock_task, sync.get());
+        t.detach();
 
+        Thread::sleep(1234);
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
+        {
+            BOOST_TEST(sync->lock());
+            stop = true;
+            BOOST_TEST(sync->unlock());
+        }
     } catch (std::exception& e) {
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
         BOOST_TEST_MESSAGE(e.what());
