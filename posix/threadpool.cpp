@@ -89,70 +89,47 @@ Synchronized::Synchronized()
 
 Synchronized::~Synchronized()
 {
-    int error  = 0;
     int errors = 0;
 
-    notify_all();
+    notify_all(); // NOTE: just in case an other thread is waiting for the
+                  // signal! CK
+    int error =
+        pthread_mutex_unlock(&monitor); // in case the thread own the lock! CK
+    if (error) {
+        ++errors;
+    }
 
-#if defined(NO_FAST_MUTEXES)
+#ifdef NO_FAST_MUTEXES
     error = pthread_mutex_destroy(&monitor);
-    if (EBUSY == error) {
+    if (error) {
         // wait for other threads ...
         error = pthread_mutex_trylock(&monitor);
         if (EBUSY == error) {
+            ++errors;
             // another thread owns the mutex,
-            if (lock()) // FIXME: let's wait, but not forever! CK
-            {
-                int retries = 0;
-                do {
-                    pthread_mutex_unlock(&monitor);
-                    ++errors;
-                    sleep(errors * 2); // NOTE: prevent busy loops! CK
-                    error = pthread_mutex_destroy(&monitor);
-                } while (EBUSY == error
-                    && (retries++ < AGENTPP_SYNCHRONIZED_UNLOCK_RETRIES));
-            }
-        }
-    }
-#elif defined(NO_FAST_MUTEXES_CK)
-    do {
-        // first try to get the lock
-        error = pthread_mutex_trylock(&monitor);
-        if (!error) {
-            notify_all();
-            (void)pthread_mutex_unlock(&monitor);
-            // if another thread waits for signal with mutex, let's wait.
 
 #    if defined(_POSIX_TIMEOUTS) && _POSIX_TIMEOUTS > 0
-            if (lock(10)) // NOTE: but not forever! CK
-#    else
-            error = pthread_mutex_trylock(&monitor);
-            if (!error)
+            if (lock(100)) { // NOTE: but not forever! CK
+                pthread_mutex_unlock(&monitor);
+            }
 #    endif
-            {
-                (void)pthread_mutex_unlock(&monitor);
-                error = pthread_mutex_destroy(&monitor);
-                if (error) {
+
+            int retries = 0;
+            do {
+                error = pthread_mutex_trylock(&monitor);
+                if (!error) {
+                    pthread_mutex_unlock(&monitor);
+                    error = pthread_mutex_destroy(&monitor);
+                } else {
                     ++errors;
-                    Thread::sleep(errors * 2);
+                    sleep(errors * 2); // NOTE: prevent busy loops! CK
                 }
-            }
-        } else {
-            // in case this thread hold the lock:
-            error = pthread_mutex_unlock(&monitor);
-            if (error != EPERM) {
-                break;
-            }
-            notify_all();
-            ++errors;
-            Thread::sleep(errors * 2);
+            } while (EBUSY == error
+                && (retries++ < AGENTPP_SYNCHRONIZED_UNLOCK_RETRIES));
         }
-        if (errors > AGENTPP_SYNCHRONIZED_UNLOCK_RETRIES) {
-            break;
-        }
-    } while (EBUSY == error);
+    }
 #else
-    error = pthread_mutex_destroy(&monitor);
+    error              = pthread_mutex_destroy(&monitor);
 #endif
 
     if (error == EBUSY) {
@@ -230,12 +207,12 @@ bool Synchronized::wait(long timeout)
 #        warning "gettimeofday() used"
     struct timeval tv = {};
     gettimeofday(&tv, NULL);
-    ts.tv_sec = tv.tv_sec + (time_t)timeout / 1000;
+    ts.tv_sec   = tv.tv_sec + (time_t)timeout / 1000;
     long millis = tv.tv_usec / 1000 + (timeout % 1000);
     if (millis >= 1000) {
         ts.tv_sec += 1;
     }
-    ts.tv_nsec = (millis % 1000) * 1000000;
+    ts.tv_nsec              = (millis % 1000) * 1000000;
 #    endif
 
     int err = cond_timed_wait(ts);
@@ -583,8 +560,8 @@ void Thread::nsleep(time_t secs, long nanos)
     }
 #    else
     struct timeval interval = {};
-    interval.tv_sec = s;
-    interval.tv_usec = n / 1000;
+    interval.tv_sec         = s;
+    interval.tv_usec        = n / 1000;
     fd_set writefds, readfds, exceptfds;
     FD_ZERO(&writefds);
     FD_ZERO(&readfds);
