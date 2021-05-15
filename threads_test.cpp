@@ -618,37 +618,49 @@ BOOST_AUTO_TEST_CASE(SyncDeadlock_test)
     BOOST_TEST(sync.unlock());
 }
 
-#ifndef _WIN32
-void handler(int signum)
-{
-    switch (signum) {
-    case SIGALRM:
-        signal(signum, SIG_DFL);
-        break;
-    default: // ignored
-        break;
-    }
-}
-#endif
-
 BOOST_AUTO_TEST_CASE(SyncDeleteLocked_test)
 {
-#ifndef _WIN32
-    signal(SIGALRM, &handler);
-    ualarm(1000, 0); // us
-#endif
+    try {
+        Synchronized sync;
+        BOOST_TEST(sync.lock());
+    } catch (std::exception& e) {
+        BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
+        BOOST_TEST_MESSAGE(e.what());
+    }
+}
 
+boost::atomic<bool> stop { false };
+void lock_task(Synchronized* m)
+{
+    Lock l(*m);
+    stop = false;
+
+    while (!stop) {
+        Thread::sleep(123); // NOTE: do somet work ...
+        m->wait();
+    }
+
+    Thread::sleep(
+        BOOST_THREAD_TEST_TIME_MS); // do some cleanup task ... with lock!
+}
+
+BOOST_AUTO_TEST_CASE(SyncDeleteWaiting_test)
+{
     Stopwatch sw;
     try {
-
         auto sync = boost::make_shared<Synchronized>();
-        BOOST_TEST(sync->lock());
 
-#ifndef __WIN32
-        sync->wait(1234); // for signal with timout
-#endif
+        boost::thread t(lock_task, sync.get());
+        t.detach();
 
+        Thread::sleep(BOOST_THREAD_TEST_TIME_MS);
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
+        {
+            BOOST_TEST(sync->lock());
+            stop = true; // NOTE: without notify! CK
+            BOOST_TEST(sync->unlock());
+        }
+        sync.reset(); // NOTE: this delete the Synchronized obj! CK
     } catch (std::exception& e) {
         BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION);
         BOOST_TEST_MESSAGE(e.what());
@@ -783,6 +795,19 @@ BOOST_AUTO_TEST_CASE(ThreadLivetime_test)
     }
     BOOST_TEST_MESSAGE(BOOST_CURRENT_FUNCTION << sw.elapsed());
 }
+
+#ifndef _WIN32
+void handler(int signum)
+{
+    switch (signum) {
+    case SIGALRM:
+        signal(signum, SIG_DFL);
+        break;
+    default: // ignored
+        break;
+    }
+}
+#endif
 
 BOOST_AUTO_TEST_CASE(ThreadNanoSleep_test)
 {
