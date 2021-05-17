@@ -179,6 +179,10 @@ if(USE_BOOST OR BUILD_TESTING)
   # ----------------------------------------------------------------------
   # additional tests from me (CK)
   # ----------------------------------------------------------------------
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    # add_compile_options(-fsanitize=memory -fsanitize-memory-use-after-dtor)
+  endif()
+
   add_executable(test_mutexattr test_mutexattr.c)
   set_target_properties(test_mutexattr PROPERTIES CXX_STANDARD 99)
   target_link_libraries(test_mutexattr Threads::Threads)

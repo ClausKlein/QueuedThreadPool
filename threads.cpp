@@ -163,8 +163,10 @@ Synchronized::Synchronized()
 
 Synchronized::~Synchronized()
 {
+    int errors = 0;
     int result = pthread_cond_destroy(&cond);
     if (result) {
+        ++errors;
         LOG_BEGIN(loggerModuleName, ERROR_LOG | 2);
         LOG("Synchronized cond_destroy failed with (result)(ptr)");
         LOG(result);
@@ -178,12 +180,12 @@ Synchronized::~Synchronized()
         // wait for other threads ...
         if (EBUSY == pthread_mutex_trylock(&monitor)) {
             // another thread owns the mutex,
-            if (lock(123)) // NOTE: let's wait, but not forever! CK
+            if (lock()) // FIXME: let's wait, but not forever! CK
             {
                 int retries = 0;
                 do {
                     pthread_mutex_unlock(&monitor);
-                    sleep(13);
+                    sleep(13); // NOTE: prevent busy loops! CK
                     result = pthread_mutex_destroy(&monitor);
                 } while (EBUSY == result
                     && (retries++ < AGENTPP_SYNCHRONIZED_UNLOCK_RETRIES));
@@ -192,13 +194,15 @@ Synchronized::~Synchronized()
     }
 #endif
 
-    isLocked = false;
     if (result) {
+        ++errors;
         LOG_BEGIN(loggerModuleName, ERROR_LOG | 2);
         LOG("Synchronized mutex_destroy failed with (result)(ptr)");
         LOG(result);
         LOG((unsigned long)this);
         LOG_END;
+    } else {
+        // NO: ThreadSanitizer: prevent data race! CK isLocked = false;
     }
 }
 
