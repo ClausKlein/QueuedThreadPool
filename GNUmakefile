@@ -26,7 +26,7 @@ CHECKS?='-*,cppcoreguidelines-*,cppcoreguidelines-pro-*,-cppcoreguidelines-avoid
 CHECKS?='-*,portability-*,readability-*'
 CHECKS?='-*,misc-*,boost-*,cert-*,misc-unused-parameters'
 
-#FIXME! ThreadSanitizer?=0
+#TBD: ThreadSanitizer?=0
 ifeq ($(BUILD_TYPE),Coverage)
     ThreadSanitizer:=0
 else
@@ -44,6 +44,7 @@ ifeq (${ThreadSanitizer},1)
     export CMAKE_INSTALL_PREFIX
     CMAKE_STAGING_PREFIX?=/tmp/staging/$(PROJECT_NAME)$(CMAKE_INSTALL_PREFIX)
     CMAKE_PREFIX_PATH?="$(CMAKE_STAGING_PREFIX);$(CMAKE_INSTALL_PREFIX);/usr/local/opt/boost;/usr/local/opt/openssl;/usr"
+    export MSAN_OPTIONS=poison_in_dtor=1
 endif
 
 
